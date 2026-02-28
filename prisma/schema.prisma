@@ -1,0 +1,514 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres", "nativeDistinct"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Campus {
+  id           String   @id @default(cuid())
+  name         String   @db.VarChar(255)
+  shortName    String   @db.VarChar(100)
+  logo         String?  @db.Text
+  location     String   @db.VarChar(255)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+  batches      Batch[]
+  departments  Department[]
+  users        User[]
+  quizzes      Quiz[]
+  assessments  Assessment[]
+  activities   Activity[]
+  registrationCodes RegistrationCode[]
+
+  @@index([isActive])
+  @@index([shortName])
+  @@map("campuses")
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(50) // e.g., "2014-2018"
+  campusId String
+  campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  users     User[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  registrationCodes RegistrationCode[]
+
+  @@index([campusId])
+  @@index([name])
+  @@map("batches")
+}
+
+model Department {
+  id       String @id @default(cuid())
+  name     String @db.VarChar(255)
+  campusId String
+  campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  users    User[]
+  activities Activity[]
+  registrationCodes RegistrationCode[]
+
+  @@index([campusId])
+  @@index([name])
+  @@map("departments")
+}
+
+model User {
+  id                   String             @id @default(cuid())
+  email                String             @unique @db.VarChar(255)
+  uoid                 String             @unique @default("") @db.VarChar(50)
+  name                 String?            @db.VarChar(255)
+  password             String             @db.VarChar(255)
+  role                 UserRole           @default(USER)
+  avatar               String?            @db.Text
+  phone                String?            @db.VarChar(20)
+  section              StudentSection     @default(A)
+  campusId             String?
+  campus               Campus?            @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  departmentId         String?
+  department           Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  batchId              String?
+  batch                Batch?             @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  registrationCodeId    String?
+  registrationCode     RegistrationCode? @relation(fields: [registrationCodeId], references: [id], onDelete: SetNull)
+  isActive             Boolean            @default(true)
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @updatedAt @db.Timestamptz(6)
+  quizAttempts         QuizAttempt[]
+  quizUsers            QuizUser[]
+  assessmentAttempts   AssessmentAttempt[]
+  assessmentUsers      AssessmentUser[]
+  tabSwitches         AssessmentTabSwitch[]
+  quizTabSwitches     QuizTabSwitch[]
+  createdQuizzes       Quiz[]             @relation("QuizCreator")
+  createdAssessments   Assessment[]       @relation("AssessmentCreator")
+  createdActivities    Activity[]         @relation("ActivityCreator")
+  questionGroups       QuestionGroup[]
+  reportedQuestions    ReportedQuestion[]
+
+  @@index([email])
+  @@index([uoid])
+  @@index([isActive])
+  @@index([campusId, departmentId, batchId])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+model QuestionGroup {
+  id          String     @id @default(cuid())
+  name        String     @db.VarChar(255)
+  description String?    @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  questions   Question[]
+  creatorId   String
+  creator     User       @relation(fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([isActive])
+  @@map("question_groups")
+}
+
+model Question {
+  id            String          @id @default(cuid())
+  title         String          @db.VarChar(500)
+  content       String          @db.Text
+  type          QuestionType
+  options       String          @db.Text
+  correctAnswer String          @db.Text
+  explanation   String?         @db.Text
+  difficulty    DifficultyLevel @default(MEDIUM)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @db.Timestamptz(6)
+  quizQuestions       QuizQuestion[]
+  assessmentQuestions AssessmentQuestion[]
+  activityQuestions   ActivityQuestion[]
+  groupId             String
+  group               QuestionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  reportedQuestions   ReportedQuestion[]
+
+  @@index([groupId])
+  @@index([type, difficulty, isActive])
+  @@index([isActive])
+  @@map("questions")
+}
+
+model Quiz {
+  id                 String          @id @default(cuid())
+  title              String          @db.VarChar(500)
+  description        String?         @db.Text
+  timeLimit          Int?
+  difficulty         DifficultyLevel @default(MEDIUM)
+  status             QuizStatus      @default(ACTIVE)
+  negativeMarking    Boolean         @default(false)
+  negativePoints     Float?
+  randomOrder        Boolean         @default(false)
+  maxAttempts        Int?
+  showAnswers        Boolean         @default(false)
+  startTime          DateTime?       @db.Timestamptz(6)
+  endTime            DateTime?       @db.Timestamptz(6)
+  creatorId          String
+  campusId           String?
+  campus             Campus?         @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
+  quizAttempts       QuizAttempt[]
+  quizQuestions      QuizQuestion[]
+  quizTabSwitches QuizTabSwitch[]
+  quizUsers          QuizUser[]
+  creator            User            @relation("QuizCreator", fields: [creatorId], references: [id])
+  checkAnswerEnabled Boolean         @default(false)
+
+  @@index([creatorId])
+  @@index([campusId])
+  @@index([status, difficulty])
+  @@index([startTime, endTime])
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id         String   @id @default(cuid())
+  quizId     String
+  questionId String
+  order      Int
+  points     Float    @default(1.0)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@map("quiz_questions")
+}
+
+model QuizUser {
+  id        String   @id @default(cuid())
+  quizId    String
+  userId    String
+  createdAt DateTime @default(now())
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@map("quiz_users")
+}
+
+model QuizAttempt {
+  id          String        @id @default(cuid())
+  userId      String
+  quizId      String
+  status      AttemptStatus @default(NOT_STARTED)
+  score       Float?
+  totalPoints Float?
+  timeTaken   Int?
+  startedAt   DateTime?     @db.Timestamptz(6)
+  submittedAt   DateTime?     @db.Timestamptz(6)
+  isAutoSubmitted Boolean          @default(false)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(6)
+  answers     QuizAnswer[]
+  quiz        Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizTabSwitches QuizTabSwitch[]
+
+  @@index([userId, quizId])
+  @@index([quizId, status])
+  @@index([status])
+  @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id           String      @id @default(cuid())
+  attemptId    String
+  questionId   String
+  userAnswer   String
+  isCorrect    Boolean?
+  pointsEarned Float?
+  timeSpent    Int?
+  createdAt    DateTime    @default(now())
+  attempt      QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@map("quiz_answers")
+}
+
+model Assessment {
+  id                 String          @id @default(cuid())
+  title              String          @db.VarChar(500)
+  description        String?         @db.Text
+  timeLimit          Int?
+  difficulty         DifficultyLevel @default(MEDIUM)
+  status             QuizStatus      @default(ACTIVE)
+  negativeMarking    Boolean         @default(false)
+  negativePoints     Float?
+  randomOrder        Boolean         @default(false)
+  startTime          DateTime?       @db.Timestamptz(6)
+  creatorId          String
+  campusId           String?
+  campus             Campus?         @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  maxTabs            Int?
+  disableCopyPaste   Boolean         @default(false)
+  accessKey          String?         @unique @db.VarChar(20)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
+  assessmentAttempts AssessmentAttempt[]
+  assessmentQuestions AssessmentQuestion[]
+  assessmentUsers    AssessmentUser[]
+  tabSwitches       AssessmentTabSwitch[]
+  creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([campusId])
+  @@index([status, difficulty])
+  @@index([startTime])
+  @@index([accessKey])
+  @@map("assessments")
+}
+
+model AssessmentQuestion {
+  id            String      @id @default(cuid())
+  assessmentId  String
+  questionId    String
+  order         Int
+  points        Float       @default(1.0)
+  question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assessment    Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, questionId])
+  @@map("assessment_questions")
+}
+
+model AssessmentUser {
+  id            String      @id @default(cuid())
+  assessmentId  String
+  userId        String
+  createdAt     DateTime @default(now())
+  assessment    Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, userId])
+  @@map("assessment_users")
+}
+
+model AssessmentAttempt {
+  id            String           @id @default(cuid())
+  userId        String
+  assessmentId  String
+  status        AttemptStatus    @default(NOT_STARTED)
+  score         Float?
+  totalPoints   Float?
+  timeTaken     Int?
+  startedAt     DateTime?        @db.Timestamptz(6)
+  submittedAt    DateTime?        @db.Timestamptz(6)
+  isAutoSubmitted Boolean          @default(false)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
+  answers       AssessmentAnswer[]
+  assessment    Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  tabSwitches     AssessmentTabSwitch[]
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, assessmentId])
+  @@index([assessmentId, status])
+  @@index([status])
+  @@map("assessment_attempts")
+}
+
+model AssessmentAnswer {
+  id             String      @id @default(cuid())
+  attemptId      String
+  questionId     String
+  userAnswer     String
+  isCorrect      Boolean?
+  pointsEarned   Float?
+  timeSpent      Int?
+  createdAt      DateTime    @default(now())
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@map("assessment_answers")
+}
+
+model ReportedQuestion {
+  id           String           @id @default(cuid())
+  questionId   String
+  userId       String
+  suggestion   String           @db.Text
+  status       ReportStatus     @default(PENDING)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
+  question     Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([questionId, status])
+  @@index([userId, status])
+  @@map("reported_questions")
+}
+
+model Settings {
+  id              String   @id @default(cuid())
+  maintenanceMode Boolean  @default(false)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("settings")
+}
+
+model RegistrationSettings {
+  id                String   @id @default(cuid())
+  allowRegistration Boolean  @default(true)
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("registration_settings")
+}
+
+model RegistrationCode {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(50)
+  expiry      DateTime @db.Timestamptz(6)
+  campusId    String?
+  campus      Campus?   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department  Department?   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  batchId     String?
+  batch       Batch?   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  users       User[]
+
+  @@index([code])
+  @@index([expiry, isActive])
+  @@index([campusId, departmentId, batchId])
+  @@map("registration_codes")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_IN_BLANK
+  MULTI_SELECT
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuizStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum StudentSection {
+  A
+  B
+  C
+  D
+  E
+  F
+}
+
+enum ActivityServerStatus {
+  INACTIVE
+  CREATING
+  CREATED
+  ERROR
+}
+
+model AssessmentTabSwitch {
+  id            String   @id @default(cuid())
+  attemptId     String
+  userId        String
+  assessmentId   String
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  @@index([attemptId, createdAt])
+  @@index([userId, createdAt])
+  @@map("assessment_tab_switches")
+}
+
+model QuizTabSwitch {
+  id            String   @id @default(cuid())
+  attemptId     String
+  userId        String
+  quizId        String
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  attempt        QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz          Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, createdAt])
+  @@index([userId, createdAt])
+  @@map("quiz_tab_switches")
+}
+
+model Activity {
+  id           String               @id @default(cuid())
+  title        String               @db.VarChar(500)
+  description  String?              @db.Text
+  campusId     String?
+  campus       Campus?              @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  section      StudentSection       @default(A)
+  answerTime   Int?                 // in seconds
+  maxDuration  Int?                 // in minutes
+  accessKey    String               @unique @db.VarChar(20)
+  creatorId    String
+  serverStatus ActivityServerStatus @default(INACTIVE)
+  serverPort   Int?
+  createdAt    DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @db.Timestamptz(6)
+  activityQuestions ActivityQuestion[]
+  creator      User                 @relation("ActivityCreator", fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([campusId, departmentId])
+  @@index([accessKey])
+  @@index([serverStatus])
+  @@map("activities")
+}
+
+model ActivityQuestion {
+  id         String   @id @default(cuid())
+  activityId String
+  questionId String
+  order      Int
+  points     Float    @default(1.0)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, questionId])
+  @@map("activity_questions")
+}
+
