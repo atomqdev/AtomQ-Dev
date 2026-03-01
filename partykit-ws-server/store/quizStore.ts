@@ -18,9 +18,11 @@ export class QuizStore {
         quizState: 'LOBBY',
         questionStartTime: null,
         questionStats: new Map(),
+        quizStarted: false,
+        quizEnded: false,
       });
     }
-    
+
     return this.rooms.get(activityKey)!;
   }
 
@@ -74,12 +76,51 @@ export class QuizStore {
       room.currentQuestionIndex = 0;
       room.quizState = 'GET_READY';
       room.questionStats.clear();
-      
+      room.quizStarted = true;
+      room.quizEnded = false;
+
       // Reset user scores
       room.users.forEach(user => {
         user.totalScore = 0;
         user.answers = [];
       });
+    }
+  }
+
+  /**
+   * Check if quiz has started
+   */
+  hasQuizStarted(activityKey: string): boolean {
+    const room = this.getRoom(activityKey);
+    return room?.quizStarted || false;
+  }
+
+  /**
+   * Check if quiz has ended
+   */
+  hasQuizEnded(activityKey: string): boolean {
+    const room = this.getRoom(activityKey);
+    return room?.quizEnded || false;
+  }
+
+  /**
+   * End quiz
+   */
+  endQuiz(activityKey: string): void {
+    const room = this.getRoom(activityKey);
+    if (room) {
+      room.quizEnded = true;
+      room.quizState = 'ENDED';
+    }
+  }
+
+  /**
+   * Mark quiz as started
+   */
+  markQuizStarted(activityKey: string): void {
+    const room = this.getRoom(activityKey);
+    if (room) {
+      room.quizStarted = true;
     }
   }
 

@@ -13,12 +13,16 @@ export type MessageType =
   | 'LEADERBOARD_UPDATE'
   | 'WAITING_SCREEN'
   | 'QUIZ_END'
+  | 'QUIZ_STARTED'
+  | 'QUIZ_ENDED'
+  | 'ADMIN_LEFT'
   | 'SYNC_TIME'
   | 'USER_UPDATE'
   | 'QUESTION_STATS_UPDATE'
   | 'ANSWER_CONFIRMED'
   | 'ADMIN_CONFIRMED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'QUIZ_ALREADY_STARTED';
 
 // User Roles
 export type UserRole = 'ADMIN' | 'USER';
@@ -214,6 +218,35 @@ export interface ErrorMessage extends BaseMessage {
   };
 }
 
+export interface QuizStartedMessage extends BaseMessage {
+  type: 'QUIZ_STARTED';
+  payload: {
+    activityKey: string;
+  };
+}
+
+export interface QuizEndedMessage extends BaseMessage {
+  type: 'QUIZ_ENDED';
+  payload: {
+    reason: 'admin_left' | 'completed' | 'error';
+    finalLeaderboard?: LeaderboardEntry[];
+  };
+}
+
+export interface AdminLeftMessage extends BaseMessage {
+  type: 'ADMIN_LEFT';
+  payload: {
+    activityKey: string;
+  };
+}
+
+export interface QuizAlreadyStartedMessage extends BaseMessage {
+  type: 'QUIZ_ALREADY_STARTED';
+  payload: {
+    activityKey: string;
+  };
+}
+
 // Union type for all messages
 export type Message =
   | JoinLobbyMessage
@@ -229,6 +262,10 @@ export type Message =
   | LeaderboardUpdateMessage
   | WaitingScreenMessage
   | QuizEndMessage
+  | QuizStartedMessage
+  | QuizEndedMessage
+  | AdminLeftMessage
+  | QuizAlreadyStartedMessage
   | SyncTimeMessage
   | UserUpdateMessage
   | QuestionStatsUpdateMessage
@@ -300,4 +337,6 @@ export interface QuizRoom {
   quizState: QuizState;
   questionStartTime: number | null;
   questionStats: Map<string, QuestionStats>;
+  quizStarted: boolean; // Flag to prevent late joiners
+  quizEnded: boolean; // Flag to track if quiz has ended
 }

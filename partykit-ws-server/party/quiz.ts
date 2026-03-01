@@ -85,7 +85,18 @@ export default class QuizServer implements Party.Server {
    */
   private handleJoinLobby(data: JoinLobbyMessage, connection: Party.Connection): void {
     const { userId, nickname, avatar, activityKey, role } = data.payload;
-    
+
+    // Check if quiz has already started (block late joiners)
+    if (role === 'USER' && this.quizStore.hasQuizStarted(activityKey)) {
+      this.sendToConnection(connection, {
+        type: 'QUIZ_ALREADY_STARTED',
+        payload: { activityKey },
+        timestamp: Date.now()
+      });
+      console.log(`User ${nickname} tried to join after quiz started in room ${activityKey}`);
+      return;
+    }
+
     // Create user
     const user: User = {
       id: userId,
@@ -97,26 +108,27 @@ export default class QuizServer implements Party.Server {
       totalScore: 0,
       answers: [],
     };
-    
+
     // Add to store
     this.quizStore.addUser(activityKey, user);
-    
+
     // Store connection with user info
     (connection as any).userId = userId;
     (connection as any).activityKey = activityKey;
     (connection as any).role = role;
-    
+
     // Broadcast updated user list
     this.broadcastUserUpdate(activityKey);
-    
+
     // If user is admin, send admin status
     if (role === 'ADMIN') {
       this.sendToConnection(connection, {
         type: 'ADMIN_CONFIRMED',
-        payload: { activityKey }
+        payload: { activityKey },
+        timestamp: Date.now()
       });
     }
-    
+
     console.log(`User ${nickname} (${role}) joined room ${activityKey}`);
   }
 
@@ -137,18 +149,25 @@ export default class QuizServer implements Party.Server {
    */
   private async handleStartQuiz(data: StartQuizMessage, connection: Party.Connection): Promise<void> {
     const { activityKey, questions } = data.payload;
-    
+
     // Verify admin
     if (!this.quizStore.isAdmin(activityKey, (connection as any).userId)) {
       this.sendError(connection, 'UNAUTHORIZED', 'Only admin can start the quiz');
       return;
     }
-    
+
     console.log(`Starting quiz in room ${activityKey} with ${questions.length} questions`);
-    
+
+    // Broadcast quiz started to prevent new joins
+    this.room.broadcast(JSON.stringify({
+      type: 'QUIZ_STARTED',
+      payload: { activityKey },
+      timestamp: Date.now()
+    }));
+
     // Start quiz
     this.quizStore.startQuiz(activityKey, questions);
-    
+
     // Begin quiz flow
     await this.runQuizFlow(activityKey);
   }
@@ -504,14 +523,52 @@ export default class QuizServer implements Party.Server {
   onClose(connection: Party.Connection): void {
     const userId = (connection as any).userId;
     const activityKey = (connection as any).activityKey;
-    
+    const role = (connection as any).role;
+
     if (userId && activityKey) {
-      this.quizStore.removeUser(activityKey, userId);
-      this.broadcastUserUpdate(activityKey);
-      console.log(`User ${userId} disconnected from room ${activityKey}`);
+      // If admin disconnects, end the quiz for everyone
+      if (role === 'ADMIN') {
+        console.log(`Admin ${userId} disconnected from room ${activityKey}. Ending quiz for all users.`);
+        this.handleAdminDisconnect(activityKey);
+      } else {
+        this.quizStore.removeUser(activityKey, userId);
+        this.broadcastUserUpdate(activityKey);
+        console.log(`User ${userId} disconnected from room ${activityKey}`);
+      }
     }
-    
+
     this.connections.delete(connection.id);
+  }
+
+  /**
+   * Handle admin disconnect - end quiz for all users
+   */
+  private handleAdminDisconnect(activityKey: string): void {
+    // Get final leaderboard before ending
+    const leaderboard = this.quizStore.getLeaderboard(activityKey);
+
+    // Mark quiz as ended
+    this.quizStore.endQuiz(activityKey);
+
+    // Broadcast quiz ended with final leaderboard
+    this.room.broadcast(JSON.stringify({
+      type: 'QUIZ_ENDED',
+      payload: {
+        reason: 'admin_left',
+        finalLeaderboard: leaderboard
+      },
+      timestamp: Date.now()
+    }));
+
+    // Broadcast admin left message
+    this.room.broadcast(JSON.stringify({
+      type: 'ADMIN_LEFT',
+      payload: { activityKey },
+      timestamp: Date.now()
+    }));
+
+    // Clear all timers
+    this.timerService.clearAll();
   }
 
   /**
