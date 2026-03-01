@@ -1,0 +1,33 @@
+{
+  "name": "quiz-party-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time quiz server with WebSocket support",
+  "scripts": {
+    "dev": "partykit dev",
+    "build": "tsc",
+    "deploy": "partykit deploy",
+    "admin": "tsx simulate/server-admin.ts",
+    "user": "tsx simulate/server-user.ts",
+    "test:admin": "tsx test/auto-admin-test.ts",
+    "test:user": "tsx test/auto-user-test.ts"
+  },
+  "dependencies": {
+    "partykit": "^0.0.115",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.0.0",
+    "tsx": "^4.19.2"
+  },
+  "keywords": [
+    "quiz",
+    "websocket",
+    "real-time",
+    "partykit"
+  ],
+  "author": "Quiz Team",
+  "license": "MIT"
+}

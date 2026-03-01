@@ -1,0 +1,11 @@
+{
+  "name": "atomq-quiz-partykit-server",
+  "main": "server.ts",
+  "compatibilityDate": "2024-12-18",
+  "parties": {
+    "quiz": "party/quiz.ts"
+  },
+  "vars": {
+    "ENVIRONMENT": "production"
+  }
+}
