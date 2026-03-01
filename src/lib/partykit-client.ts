@@ -59,6 +59,10 @@ export type PartyKitEventType =
   | 'ADMIN_DISCONNECTED'
   | 'ADMIN_RECONNECTED'
   | 'REQUEST_STATE'
+  | 'QUIZ_STARTED'
+  | 'QUIZ_ENDED'
+  | 'ADMIN_LEFT'
+  | 'QUIZ_ALREADY_STARTED'
 
 export interface PartyKitEventHandlers {
   onOpen?: () => void
@@ -78,6 +82,10 @@ export interface PartyKitEventHandlers {
   onRoomClosed?: () => void
   onAdminDisconnected?: () => void
   onAdminReconnected?: () => void
+  onQuizStarted?: () => void
+  onQuizEnded?: (payload: { reason: string; finalLeaderboard?: LeaderboardEntry[] }) => void
+  onAdminLeft?: () => void
+  onQuizAlreadyStarted?: () => void
 }
 
 export class PartyKitClient {
@@ -91,16 +99,21 @@ export class PartyKitClient {
   private connectionTimeout: number = 10000
 
   constructor(room: string) {
-    this.url = 'wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party'
+    // Always use PARTYKIT_URL from environment variable
+    this.url = process.env.PARTYKIT_URL || 'ws://localhost:1999/party'
     this.room = room
   }
 
   // Test if the PartyKit server is accessible
   static async testServer(): Promise<{ accessible: boolean; message: string }> {
+    const serverUrl = process.env.NODE_ENV === 'production'
+      ? 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev/party'
+      : 'http://localhost:1999/party'
+
     try {
-      const response = await fetch('https://atomq-quiz-partykit-server.atombaseai.partykit.dev/party', {
+      const response = await fetch(serverUrl, {
         method: 'HEAD',
-        mode: 'no-cors'
+        mode: process.env.NODE_ENV === 'production' ? 'no-cors' : 'cors'
       })
       return {
         accessible: true,
@@ -109,7 +122,7 @@ export class PartyKitClient {
     } catch (error) {
       return {
         accessible: false,
-        message: 'Server is not accessible - check network or server status'
+        message: `Server is not accessible (${serverUrl}) - check if PartyKit server is running`
       }
     }
   }
@@ -270,6 +283,22 @@ export class PartyKitClient {
 
       case 'QUIZ_END':
         this.handlers.onQuizEnd?.(payload)
+        break
+
+      case 'QUIZ_STARTED':
+        this.handlers.onQuizStarted?.()
+        break
+
+      case 'QUIZ_ENDED':
+        this.handlers.onQuizEnded?.(payload)
+        break
+
+      case 'ADMIN_LEFT':
+        this.handlers.onAdminLeft?.()
+        break
+
+      case 'QUIZ_ALREADY_STARTED':
+        this.handlers.onQuizAlreadyStarted?.()
         break
 
       case 'CLOSE_ROOM':

@@ -8,7 +8,7 @@ import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconU
 import { Play, Users, ChevronRight, Eye, Trophy, RotateCcw, LogOut, Minimize2, Sun, Moon } from "lucide-react"
 import { useTheme } from "next-themes"
 
-type QuizPhase = 'lobby' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard'
+type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard'
 
 interface AdminQuizProps {
   client: PartyKitClient | null
@@ -40,6 +40,10 @@ export function AdminQuiz({
   const [loaderTime, setLoaderTime] = useState(5)
   const [answerTime, setAnswerTime] = useState(0)
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [quizStarted, setQuizStarted] = useState(false)
+  const [quizEnded, setQuizEnded] = useState(false)
+  const [quizEndReason, setQuizEndReason] = useState<string | null>(null)
+  const [serverTimeOffset, setServerTimeOffset] = useState(0)
 
   const getReadyTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loaderTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -171,6 +175,50 @@ export function AdminQuiz({
             console.log('[AdminQuiz] QUIZ_END received')
             setPhase('leaderboard')
             setLeaderboard(payload.finalLeaderboard || [])
+            break
+
+          case 'QUIZ_STARTED':
+            console.log('[AdminQuiz] QUIZ_STARTED received')
+            setQuizStarted(true)
+            break
+
+          case 'QUIZ_ENDED':
+            console.log('[AdminQuiz] QUIZ_ENDED received with reason:', payload.reason)
+            setQuizEnded(true)
+            setQuizEndReason(payload.reason || null)
+            setPhase('leaderboard')
+            if (payload.finalLeaderboard) {
+              setLeaderboard(payload.finalLeaderboard)
+            }
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            break
+
+          case 'ADMIN_LEFT':
+            console.log('[AdminQuiz] ADMIN_LEFT received')
+            setQuizEnded(true)
+            setQuizEndReason('admin_left')
+            setPhase('leaderboard')
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            break
+
+          case 'WAITING_SCREEN':
+            console.log('[AdminQuiz] WAITING_SCREEN received')
+            setPhase('waiting')
+            break
+
+          case 'SYNC_TIME':
+            console.log('[AdminQuiz] SYNC_TIME received')
+            const clientTime = Date.now()
+            const serverTime = payload.serverTime || clientTime
+            const offset = serverTime - clientTime
+            setServerTimeOffset(offset)
+            console.log(`[AdminQuiz] Time offset: ${offset}ms`)
             break
 
           case 'USER_UPDATE':
@@ -319,6 +367,7 @@ export function AdminQuiz({
                     onClick={handleStartQuiz}
                     size="lg"
                     className="text-lg px-8"
+                    disabled={quizStarted}
                   >
                     <Play className="mr-2 h-5 w-5 fill-current" />
                     Start Quiz
@@ -345,6 +394,74 @@ export function AdminQuiz({
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'waiting' && (
+          <Card className="w-full max-w-4xl">
+            <CardContent className="pt-8 pb-8">
+              <div className="text-center space-y-6">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="h-10 w-10 text-primary" />
+                  </div>
+                </div>
+
+                <h2 className="text-3xl font-bold">Waiting for Players</h2>
+                <p className="text-muted-foreground text-lg">
+                  {playerCount} {playerCount === 1 ? 'player' : 'players'} ready
+                </p>
+
+                <div className="p-6 bg-primary/10 rounded-lg inline-block">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm text-muted-foreground">Players Joined</p>
+                      <p className="text-3xl font-bold text-primary">{playerCount}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6">
+                  <Button
+                    onClick={handleStartQuiz}
+                    size="lg"
+                    className="text-lg px-8"
+                    disabled={quizStarted || playerCount === 0}
+                  >
+                    <Play className="mr-2 h-5 w-5 fill-current" />
+                    Start Quiz
+                  </Button>
+                </div>
+
+                {/* Users Avatar Grid */}
+                <div className="mt-8 pt-8 border-t">
+                  <h3 className="font-semibold mb-4">Ready Players</h3>
+                  <div className="flex flex-wrap justify-center gap-4">
+                    {users
+                      .filter(u => u.role !== 'ADMIN')
+                      .map(user => (
+                        <div 
+                          key={user.id} 
+                          className="flex flex-col items-center gap-2 p-3 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+                        >
+                          <img
+                            src={getUserIconUrl(parseInt(user.avatar))}
+                            alt={user.nickname}
+                            className="w-16 h-16 rounded-full border-2 border-primary/30"
+                          />
+                          <span className="text-sm font-medium text-center max-w-[80px] truncate">{user.nickname}</span>
+                        </div>
+                      ))}
+                    {playerCount === 0 && (
+                      <p className="text-muted-foreground italic">No players yet...</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -569,55 +686,82 @@ export function AdminQuiz({
               <div className="space-y-6">
                 <div className="text-center">
                   <Trophy className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
-                  <h2 className="text-3xl font-bold">Leaderboard</h2>
+                  <h2 className="text-3xl font-bold">{quizEndReason === 'admin_left' ? 'Quiz Ended' : 'Leaderboard'}</h2>
+                  {quizEndReason === 'admin_left' && (
+                    <p className="text-sm text-muted-foreground mt-2">The admin has disconnected</p>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  {leaderboard.map((entry, index) => {
-                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
+                {/* Admin left message */}
+                {quizEndReason === 'admin_left' && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-400 text-center">
+                      The quiz host has disconnected. Showing final results.
+                    </p>
+                  </div>
+                )}
 
-                    return (
-                      <div
-                        key={entry.userId}
-                        className={`flex items-center gap-4 p-4 rounded-lg ${
-                          index === 0 ? 'bg-yellow-500/10 border border-yellow-500/30' :
-                          index === 1 ? 'bg-gray-400/10 border border-gray-400/30' :
-                          index === 2 ? 'bg-orange-600/10 border border-orange-600/30' :
-                          'bg-muted'
-                        }`}
-                      >
-                        <span className="text-2xl w-10 text-center font-bold">{medal}</span>
-                        <img
-                          src={getUserIconUrl(parseInt(entry.avatar))}
-                          alt={entry.nickname}
-                          className="w-12 h-12 rounded-full"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold">{entry.nickname}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">{entry.score || 0}</p>
-                          <p className="text-xs text-muted-foreground">points</p>
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="space-y-2">
+                  {leaderboard.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>No scores yet</p>
+                    </div>
+                  ) : (
+                    leaderboard
+                      .sort((a, b) => (b.score || 0) - (a.score || 0))
+                      .map((entry, index) => {
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
+
+                        return (
+                          <div
+                            key={entry.userId}
+                            className={`flex items-center gap-4 p-4 rounded-lg ${
+                              index === 0 ? 'bg-yellow-500/10 border border-yellow-500/30' :
+                              index === 1 ? 'bg-gray-400/10 border border-gray-400/30' :
+                              index === 2 ? 'bg-orange-600/10 border border-orange-600/30' :
+                              'bg-muted'
+                            }`}
+                          >
+                            <span className="text-2xl w-10 text-center font-bold">{medal}</span>
+                            <img
+                              src={getUserIconUrl(parseInt(entry.avatar))}
+                              alt={entry.nickname}
+                              className="w-12 h-12 rounded-full"
+                            />
+                            <div className="flex-1">
+                              <p className="font-semibold">{entry.nickname}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {entry.correctAnswers || 0} correct answers
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-primary">{entry.score || 0}</p>
+                              <p className="text-xs text-muted-foreground">points</p>
+                            </div>
+                          </div>
+                        )
+                      })
+                  )}
                 </div>
               </div>
             </CardContent>
 
             {/* Bottom Left: Next Question button */}
             <div className="absolute bottom-4 left-4">
-              {questionIndex < questions.length - 1 ? (
+              {!quizEnded && questionIndex < questions.length - 1 ? (
                 <Button onClick={handleNextQuestion} size="lg" className="gap-2">
                   <ChevronRight className="h-4 w-4" />
                   Next Question
                 </Button>
-              ) : (
+              ) : !quizEnded ? (
                 <Button onClick={handleNextQuestion} size="lg" variant="destructive" className="gap-2">
                   <RotateCcw className="h-4 w-4" />
                   End Quiz
                 </Button>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Quiz ended
+                </div>
               )}
             </div>
           </Card>

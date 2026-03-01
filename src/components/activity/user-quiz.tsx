@@ -4,10 +4,10 @@ import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconUrl } from "@/lib/partykit-client"
-import { Play, Users, Trophy, LogOut, Minimize2, Sun, Moon, Check, X } from "lucide-react"
+import { Play, Users, Trophy, LogOut, Minimize2, Sun, Moon, Check, X, Home, AlertCircle, Clock } from "lucide-react"
 import { useTheme } from "next-themes"
 
-type QuizPhase = 'lobby' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard'
+type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard' | 'ended' | 'error'
 
 interface UserQuizProps {
   client: PartyKitClient | null
@@ -18,6 +18,14 @@ interface UserQuizProps {
   onToggleFullscreen: () => void
   onBack: () => void
   activityTitle?: string
+}
+
+interface ScoreBreakdown {
+  questionIndex: number
+  points: number
+  timeTaken: number
+  isCorrect: boolean
+  answerIndex: number | null
 }
 
 export function UserQuiz({
@@ -43,11 +51,20 @@ export function UserQuiz({
   const [myAnswer, setMyAnswer] = useState<number | null>(null)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [isQuizStarted, setIsQuizStarted] = useState(false)
+  const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown[]>([])
+  const [timeTaken, setTimeTaken] = useState(0)
+  const [pointsEarned, setPointsEarned] = useState(0)
+  const [endReason, setEndReason] = useState<string | null>(null)
+  const [prevScore, setPrevScore] = useState(0)
+  const [isDisabled, setIsDisabled] = useState(false)
+  const [autoRedirectTimer, setAutoRedirectTimer] = useState<number | null>(null)
 
   const getReadyTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loaderTimerRef = useRef<NodeJS.Timeout | null>(null)
   const answerTimerRef = useRef<NodeJS.Timeout | null>(null)
   const questionStartTimeRef = useRef<number>(0)
+  const autoRedirectRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (!client) return
@@ -67,6 +84,65 @@ export function UserQuiz({
         const { type, payload } = message
 
         switch (type) {
+          case 'QUIZ_STARTED':
+            console.log('[UserQuiz] QUIZ_STARTED received')
+            setIsQuizStarted(true)
+            setPhase('get_ready')
+            break
+
+          case 'WAITING_SCREEN':
+            console.log('[UserQuiz] WAITING_SCREEN received')
+            setPhase('waiting')
+            break
+
+          case 'QUIZ_ENDED':
+            console.log('[UserQuiz] QUIZ_ENDED received')
+            setEndReason(payload.reason || 'Quiz ended')
+            setPhase('ended')
+            setLeaderboard(payload.finalLeaderboard || [])
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            break
+
+          case 'ADMIN_LEFT':
+            console.log('[UserQuiz] ADMIN_LEFT received')
+            setEndReason('Host has disconnected')
+            setPhase('ended')
+            setLeaderboard(payload.finalLeaderboard || [])
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            
+            // Auto-redirect after 10 seconds
+            setAutoRedirectTimer(10)
+            if (autoRedirectRef.current) clearInterval(autoRedirectRef.current)
+            autoRedirectRef.current = setInterval(() => {
+              setAutoRedirectTimer((prev) => {
+                if (prev === null) return null
+                const newTimer = prev - 1
+                if (newTimer <= 0) {
+                  clearInterval(autoRedirectRef.current!)
+                  onBack()
+                  return null
+                }
+                return newTimer
+              })
+            }, 1000)
+            break
+
+          case 'QUIZ_ALREADY_STARTED':
+            console.log('[UserQuiz] QUIZ_ALREADY_STARTED received')
+            setPhase('error')
+            setIsDisabled(true)
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            break
+
           case 'GET_READY':
             console.log('[UserQuiz] GET_READY received')
             setPhase('get_ready')
@@ -75,6 +151,8 @@ export function UserQuiz({
             setSelectedAnswer(null)
             setMyAnswer(null)
             setIsCorrect(null)
+            setPointsEarned(0)
+            setTimeTaken(0)
 
             // Start countdown for get ready phase
             let time = payload.duration || 5
@@ -135,6 +213,8 @@ export function UserQuiz({
             setSelectedAnswer(null)
             setMyAnswer(null)
             setIsCorrect(null)
+            setPointsEarned(0)
+            setTimeTaken(0)
             questionStartTimeRef.current = Date.now()
 
             // Start answer timer
@@ -156,13 +236,20 @@ export function UserQuiz({
 
           case 'ANSWER_CONFIRMED':
             console.log('[UserQuiz] ANSWER_CONFIRMED received')
-            setScore(prev => prev + payload.score)
+            const newScore = prevScore + payload.score
+            setPrevScore(score)
+            setScore(newScore)
+            setPointsEarned(payload.score)
             break
 
           case 'SHOW_ANSWER':
             console.log('[UserQuiz] SHOW_ANSWER received')
             // Clear answer timer
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+
+            // Calculate time taken
+            const timeSpent = (Date.now() - questionStartTimeRef.current) / 1000
+            setTimeTaken(timeSpent)
 
             setPhase('show_answer')
             if (payload.questionStats) {
@@ -171,7 +258,18 @@ export function UserQuiz({
 
             // Check if user's answer is correct
             if (currentQuestion && myAnswer !== null) {
-              setIsCorrect(myAnswer === currentQuestion.correctAnswer)
+              const correct = myAnswer === currentQuestion.correctAnswer
+              setIsCorrect(correct)
+              
+              // Add to score breakdown
+              const breakdown: ScoreBreakdown = {
+                questionIndex: currentQuestion.questionIndex,
+                points: pointsEarned,
+                timeTaken: timeSpent,
+                isCorrect: correct,
+                answerIndex: myAnswer
+              }
+              setScoreBreakdown(prev => [...prev, breakdown])
             }
             break
 
@@ -203,17 +301,19 @@ export function UserQuiz({
       if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
       if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+      if (autoRedirectRef.current) clearInterval(autoRedirectRef.current)
     }
-  }, [client, currentQuestion, myAnswer])
+  }, [client, currentQuestion, myAnswer, score, prevScore, onBack])
 
   const handleSelectAnswer = (index: number) => {
-    if (!displayQuestion || selectedAnswer !== null) return
+    if (isDisabled || !displayQuestion || selectedAnswer !== null) return
 
     setSelectedAnswer(index)
     setMyAnswer(index)
 
     // Submit answer to server
     const timeSpent = (Date.now() - questionStartTimeRef.current) / 1000
+    setTimeTaken(timeSpent)
     client?.submitAnswer(displayQuestion.id, index, timeSpent, currentUser.id)
   }
 
@@ -236,6 +336,11 @@ export function UserQuiz({
   // Use question from props if available, otherwise fall back to WebSocket payload
   const displayQuestion = currentQuestionFromProps || currentQuestion
 
+  // Get user's leaderboard entry and their rank
+  const userEntry = leaderboard.find(entry => entry.userId === currentUser.id)
+  const userRank = userEntry ? leaderboard.findIndex(entry => entry.userId === currentUser.id) + 1 : null
+  const scoreChange = score - prevScore
+
   return (
     <div className={`min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-primary/5 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       {/* Top Bar */}
@@ -246,6 +351,7 @@ export function UserQuiz({
             variant="ghost"
             size="icon"
             onClick={onBack}
+            disabled={isDisabled}
           >
             <LogOut className="h-5 w-5" />
           </Button>
@@ -277,7 +383,14 @@ export function UserQuiz({
             />
             <div className="hidden sm:block">
               <p className="font-medium text-sm">{currentUser.nickname}</p>
-              <p className="text-xs text-primary font-bold">{score} pts</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-primary font-bold">{score} pts</p>
+                {scoreChange !== 0 && (
+                  <span className={`text-xs font-bold ${scoreChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {scoreChange > 0 ? `+${scoreChange}` : scoreChange}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -317,6 +430,34 @@ export function UserQuiz({
                 <p className="text-lg text-muted-foreground">
                   Waiting for host to start the quiz...
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'waiting' && (
+          <Card className="w-full max-w-2xl">
+            <CardContent className="pt-12 pb-12">
+              <div className="text-center space-y-6">
+                <div className="flex items-center justify-center">
+                  <img
+                    src={getUserIconUrl(parseInt(currentUser.avatar))}
+                    alt={currentUser.nickname}
+                    className="w-32 h-32 rounded-full border-4 border-primary shadow-lg animate-pulse"
+                  />
+                </div>
+
+                <h2 className="text-3xl font-bold">{currentUser.nickname}</h2>
+                <p className="text-lg text-muted-foreground">
+                  Waiting for next round...
+                </p>
+
+                {/* Animated loading indicator */}
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -393,7 +534,7 @@ export function UserQuiz({
           </Card>
         )}
 
-        {phase === 'question' && displayQuestion && (
+        {phase === 'question' && displayQuestion && !isDisabled && (
           <Card className="w-full max-w-4xl">
             <CardContent className="pt-8 pb-8">
               <div className="space-y-6">
@@ -414,12 +555,12 @@ export function UserQuiz({
                       <button
                         key={index}
                         onClick={() => handleSelectAnswer(index)}
-                        disabled={selectedAnswer !== null}
+                        disabled={selectedAnswer !== null || isDisabled}
                         className={`relative p-6 text-left rounded-lg border-2 transition-all ${
                           isSelected
                             ? 'border-primary bg-primary/10'
                             : 'border-border hover:border-primary/50 hover:bg-muted'
-                        } ${selectedAnswer !== null ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                        } ${selectedAnswer !== null || isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${
@@ -530,7 +671,7 @@ export function UserQuiz({
                   })}
                 </div>
 
-                {/* Score feedback */}
+                {/* Enhanced Score feedback */}
                 <div className="text-center pt-4 border-t">
                   {isCorrect !== null && (
                     <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
@@ -539,7 +680,7 @@ export function UserQuiz({
                       {isCorrect ? (
                         <>
                           <Check className="h-5 w-5" />
-                          <span className="font-bold">Correct! +{Math.ceil(displayQuestion.duration || 0)} points</span>
+                          <span className="font-bold">Correct! +{pointsEarned} pts (100 base + {pointsEarned - 100} time bonus)</span>
                         </>
                       ) : (
                         <>
@@ -549,6 +690,21 @@ export function UserQuiz({
                       )}
                     </div>
                   )}
+                  
+                  {/* Time taken display */}
+                  {myAnswer !== null && (
+                    <div className="flex items-center justify-center gap-2 mt-3 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>Time taken: {timeTaken.toFixed(1)}s</span>
+                    </div>
+                  )}
+
+                  {/* Cumulative score */}
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground">Your total score:</p>
+                    <p className="text-3xl font-bold text-primary">{score} points</p>
+                  </div>
+
                   <p className="text-sm text-muted-foreground mt-4">
                     Waiting for leaderboard...
                   </p>
@@ -567,45 +723,159 @@ export function UserQuiz({
                   <h2 className="text-3xl font-bold">Leaderboard</h2>
                 </div>
 
-                {/* Show only user's rank */}
-                {leaderboard.map((entry, index) => {
-                  if (entry.userId !== currentUser.id) return null
-
-                  const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
-
-                  return (
-                    <div
-                      key={entry.userId}
-                      className={`flex items-center gap-4 p-6 rounded-lg border-2 ${
-                        index === 0 ? 'bg-yellow-500/10 border-yellow-500' :
-                        index === 1 ? 'bg-gray-400/10 border-gray-400' :
-                        index === 2 ? 'bg-orange-600/10 border-orange-600' :
-                        'bg-muted border-border'
-                      }`}
-                    >
-                      <span className="text-3xl w-12 text-center font-bold">{medal}</span>
-                      <img
-                        src={getUserIconUrl(parseInt(entry.avatar))}
-                        alt={entry.nickname}
-                        className="w-16 h-16 rounded-full border-2 border-primary"
-                      />
-                      <div className="flex-1">
-                        <p className="text-xl font-bold">{entry.nickname}</p>
-                        <p className="text-sm text-muted-foreground">YOU</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-4xl font-bold text-primary">{entry.score || 0}</p>
-                        <p className="text-sm text-muted-foreground">points</p>
-                      </div>
+                {/* Show user's rank prominently */}
+                {userEntry && userRank && (
+                  <div className={`flex items-center gap-4 p-6 rounded-lg border-2 ${
+                    userRank === 1 ? 'bg-yellow-500/10 border-yellow-500' :
+                    userRank === 2 ? 'bg-gray-400/10 border-gray-400' :
+                    userRank === 3 ? 'bg-orange-600/10 border-orange-600' :
+                    'bg-primary/10 border-primary'
+                  }`}>
+                    <span className="text-3xl w-12 text-center font-bold">
+                      {userRank === 1 ? '🥇' : userRank === 2 ? '🥈' : userRank === 3 ? '🥉' : `#${userRank}`}
+                    </span>
+                    <img
+                      src={getUserIconUrl(parseInt(userEntry.avatar))}
+                      alt={userEntry.nickname}
+                      className="w-16 h-16 rounded-full border-2 border-primary"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xl font-bold">{userEntry.nickname}</p>
+                      <p className="text-sm text-primary font-medium">YOU</p>
                     </div>
-                  )
-                })}
+                    <div className="text-right">
+                      <p className="text-4xl font-bold text-primary">{userEntry.score || 0}</p>
+                      <p className="text-sm text-muted-foreground">points</p>
+                      {scoreChange !== 0 && (
+                        <span className={`text-sm font-bold ${scoreChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {scoreChange > 0 ? `+${scoreChange}` : scoreChange}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Show all users on leaderboard */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground text-center mb-4">All Players</p>
+                  {leaderboard.map((entry, index) => {
+                    if (entry.userId === currentUser.id) return null
+
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
+                    const entryScoreChange = entry.score - (leaderboard[index - 1]?.score || entry.score)
+
+                    return (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-4 p-4 rounded-lg border-2 ${
+                          index === 0 ? 'bg-yellow-500/5 border-yellow-500/50' :
+                          index === 1 ? 'bg-gray-400/5 border-gray-400/50' :
+                          index === 2 ? 'bg-orange-600/5 border-orange-600/50' :
+                          'bg-muted/30 border-border'
+                        }`}
+                      >
+                        <span className="text-xl w-8 text-center font-bold">{medal}</span>
+                        <img
+                          src={getUserIconUrl(parseInt(entry.avatar))}
+                          alt={entry.nickname}
+                          className="w-10 h-10 rounded-full border-2 border-muted"
+                        />
+                        <div className="flex-1">
+                          <p className="font-bold">{entry.nickname}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold">{entry.score || 0}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
 
                 <div className="text-center pt-4">
                   <p className="text-sm text-muted-foreground">
                     Waiting for next question...
                   </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'ended' && (
+          <Card className="w-full max-w-2xl">
+            <CardContent className="pt-8 pb-8">
+              <div className="space-y-6">
+                <div className="text-center">
+                  <AlertCircle className="h-16 w-16 mx-auto mb-4 text-orange-500" />
+                  <h2 className="text-3xl font-bold">{endReason || 'Quiz Ended'}</h2>
+                  <p className="text-muted-foreground mt-2">Here's the final leaderboard</p>
+                </div>
+
+                {/* Show final leaderboard with all users */}
+                <div className="space-y-2">
+                  {leaderboard.map((entry, index) => {
+                    const isCurrentUser = entry.userId === currentUser.id
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`
+
+                    return (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-4 p-4 rounded-lg border-2 ${
+                          isCurrentUser ? 'bg-primary/10 border-primary' :
+                          index === 0 ? 'bg-yellow-500/10 border-yellow-500' :
+                          index === 1 ? 'bg-gray-400/10 border-gray-400' :
+                          index === 2 ? 'bg-orange-600/10 border-orange-600' :
+                          'bg-muted/30 border-border'
+                        }`}
+                      >
+                        <span className="text-xl w-8 text-center font-bold">{medal}</span>
+                        <img
+                          src={getUserIconUrl(parseInt(entry.avatar))}
+                          alt={entry.nickname}
+                          className="w-10 h-10 rounded-full border-2 border-muted"
+                        />
+                        <div className="flex-1">
+                          <p className="font-bold">{entry.nickname}</p>
+                          {isCurrentUser && <p className="text-xs text-primary font-medium">YOU</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold">{entry.score || 0}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Return to Home button */}
+                <div className="text-center pt-6 space-y-4">
+                  <Button onClick={onBack} size="lg" className="gap-2">
+                    <Home className="h-5 w-5" />
+                    Return to Home
+                  </Button>
+                  {autoRedirectTimer !== null && (
+                    <p className="text-sm text-muted-foreground">
+                      Auto-redirecting in {autoRedirectTimer} seconds...
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'error' && (
+          <Card className="w-full max-w-2xl border-2 border-red-500">
+            <CardContent className="pt-12 pb-12">
+              <div className="text-center space-y-6">
+                <AlertCircle className="h-20 w-20 mx-auto text-red-500" />
+                <h2 className="text-3xl font-bold text-red-600">Activity Already Started</h2>
+                <p className="text-lg text-muted-foreground">
+                  This activity has already started and you cannot join at this time.
+                </p>
+                <Button onClick={onBack} size="lg" className="gap-2 mt-6">
+                  <Home className="h-5 w-5" />
+                  Return to Home
+                </Button>
               </div>
             </CardContent>
           </Card>
