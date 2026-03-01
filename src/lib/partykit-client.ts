@@ -36,6 +36,7 @@ export interface LeaderboardEntry {
   nickname: string
   score: number
   avatar: string
+  correctAnswers?: number
 }
 
 export type PartyKitEventType =
@@ -100,20 +101,18 @@ export class PartyKitClient {
 
   constructor(room: string) {
     // Always use PARTYKIT_URL from environment variable
-    this.url = process.env.PARTYKIT_URL || 'ws://localhost:1999/party'
+    this.url = 'wss://atomq-quiz-partykit-server.atombaseai.partykit.dev/party'
     this.room = room
   }
 
   // Test if the PartyKit server is accessible
   static async testServer(): Promise<{ accessible: boolean; message: string }> {
-    const serverUrl = process.env.NODE_ENV === 'production'
-      ? 'https://atomq-quiz-partykit-server.atombaseai.partykit.dev/party'
-      : 'http://localhost:1999/party'
+
 
     try {
-      const response = await fetch(serverUrl, {
+      const response = await fetch('https://atomq-quiz-partykit-server.atombaseai.partykit.dev/party', {
         method: 'HEAD',
-        mode: process.env.NODE_ENV === 'production' ? 'no-cors' : 'cors'
+        mode: 'no-cors'
       })
       return {
         accessible: true,
@@ -122,7 +121,7 @@ export class PartyKitClient {
     } catch (error) {
       return {
         accessible: false,
-        message: `Server is not accessible (${serverUrl}) - check if PartyKit server is running`
+        message: 'Server is not accessible - check network or server status'
       }
     }
   }
