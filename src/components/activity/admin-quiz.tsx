@@ -19,6 +19,7 @@ interface AdminQuizProps {
   onToggleFullscreen: () => void
   onBack: () => void
   activityTitle?: string
+  questionCount?: number
 }
 
 export function AdminQuiz({
@@ -29,7 +30,8 @@ export function AdminQuiz({
   isFullscreen,
   onToggleFullscreen,
   onBack,
-  activityTitle
+  activityTitle,
+  questionCount
 }: AdminQuizProps) {
   const { theme, setTheme } = useTheme()
   const [phase, setPhase] = useState<QuizPhase>('lobby')
@@ -270,6 +272,13 @@ export function AdminQuiz({
   // Use question from props if available, otherwise fall back to WebSocket payload
   const displayQuestion = currentQuestionFromProps || currentQuestion
 
+  // Calculate progress based on (n+1) steps
+  const totalQuestions = questionCount || questions.length
+  const totalSteps = totalQuestions > 0 ? totalQuestions + 1 : 1
+  // Lobby = step 1, after question 1 = step 2, etc.
+  const currentStep = phase === 'lobby' || phase === 'waiting' ? 1 : questionIndex + 2
+  const progressPercentage = Math.min((currentStep / totalSteps) * 100, 100)
+
   // Calculate option percentages
   const getOptionPercentage = (count: number) => {
     if (!questionStats || questionStats.totalResponses === 0) return 0
@@ -283,6 +292,23 @@ export function AdminQuiz({
 
   return (
     <div className={`min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-primary/5 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+      {/* Progress Bar at Bottom */}
+      {totalQuestions > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50">
+          <div className="h-[5px] bg-muted w-full">
+            <div
+              className="h-full bg-orange-500 transition-all duration-500 ease-in-out"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+          <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-2">
+            <p className="text-xs text-muted-foreground text-center">
+              Step {currentStep} of {totalSteps} - {Math.round(progressPercentage)}% Complete
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar */}
       <div className="flex items-center justify-between p-4 border-b bg-card/50 backdrop-blur-sm">
         {/* Left: Activity info */}

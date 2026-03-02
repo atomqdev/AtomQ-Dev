@@ -467,6 +467,7 @@ export default function ActivityPreparePage() {
           onToggleFullscreen={handleToggleFullscreen}
           onBack={handleBackFromLobby}
           activityTitle={activity.title}
+          questionCount={questions.length}
         />
       </>
     )
@@ -488,110 +489,105 @@ export default function ActivityPreparePage() {
           onStartQuiz={handleStartQuiz}
           onBack={handleBackFromLobby}
           questionCount={activity._count?.activityQuestions || 0}
+          currentStep={1}
         />
       </>
     )
   }
 
+
   // Prepare view
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Progress Bar at Bottom */}
-      {activity._count?.activityQuestions && activity._count.activityQuestions > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 h-[5px] bg-orange-500 z-50" />
-      )}
-
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl border-2 relative">
-          {/* Top Left: Campus, Department, Section */}
-          <div className="absolute top-4 left-4 flex flex-col gap-1 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Building2 className="h-3 w-3" />
-              <span>{activity.campus?.name || "General"}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <GraduationCap className="h-3 w-3" />
-              <span>{activity.department?.name || "-"}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Layers className="h-3 w-3" />
-              <span>{activity.section}</span>
-            </div>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl border-2 relative">
+        {/* Top Left: Campus, Department, Section */}
+        <div className="absolute top-4 left-4 flex flex-col gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Building2 className="h-3 w-3" />
+            <span>{activity.campus?.name || "General"}</span>
           </div>
-
-          {/* Top Right: Question Count */}
-          <div className="absolute top-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
-            <FileQuestion className="h-3 w-3" />
-            <span>{activity._count?.activityQuestions || 0}</span>
+          <div className="flex items-center gap-1">
+            <GraduationCap className="h-3 w-3" />
+            <span>{activity.department?.name || "-"}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <Layers className="h-3 w-3" />
+            <span>{activity.section}</span>
+          </div>
+        </div>
 
-          {/* Middle Section */}
-          <CardContent className="pt-16 pb-20 px-12">
-            <div className="flex flex-col items-center justify-center text-center space-y-4">
-              {/* Play Icon */}
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Play className="h-8 w-8 text-primary fill-current" />
+        {/* Top Right: Question Count */}
+        <div className="absolute top-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
+          <FileQuestion className="h-3 w-3" />
+          <span>{activity._count?.activityQuestions || 0}</span>
+        </div>
+
+        {/* Middle Section */}
+        <CardContent className="pt-16 pb-20 px-12">
+          <div className="flex flex-col items-center justify-center text-center space-y-4">
+            {/* Play Icon */}
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Play className="h-8 w-8 text-primary fill-current" />
+            </div>
+
+            {/* Title */}
+            <h1 className="text-3xl font-bold">{activity.title}</h1>
+
+            {/* Access Key */}
+            {activity.accessKey && (
+              <div className="mt-4">
+                <p className="text-sm text-muted-foreground mb-1">Activity Code</p>
+                <p className="text-2xl font-bold font-mono tracking-wider">{activity.accessKey}</p>
               </div>
-
-              {/* Title */}
-              <h1 className="text-3xl font-bold">{activity.title}</h1>
-
-              {/* Access Key */}
-              {activity.accessKey && (
-                <div className="mt-4">
-                  <p className="text-sm text-muted-foreground mb-1">Activity Code</p>
-                  <p className="text-2xl font-bold font-mono tracking-wider">{activity.accessKey}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-
-          {/* Bottom Left: Buttons */}
-          <div className="absolute bottom-4 left-4 flex items-center gap-2">
-            <Button
-              onClick={() => router.push("/admin/activity")}
-              variant="outline"
-              size="sm"
-              className="rounded-none"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={handleJoinLobby}
-              variant="outline"
-              size="sm"
-              className="rounded-none"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              <span>Lobby</span>
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            )}
           </div>
+        </CardContent>
 
-          {/* Bottom Right: Server Status and Connection Status */}
-          <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
-            {/* Server Status */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {activity.serverStatus === ActivityServerStatus.CREATING && 'Creating...'}
-                {activity.serverStatus === ActivityServerStatus.CREATED && 'Server Ready'}
-                {activity.serverStatus === ActivityServerStatus.INACTIVE && 'Inactive'}
-                {activity.serverStatus === ActivityServerStatus.ERROR && 'Error'}
-              </span>
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  activity.serverStatus === ActivityServerStatus.CREATING
-                    ? 'bg-yellow-500 animate-pulse'
-                    : activity.serverStatus === ActivityServerStatus.CREATED
-                    ? 'bg-green-500'
-                    : 'bg-red-500'
-                }`}
-                title={`Server Status: ${activity.serverStatus}`}
-              />
-            </div>
+        {/* Bottom Left: Buttons */}
+        <div className="absolute bottom-4 left-4 flex items-center gap-2">
+          <Button
+            onClick={() => router.push("/admin/activity")}
+            variant="outline"
+            size="sm"
+            className="rounded-none"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={handleJoinLobby}
+            variant="outline"
+            size="sm"
+            className="rounded-none"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            <span>Lobby</span>
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+
+        {/* Bottom Right: Server Status and Connection Status */}
+        <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
+          {/* Server Status */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {activity.serverStatus === ActivityServerStatus.CREATING && 'Creating...'}
+              {activity.serverStatus === ActivityServerStatus.CREATED && 'Server Ready'}
+              {activity.serverStatus === ActivityServerStatus.INACTIVE && 'Inactive'}
+              {activity.serverStatus === ActivityServerStatus.ERROR && 'Error'}
+            </span>
+            <div
+              className={`w-3 h-3 rounded-full ${
+                activity.serverStatus === ActivityServerStatus.CREATING
+                  ? 'bg-yellow-500 animate-pulse'
+                  : activity.serverStatus === ActivityServerStatus.CREATED
+                  ? 'bg-green-500'
+                  : 'bg-red-500'
+              }`}
+              title={`Server Status: ${activity.serverStatus}`}
+            />
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
     </div>
   )
 }

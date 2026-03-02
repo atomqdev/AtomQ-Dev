@@ -491,6 +491,7 @@ export default function UserActivityPreparePage() {
           onToggleFullscreen={handleToggleFullscreen}
           onBack={handleBackFromLobby}
           activityTitle={activity.title}
+          questionCount={questions.length}
         />
       </>
     )
@@ -525,6 +526,8 @@ export default function UserActivityPreparePage() {
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
           onBack={handleBackFromLobby}
+          questionCount={activity._count?.activityQuestions || 0}
+          currentStep={1}
         />
       </>
     )
