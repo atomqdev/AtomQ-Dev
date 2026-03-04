@@ -122,11 +122,6 @@ export function Lobby({
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>
-            <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-2">
-              <p className="text-xs text-muted-foreground text-center">
-                Step {currentStep} of {totalSteps} - {Math.round(progressPercentage)}% Complete
-              </p>
-            </div>
           </div>
         )}
 
@@ -219,11 +214,6 @@ export function Lobby({
               className="h-full bg-orange-500 transition-all duration-500 ease-in-out"
               style={{ width: `${progressPercentage}%` }}
             />
-          </div>
-          <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-2">
-            <p className="text-xs text-muted-foreground text-center">
-              Step {currentStep} of {totalSteps} - {Math.round(progressPercentage)}% Complete
-            </p>
           </div>
         </div>
       )}

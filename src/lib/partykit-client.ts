@@ -54,6 +54,7 @@ export type PartyKitEventType =
   | 'LEADERBOARD_UPDATE'
   | 'NEXT_QUESTION'
   | 'START_QUIZ'
+  | 'END_ACTIVITY'
   | 'QUIZ_END'
   | 'JOIN_LOBBY'
   | 'CLOSE_ROOM'
@@ -62,6 +63,7 @@ export type PartyKitEventType =
   | 'REQUEST_STATE'
   | 'QUIZ_STARTED'
   | 'QUIZ_ENDED'
+  | 'ACTIVITY_ENDED'
   | 'ADMIN_LEFT'
   | 'QUIZ_ALREADY_STARTED'
 
@@ -85,6 +87,7 @@ export interface PartyKitEventHandlers {
   onAdminReconnected?: () => void
   onQuizStarted?: () => void
   onQuizEnded?: (payload: { reason: string; finalLeaderboard?: LeaderboardEntry[] }) => void
+  onActivityEnded?: (payload: { reason: string; finalLeaderboard?: LeaderboardEntry[] }) => void
   onAdminLeft?: () => void
   onQuizAlreadyStarted?: () => void
 }
@@ -292,6 +295,10 @@ export class PartyKitClient {
         this.handlers.onQuizEnded?.(payload)
         break
 
+      case 'ACTIVITY_ENDED':
+        this.handlers.onActivityEnded?.(payload)
+        break
+
       case 'ADMIN_LEFT':
         this.handlers.onAdminLeft?.()
         break
@@ -369,6 +376,13 @@ export class PartyKitClient {
     return this.send('START_QUIZ', {
       activityKey: this.room,
       questions,
+    })
+  }
+
+  endActivity() {
+    console.log('[PartyKit] Ending activity')
+    return this.send('END_ACTIVITY', {
+      activityKey: this.room,
     })
   }
 

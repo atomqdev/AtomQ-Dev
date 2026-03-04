@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconUrl } from "@/lib/partykit-client"
 import { Play, Users, Trophy, LogOut, Minimize2, Sun, Moon, Check, X, Home, AlertCircle, Clock } from "lucide-react"
 import { useTheme } from "next-themes"
 
-type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard' | 'ended' | 'error'
+type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'preparing_start' | 'question' | 'show_answer' | 'leaderboard' | 'ended' | 'error'
 
 interface UserQuizProps {
   client: PartyKitClient | null
@@ -40,6 +41,7 @@ export function UserQuiz({
   activityTitle,
   questionCount
 }: UserQuizProps) {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [phase, setPhase] = useState<QuizPhase>('lobby')
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
@@ -48,6 +50,7 @@ export function UserQuiz({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [getReadyTime, setGetReadyTime] = useState(5)
   const [loaderTime, setLoaderTime] = useState(5)
+  const [preparingTime, setPreparingTime] = useState(10)
   const [answerTime, setAnswerTime] = useState(0)
   const [score, setScore] = useState(0)
   const [myAnswer, setMyAnswer] = useState<number | null>(null)
@@ -64,6 +67,7 @@ export function UserQuiz({
 
   const getReadyTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loaderTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const preparingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const answerTimerRef = useRef<NodeJS.Timeout | null>(null)
   const questionStartTimeRef = useRef<number>(0)
   const autoRedirectRef = useRef<NodeJS.Timeout | null>(null)
@@ -89,12 +93,34 @@ export function UserQuiz({
           case 'QUIZ_STARTED':
             console.log('[UserQuiz] QUIZ_STARTED received')
             setIsQuizStarted(true)
-            setPhase('get_ready')
             break
 
           case 'WAITING_SCREEN':
             console.log('[UserQuiz] WAITING_SCREEN received')
             setPhase('waiting')
+            break
+
+          case 'PREPARING_START':
+            console.log('[UserQuiz] PREPARING_START received')
+            setPhase('preparing_start')
+            setQuestionIndex(payload.questionIndex - 1)
+            setPreparingTime(payload.duration || 10)
+            setSelectedAnswer(null)
+            setMyAnswer(null)
+            setIsCorrect(null)
+            setPointsEarned(0)
+            setTimeTaken(0)
+
+            // Start countdown for preparing phase
+            let prepTime = payload.duration || 10
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
+            preparingTimerRef.current = setInterval(() => {
+              prepTime -= 1
+              setPreparingTime(prepTime)
+              if (prepTime <= 0) {
+                clearInterval(preparingTimerRef.current!)
+              }
+            }, 1000)
             break
 
           case 'QUIZ_ENDED':
@@ -105,6 +131,7 @@ export function UserQuiz({
             // Clear all timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
             break
 
@@ -116,6 +143,7 @@ export function UserQuiz({
             // Clear all timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
             
             // Auto-redirect after 10 seconds
@@ -142,6 +170,7 @@ export function UserQuiz({
             // Clear all timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
             break
 
@@ -287,6 +316,33 @@ export function UserQuiz({
             setLeaderboard(payload.finalLeaderboard || [])
             break
 
+          case 'ACTIVITY_ENDED':
+            console.log('[UserQuiz] ACTIVITY_ENDED received with reason:', payload.reason)
+            setEndReason(payload.reason || 'Activity ended by host')
+            setPhase('ended')
+            setLeaderboard(payload.finalLeaderboard || [])
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            // Auto-redirect after 3 seconds
+            setAutoRedirectTimer(3)
+            if (autoRedirectRef.current) clearInterval(autoRedirectRef.current)
+            autoRedirectRef.current = setInterval(() => {
+              setAutoRedirectTimer((prev) => {
+                if (prev === null) return null
+                const newTimer = prev - 1
+                if (newTimer <= 0) {
+                  clearInterval(autoRedirectRef.current!)
+                  router.push('/user/activity')
+                  return null
+                }
+                return newTimer
+              })
+            }, 1000)
+            break
+
           case 'USER_UPDATE':
             // Let the parent handle user updates
             break
@@ -302,6 +358,7 @@ export function UserQuiz({
       ws.removeEventListener('message', handleMessage)
       if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+      if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
       if (answerTimerRef.current) clearInterval(answerTimerRef.current)
       if (autoRedirectRef.current) clearInterval(autoRedirectRef.current)
     }
@@ -360,11 +417,6 @@ export function UserQuiz({
               className="h-full bg-orange-500 transition-all duration-500 ease-in-out"
               style={{ width: `${progressPercentage}%` }}
             />
-          </div>
-          <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-2">
-            <p className="text-xs text-muted-foreground text-center">
-              Step {currentStep} of {totalSteps} - {Math.round(progressPercentage)}% Complete
-            </p>
           </div>
         </div>
       )}
@@ -483,6 +535,49 @@ export function UserQuiz({
                   <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
                   <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
                   <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'preparing_start' && (
+          <Card className="w-full max-w-4xl">
+            <CardContent className="pt-16 pb-16">
+              <div className="text-center space-y-8">
+                {/* Preparing message */}
+                <div className="space-y-4">
+                  <h2 className="text-4xl font-bold animate-pulse">Preparing for Start</h2>
+                  <p className="text-xl text-muted-foreground">
+                    Get ready for Question 1...
+                  </p>
+                </div>
+
+                {/* Loading spinner */}
+                <div className="flex items-center justify-center">
+                  <div className="relative w-32 h-32">
+                    {/* Outer spinning ring */}
+                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    {/* Timer in center */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-5xl font-bold text-primary">{preparingTime}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress dots */}
+                <div className="flex items-center justify-center gap-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        i < Math.ceil((10 - preparingTime) / 2)
+                          ? 'bg-primary'
+                          : 'bg-muted'
+                      }`}
+                    />
+                  ))}
                 </div>
               </div>
             </CardContent>

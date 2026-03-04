@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconUrl } from "@/lib/partykit-client"
-import { Play, Users, ChevronRight, Eye, Trophy, RotateCcw, LogOut, Minimize2, Sun, Moon } from "lucide-react"
+import { Play, Users, ChevronRight, Eye, Trophy, RotateCcw, LogOut, Minimize2, Sun, Moon, AlertTriangle } from "lucide-react"
 import { useTheme } from "next-themes"
+import { toasts } from "@/lib/toasts"
 
-type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'question' | 'show_answer' | 'leaderboard'
+type QuizPhase = 'lobby' | 'waiting' | 'get_ready' | 'question_loader' | 'preparing_start' | 'question' | 'show_answer' | 'leaderboard'
 
 interface AdminQuizProps {
   client: PartyKitClient | null
@@ -40,15 +42,18 @@ export function AdminQuiz({
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [getReadyTime, setGetReadyTime] = useState(5)
   const [loaderTime, setLoaderTime] = useState(5)
+  const [preparingTime, setPreparingTime] = useState(10)
   const [answerTime, setAnswerTime] = useState(0)
   const [questionIndex, setQuestionIndex] = useState(0)
   const [quizStarted, setQuizStarted] = useState(false)
   const [quizEnded, setQuizEnded] = useState(false)
   const [quizEndReason, setQuizEndReason] = useState<string | null>(null)
   const [serverTimeOffset, setServerTimeOffset] = useState(0)
+  const [showExitDialog, setShowExitDialog] = useState(false)
 
   const getReadyTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loaderTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const preparingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const answerTimerRef = useRef<NodeJS.Timeout | null>(null)
   const questionStartTimeRef = useRef<number>(0)
 
@@ -184,6 +189,24 @@ export function AdminQuiz({
             setQuizStarted(true)
             break
 
+          case 'PREPARING_START':
+            console.log('[AdminQuiz] PREPARING_START received')
+            setPhase('preparing_start')
+            setQuestionIndex(payload.questionIndex - 1)
+            setPreparingTime(payload.duration || 10)
+
+            // Start countdown for preparing phase
+            let prepTime = payload.duration || 10
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
+            preparingTimerRef.current = setInterval(() => {
+              prepTime -= 1
+              setPreparingTime(prepTime)
+              if (prepTime <= 0) {
+                clearInterval(preparingTimerRef.current!)
+              }
+            }, 1000)
+            break
+
           case 'QUIZ_ENDED':
             console.log('[AdminQuiz] QUIZ_ENDED received with reason:', payload.reason)
             setQuizEnded(true)
@@ -195,6 +218,7 @@ export function AdminQuiz({
             // Clear all timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
             break
 
@@ -206,7 +230,27 @@ export function AdminQuiz({
             // Clear all timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            break
+
+          case 'ACTIVITY_ENDED':
+            console.log('[AdminQuiz] ACTIVITY_ENDED received')
+            setQuizEnded(true)
+            setQuizEndReason('admin_ended')
+            setPhase('leaderboard')
+            if (payload.finalLeaderboard) {
+              setLeaderboard(payload.finalLeaderboard)
+            }
+            // Clear all timers
+            if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
+            if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+            if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
+            if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            // Redirect after a short delay
+            setTimeout(() => {
+              onBack()
+            }, 2000)
             break
 
           case 'WAITING_SCREEN':
@@ -238,6 +282,7 @@ export function AdminQuiz({
       ws.removeEventListener('message', handleMessage)
       if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
+      if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
       if (answerTimerRef.current) clearInterval(answerTimerRef.current)
     }
   }, [client])
@@ -260,6 +305,25 @@ export function AdminQuiz({
   const handleNextQuestion = () => {
     if (!client) return
     client.nextQuestion()
+  }
+
+  const handleEndActivity = () => {
+    if (!client) return
+    client.endActivity()
+    toasts.success('Activity ended for all users')
+  }
+
+  const handleExitClick = () => {
+    setShowExitDialog(true)
+  }
+
+  const handleExitConfirm = () => {
+    setShowExitDialog(false)
+    handleEndActivity()
+  }
+
+  const handleExitCancel = () => {
+    setShowExitDialog(false)
   }
 
   const playerCount = users.filter(u => u.role !== 'ADMIN').length
@@ -301,11 +365,6 @@ export function AdminQuiz({
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <div className="bg-background/90 backdrop-blur-sm border-t px-4 py-2">
-            <p className="text-xs text-muted-foreground text-center">
-              Step {currentStep} of {totalSteps} - {Math.round(progressPercentage)}% Complete
-            </p>
-          </div>
         </div>
       )}
 
@@ -316,7 +375,7 @@ export function AdminQuiz({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onBack}
+            onClick={handleExitClick}
           >
             <LogOut className="h-5 w-5" />
           </Button>
@@ -487,6 +546,49 @@ export function AdminQuiz({
                       <p className="text-muted-foreground italic">No players yet...</p>
                     )}
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {phase === 'preparing_start' && (
+          <Card className="w-full max-w-4xl">
+            <CardContent className="pt-16 pb-16">
+              <div className="text-center space-y-8">
+                {/* Preparing message */}
+                <div className="space-y-4">
+                  <h2 className="text-4xl font-bold animate-pulse">Preparing for Start</h2>
+                  <p className="text-xl text-muted-foreground">
+                    Get ready for Question 1...
+                  </p>
+                </div>
+
+                {/* Loading spinner */}
+                <div className="flex items-center justify-center">
+                  <div className="relative w-32 h-32">
+                    {/* Outer spinning ring */}
+                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    {/* Timer in center */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-5xl font-bold text-primary">{preparingTime}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress dots */}
+                <div className="flex items-center justify-center gap-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        i < Math.ceil((10 - preparingTime) / 2)
+                          ? 'bg-primary'
+                          : 'bg-muted'
+                      }`}
+                    />
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -793,6 +895,29 @@ export function AdminQuiz({
           </Card>
         )}
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              End Activity?
+            </DialogTitle>
+            <DialogDescription>
+              This will end the activity for everyone. All users will be disconnected and redirected to their activity page. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleExitCancel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleExitConfirm}>
+              End Activity
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

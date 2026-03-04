@@ -1,24 +1,24 @@
 import { PrismaClient } from '@prisma/client'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Load environment variables from .env file in the project root
+const envPath = path.resolve(process.cwd(), '.env')
+dotenv.config({ path: envPath, override: true })
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Ensure DATABASE_URL is set
-const databaseUrl = process.env.DATABASE_URL
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL environment variable is not set')
-}
-
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'],
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
+    log: ['query', 'error', 'warn'],
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
