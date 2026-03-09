@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Play, ArrowLeft, ChevronRight, FileQuestion, Building2, GraduationCap, Layers, Users } from "lucide-react"
 import { UserRole, ActivityServerStatus } from "@prisma/client"
-import { PartyKitClient, User, Question, getUserIconUrl } from "@/lib/partykit-client"
+import { PartyKitClient, User, Question, getUserIconUrl, saveActivityState, getActivityState, clearActivityState, ActivityState } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
 import { AdminQuiz } from "@/components/activity/admin-quiz"
 import { FullscreenModal } from "@/components/activity/fullscreen-modal"
@@ -78,9 +78,36 @@ export default function ActivityPreparePage() {
       return
     }
 
+    // Check for saved activity state
+    const savedState = getActivityState(params.id as string)
+    if (savedState && savedState.role === 'ADMIN') {
+      console.log('[Activity-Prepare] Found saved state:', savedState)
+      // Only restore valid views for admin
+      if (savedState.view === 'prepare' || savedState.view === 'lobby' || savedState.view === 'quiz') {
+        setView(savedState.view as View)
+      }
+      if (savedState.view === 'lobby' || savedState.view === 'quiz') {
+        // Auto-reconnect if they were in lobby or quiz
+        handleJoinLobby()
+      }
+    }
+
     fetchActivity()
     fetchQuestions()
   }, [session, status, router, params.id])
+
+  // Save activity state when view changes
+  useEffect(() => {
+    if (activity && session?.user) {
+      const state: ActivityState = {
+        activityId: params.id as string,
+        role: 'ADMIN',
+        view: view,
+        timestamp: Date.now()
+      }
+      saveActivityState(state)
+    }
+  }, [view, activity, session, params.id])
 
   // Poll for server status updates when in CREATING state
   useEffect(() => {
@@ -391,6 +418,9 @@ export default function ActivityPreparePage() {
   }
 
   const handleBackFromLobby = () => {
+    // Clear activity state from localStorage
+    clearActivityState(params.id as string)
+
     // Close the room to notify all users
     if (partyKitClientRef.current) {
       partyKitClientRef.current.closeRoom()
@@ -462,6 +492,7 @@ export default function ActivityPreparePage() {
             correctAnswer: parseInt(aq.question.correctAnswer),
           }))}
           activityKey={activity.accessKey!}
+          activityId={activity.id}
           users={users}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}

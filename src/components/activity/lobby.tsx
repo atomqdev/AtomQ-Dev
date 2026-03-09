@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { Users, Crown, Play, ArrowLeft, Maximize2, Minimize2, Key, Sun, Moon, Loader2 } from "lucide-react"
+import { Users, Crown, Play, ArrowLeft, Maximize2, Minimize2, Key, Sun, Moon, Loader2, LogOut, Search, X } from "lucide-react"
 import { User, getUserIconUrl, retrieveUserIcon, getRandomUserIcon, storeUserIcon, USER_ICON_STORAGE_KEY } from "@/lib/partykit-client"
 import { useTheme } from "next-themes"
 import { usePathname } from "next/navigation"
@@ -42,6 +42,7 @@ export function Lobby({
   const pathname = usePathname()
   const [animatedUsers, setAnimatedUsers] = useState<AnimatedUser[]>([])
   const [prevUserCount, setPrevUserCount] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const playerCount = users.filter(u => u.role === 'USER').length
   const adminUser = users.find(u => u.role === 'ADMIN')
@@ -103,6 +104,14 @@ export function Lobby({
     if (a.role === 'ADMIN') return -1
     if (b.role === 'ADMIN') return 1
     return a.joinedAt - b.joinedAt
+  })
+
+  // Filter users by search query
+  const filteredUsers = sortedUsers.filter(user => {
+    if (user.role === 'ADMIN') return false
+    const searchLower = searchQuery.toLowerCase()
+    return user.nickname.toLowerCase().includes(searchLower) ||
+           (user.rollNumber && user.rollNumber.toLowerCase().includes(searchLower))
   })
 
   // Calculate progress percentage based on (n+1) steps
@@ -228,6 +237,18 @@ export function Lobby({
             <Key className="h-4 w-4 text-primary" />
             <span className="font-mono font-bold text-lg">{activityKey}</span>
           </div>
+          {/* Exit Activity Button */}
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Exit Activity</span>
+            </Button>
+          )}
           {/* Admin Icon */}
           {adminUser && (
             <div className="relative group">
@@ -370,8 +391,28 @@ export function Lobby({
             </SheetHeader>
 
             <div className="mt-6">
-              <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)] pr-2">
-                {sortedUsers
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by name or roll number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-2">
+                {filteredUsers
                   .filter(u => u.role !== 'ADMIN')
                   .map((user) => (
                     <div
@@ -390,15 +431,15 @@ export function Lobby({
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{user.nickname}</p>
                         <p className="text-xs text-muted-foreground">
-                          Joined {new Date(user.joinedAt).toLocaleTimeString()}
+                          {user.rollNumber || 'No roll number'}
                         </p>
                       </div>
                     </div>
                   ))}
-                {playerCount === 0 && (
+                {filteredUsers.filter(u => u.role !== 'ADMIN').length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No players joined yet</p>
+                    <p>{searchQuery ? 'No matching players' : 'No players joined yet'}</p>
                   </div>
                 )}
               </div>

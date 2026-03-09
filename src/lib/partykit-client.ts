@@ -13,6 +13,7 @@ export interface User {
   status: string
   joinedAt: number
   totalScore?: number
+  rollNumber?: string
 }
 
 export interface Question {
@@ -476,4 +477,57 @@ export function retrieveUserIcon(activityId: string): number | null {
     console.error('[PartyKit] Failed to retrieve user icon:', error)
   }
   return null
+}
+
+// Activity State Persistence for localStorage
+export interface ActivityState {
+  activityId: string
+  role: 'ADMIN' | 'USER'
+  view: string
+  phase?: string
+  questionIndex?: number
+  score?: number
+  username?: string
+  timestamp: number
+}
+
+export const ACTIVITY_STATE_KEY = 'activity_state'
+
+export function saveActivityState(state: ActivityState) {
+  try {
+    localStorage.setItem(`${ACTIVITY_STATE_KEY}_${state.activityId}`, JSON.stringify({
+      ...state,
+      timestamp: Date.now()
+    }))
+  } catch (error) {
+    console.error('[PartyKit] Failed to save activity state:', error)
+  }
+}
+
+export function getActivityState(activityId: string): ActivityState | null {
+  try {
+    const data = localStorage.getItem(`${ACTIVITY_STATE_KEY}_${activityId}`)
+    if (data) {
+      const parsed = JSON.parse(data)
+      // Check if state is less than 24 hours old
+      const isRecent = (Date.now() - parsed.timestamp) < 24 * 60 * 60 * 1000
+      if (isRecent) {
+        return parsed
+      } else {
+        // Clear old state
+        clearActivityState(activityId)
+      }
+    }
+  } catch (error) {
+    console.error('[PartyKit] Failed to retrieve activity state:', error)
+  }
+  return null
+}
+
+export function clearActivityState(activityId: string) {
+  try {
+    localStorage.removeItem(`${ACTIVITY_STATE_KEY}_${activityId}`)
+  } catch (error) {
+    console.error('[PartyKit] Failed to clear activity state:', error)
+  }
 }

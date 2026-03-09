@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconUrl } from "@/lib/partykit-client"
+import { PartyKitClient, Question, QuestionStats, LeaderboardEntry, getUserIconUrl, clearActivityState } from "@/lib/partykit-client"
 import { Play, Users, ChevronRight, Eye, Trophy, RotateCcw, LogOut, Minimize2, Sun, Moon, AlertTriangle } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toasts } from "@/lib/toasts"
@@ -16,6 +16,7 @@ interface AdminQuizProps {
   client: PartyKitClient | null
   questions: Question[]
   activityKey: string
+  activityId: string
   users: any[]
   isFullscreen: boolean
   onToggleFullscreen: () => void
@@ -28,6 +29,7 @@ export function AdminQuiz({
   client,
   questions,
   activityKey,
+  activityId,
   users,
   isFullscreen,
   onToggleFullscreen,
@@ -247,6 +249,8 @@ export function AdminQuiz({
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
             if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            // Clear activity state from localStorage
+            clearActivityState(activityId)
             // Redirect after a short delay
             setTimeout(() => {
               onBack()
@@ -310,6 +314,8 @@ export function AdminQuiz({
   const handleEndActivity = () => {
     if (!client) return
     client.endActivity()
+    // Clear activity state from localStorage
+    clearActivityState(activityId)
     toasts.success('Activity ended for all users')
   }
 

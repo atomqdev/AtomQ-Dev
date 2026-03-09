@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Question, QuestionStats, LeaderboardEntry, PartyKitClient, getUserIconUrl } from "@/lib/partykit-client"
+import { PartyKitClient, Question, QuestionStats, LeaderboardEntry, getUserIconUrl, clearActivityState } from "@/lib/partykit-client"
 import { Play, Users, Trophy, LogOut, Minimize2, Sun, Moon, Check, X, Home, AlertCircle, Clock } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -14,6 +14,7 @@ interface UserQuizProps {
   client: PartyKitClient | null
   questions: Question[]
   activityKey: string
+  activityId: string
   currentUser: any
   isFullscreen: boolean
   onToggleFullscreen: () => void
@@ -34,6 +35,7 @@ export function UserQuiz({
   client,
   questions,
   activityKey,
+  activityId,
   currentUser,
   isFullscreen,
   onToggleFullscreen,
@@ -326,6 +328,8 @@ export function UserQuiz({
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
             if (preparingTimerRef.current) clearInterval(preparingTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
+            // Clear activity state from localStorage
+            clearActivityState(activityId)
             // Auto-redirect after 3 seconds
             setAutoRedirectTimer(3)
             if (autoRedirectRef.current) clearInterval(autoRedirectRef.current)

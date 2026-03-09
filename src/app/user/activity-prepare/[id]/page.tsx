@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, ArrowLeft, User as UserIcon, ChevronRight, FileQuestion, Building2, GraduationCap, Layers, Users, Maximize2, Minimize2, Crown, Play, AlertTriangle } from "lucide-react"
 import { UserRole } from "@prisma/client"
 import { toasts } from "@/lib/toasts"
-import { PartyKitClient, User, Question, getUserIconUrl, getRandomUserIcon, storeUserIcon, retrieveUserIcon } from "@/lib/partykit-client"
+import { PartyKitClient, User, Question, getUserIconUrl, getRandomUserIcon, storeUserIcon, retrieveUserIcon, saveActivityState, getActivityState, clearActivityState, ActivityState } from "@/lib/partykit-client"
 import { Lobby } from "@/components/activity/lobby"
 import { UserQuiz } from "@/components/activity/user-quiz"
 import { FullscreenModal } from "@/components/activity/fullscreen-modal"
@@ -86,9 +86,40 @@ export default function UserActivityPreparePage() {
       return
     }
 
+    // Check for saved activity state
+    const savedState = getActivityState(params.id as string)
+    if (savedState && savedState.role === 'USER') {
+      console.log('[User Activity-Prepare] Found saved state:', savedState)
+      setUsername(savedState.username || session.user.name || '')
+      // Only restore valid views for user
+      if (savedState.view === 'join' || savedState.view === 'lobby' || savedState.view === 'quiz') {
+        setView(savedState.view as View)
+      }
+      if (savedState.view === 'lobby' || savedState.view === 'quiz') {
+        // Auto-reconnect if they were in lobby or quiz
+        setTimeout(() => {
+          handleJoinLobby({ preventDefault: () => {} } as React.FormEvent)
+        }, 100)
+      }
+    }
+
     fetchActivity()
     fetchQuestions()
   }, [session, status, router, params.id])
+
+  // Save activity state when view or username changes
+  useEffect(() => {
+    if (activity && session?.user && username) {
+      const state: ActivityState = {
+        activityId: params.id as string,
+        role: 'USER',
+        view: view,
+        username: username,
+        timestamp: Date.now()
+      }
+      saveActivityState(state)
+    }
+  }, [view, username, activity, session, params.id])
 
   const fetchActivity = async () => {
     try {
@@ -372,6 +403,9 @@ export default function UserActivityPreparePage() {
   }
 
   const handleBackFromLobby = () => {
+    // Clear activity state from localStorage
+    clearActivityState(params.id as string)
+
     // Clear admin disconnect timers
     if (adminDisconnectTimerRef.current) {
       clearTimeout(adminDisconnectTimerRef.current)
@@ -479,6 +513,7 @@ export default function UserActivityPreparePage() {
             correctAnswer: parseInt(aq.question.correctAnswer),
           }))}
           activityKey={activity.accessKey!}
+          activityId={activity.id}
           currentUser={{
             id: session?.user?.id || '',
             nickname: username,
