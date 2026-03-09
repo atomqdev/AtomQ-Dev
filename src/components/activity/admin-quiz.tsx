@@ -80,7 +80,7 @@ export function AdminQuiz({
           case 'GET_READY':
             console.log('[AdminQuiz] GET_READY received')
             setPhase('get_ready')
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setGetReadyTime(payload.duration || 5)
 
             // Start countdown for get ready phase
@@ -137,7 +137,7 @@ export function AdminQuiz({
             setPhase('question')
             setCurrentQuestion(payload)
             setQuestionStats(null)
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setAnswerTime(payload.duration)
             questionStartTimeRef.current = Date.now()
 
@@ -194,7 +194,7 @@ export function AdminQuiz({
           case 'PREPARING_START':
             console.log('[AdminQuiz] PREPARING_START received')
             setPhase('preparing_start')
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setPreparingTime(payload.duration || 10)
 
             // Start countdown for preparing phase
@@ -346,7 +346,7 @@ export function AdminQuiz({
   const totalQuestions = questionCount || questions.length
   const totalSteps = totalQuestions > 0 ? totalQuestions + 1 : 1
   // Lobby = step 1, after question 1 = step 2, etc.
-  const currentStep = phase === 'lobby' || phase === 'waiting' ? 1 : questionIndex + 2
+  const currentStep = phase === 'lobby' || phase === 'waiting' ? 1 : questionIndex + 1
   const progressPercentage = Math.min((currentStep / totalSteps) * 100, 100)
 
   // Calculate option percentages
@@ -608,7 +608,7 @@ export function AdminQuiz({
                 <div className="animate-pulse">
                   <h2 className="text-4xl font-bold mb-4">Look at Your Screen!</h2>
                   <p className="text-2xl text-muted-foreground">
-                    Question {questionIndex + 1} starting in...
+                    Question {questionIndex} starting in...
                   </p>
                 </div>
 

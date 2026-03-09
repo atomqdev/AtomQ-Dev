@@ -105,7 +105,7 @@ export function UserQuiz({
           case 'PREPARING_START':
             console.log('[UserQuiz] PREPARING_START received')
             setPhase('preparing_start')
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setPreparingTime(payload.duration || 10)
             setSelectedAnswer(null)
             setMyAnswer(null)
@@ -179,7 +179,7 @@ export function UserQuiz({
           case 'GET_READY':
             console.log('[UserQuiz] GET_READY received')
             setPhase('get_ready')
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setGetReadyTime(payload.duration || 5)
             setSelectedAnswer(null)
             setMyAnswer(null)
@@ -241,7 +241,7 @@ export function UserQuiz({
             setPhase('question')
             setCurrentQuestion(payload)
             setQuestionStats(null)
-            setQuestionIndex(payload.questionIndex - 1)
+            setQuestionIndex(payload.questionIndex)
             setAnswerTime(payload.duration)
             setSelectedAnswer(null)
             setMyAnswer(null)
@@ -269,8 +269,9 @@ export function UserQuiz({
 
           case 'ANSWER_CONFIRMED':
             console.log('[UserQuiz] ANSWER_CONFIRMED received')
-            const newScore = prevScore + payload.score
-            setPrevScore(score)
+            const currentScore = score
+            const newScore = currentScore + payload.score
+            setPrevScore(currentScore)
             setScore(newScore)
             setPointsEarned(payload.score)
             break
@@ -408,7 +409,7 @@ export function UserQuiz({
   const totalQuestions = questionCount || questions.length
   const totalSteps = totalQuestions > 0 ? totalQuestions + 1 : 1
   // Lobby = step 1, after question 1 = step 2, etc.
-  const currentStep = phase === 'lobby' || phase === 'waiting' ? 1 : questionIndex + 2
+  const currentStep = phase === 'lobby' || phase === 'waiting' ? 1 : questionIndex + 1
   const progressPercentage = Math.min((currentStep / totalSteps) * 100, 100)
 
   return (
@@ -595,7 +596,7 @@ export function UserQuiz({
                 <div className="animate-pulse">
                   <h2 className="text-4xl font-bold mb-4">Get Ready!</h2>
                   <p className="text-2xl text-muted-foreground">
-                    Question {questionIndex + 1} starting in...
+                    Question {questionIndex} starting in...
                   </p>
                 </div>
 

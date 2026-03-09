@@ -361,14 +361,15 @@ export class PartyKitClient {
     }
   }
 
-  joinLobby(userId: string, nickname: string, avatar: string, role: 'ADMIN' | 'USER') {
-    console.log('[PartyKit] Joining lobby:', { userId, nickname, avatar, role })
+  joinLobby(userId: string, nickname: string, avatar: string, role: 'ADMIN' | 'USER', rollNumber?: string) {
+    console.log('[PartyKit] Joining lobby:', { userId, nickname, avatar, role, rollNumber })
     return this.send('JOIN_LOBBY', {
       userId,
       nickname,
       avatar,
       activityKey: this.room,
       role,
+      rollNumber,
     })
   }
 

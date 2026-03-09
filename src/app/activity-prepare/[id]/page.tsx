@@ -231,7 +231,8 @@ export default function ActivityPreparePage() {
             session.user.id,
             session.user.name || 'Game Master',
             '1', // Use admin icon (you can customize this)
-            'ADMIN'
+            'ADMIN',
+            session.user.uoid || undefined
           )
           // Request current state to get existing users
           setTimeout(() => {

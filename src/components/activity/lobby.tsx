@@ -19,6 +19,9 @@ interface LobbyProps {
   activityId?: string
   questionCount?: number
   currentStep?: number
+  currentUserId?: string
+  currentUserName?: string
+  currentUserIcon?: string
 }
 
 interface AnimatedUser extends User {
@@ -36,7 +39,10 @@ export function Lobby({
   onBack,
   activityId,
   questionCount = 0,
-  currentStep = 1
+  currentStep = 1,
+  currentUserId,
+  currentUserName,
+  currentUserIcon: propCurrentUserIcon
 }: LobbyProps) {
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
@@ -65,10 +71,29 @@ export function Lobby({
 
   // Get current user from users list
   const getCurrentUser = () => {
-    // For simplicity, we'll show the first user in the list
-    // In a real app, you'd match by session user ID
-    const user = users.find(u => u.role === 'USER')
-    return user || { id: '', nickname: 'Player', avatar: currentUserIcon.toString(), role: 'USER' as const, status: '', joinedAt: Date.now() }
+    // Find the user matching the current user ID from session
+    const user = users.find(u => u.id === currentUserId)
+    
+    // Fallback to provided user info if not found in users list
+    if (!user && currentUserId) {
+      return {
+        id: currentUserId,
+        nickname: currentUserName || 'Player',
+        avatar: propCurrentUserIcon || propCurrentUserIcon?.toString() || '1',
+        role: 'USER' as const,
+        status: '' as const,
+        joinedAt: Date.now()
+      }
+    }
+    
+    return user || { 
+      id: currentUserId || '', 
+      nickname: currentUserName || 'Player', 
+      avatar: propCurrentUserIcon || propCurrentUserIcon?.toString() || '1', 
+      role: 'USER' as const, 
+      status: '' as const, 
+      joinedAt: Date.now() 
+    }
   }
 
   const currentUser = currentUserRole === 'USER' ? getCurrentUser() : null

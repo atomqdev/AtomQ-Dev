@@ -207,7 +207,8 @@ export default function UserActivityPreparePage() {
             session.user.id,
             username.trim(),
             userIcon.toString(),
-            'USER'
+            'USER',
+            session.user.uoid || undefined
           )
           setView('lobby')
           setIsJoiningLobby(false)
@@ -563,6 +564,9 @@ export default function UserActivityPreparePage() {
           onBack={handleBackFromLobby}
           questionCount={activity._count?.activityQuestions || 0}
           currentStep={1}
+          currentUserId={session?.user?.id}
+          currentUserName={username}
+          currentUserIcon={userIcon?.toString()}
         />
       </>
     )
