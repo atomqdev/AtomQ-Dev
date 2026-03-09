@@ -374,7 +374,7 @@ export default function QuizzesPage() {
       const response = await fetch("/api/admin/quiz")
       if (response.ok) {
         const data = await response.json()
-        setQuizzes(data)
+        setQuizzes(data.quizzes || [])
       }
     } catch (error) {
       toasts.networkError()
