@@ -87,7 +87,7 @@ export default function UserActivityPreparePage() {
     }
 
     // Check for saved activity state
-    const savedState = getActivityState(params.id as string)
+    const savedState = getActivityState(params?.id as string, session?.user?.id)
     if (savedState && savedState.role === 'USER') {
       setUsername(savedState.username || session.user.name || '')
       // Only restore valid views for user
@@ -104,13 +104,14 @@ export default function UserActivityPreparePage() {
 
     fetchActivity()
     fetchQuestions()
-  }, [session, status, router, params.id])
+  }, [session, status, router, params?.id as string])
 
   // Save activity state when view or username changes
   useEffect(() => {
     if (activity && session?.user && username) {
       const state: ActivityState = {
-        activityId: params.id as string,
+        activityId: params?.id as string,
+        userId: session.user.id,  // Add userId
         role: 'USER',
         view: view,
         username: username,
@@ -118,11 +119,11 @@ export default function UserActivityPreparePage() {
       }
       saveActivityState(state)
     }
-  }, [view, username, activity, session, params.id])
+  }, [view, username, activity, session, params?.id as string])
 
   const fetchActivity = async () => {
     try {
-      const response = await fetch(`/api/user/activity/${params.id}`)
+      const response = await fetch(`/api/user/activity/${params?.id as string}`)
       if (response.ok) {
         const data = await response.json()
         setActivity(data)
@@ -132,14 +133,14 @@ export default function UserActivityPreparePage() {
         }
 
         // Check if user already has an icon for this activity
-        const savedIcon = retrieveUserIcon(params.id as string)
+        const savedIcon = retrieveUserIcon(params?.id as string)
         if (savedIcon) {
           setUserIcon(savedIcon)
         } else {
           // Assign random icon
           const newIcon = getRandomUserIcon()
           setUserIcon(newIcon)
-          storeUserIcon(params.id as string, newIcon)
+          storeUserIcon(params?.id as string, newIcon)
         }
       } else if (response.status === 404) {
         setError("Activity not found")
@@ -159,7 +160,7 @@ export default function UserActivityPreparePage() {
 
   const fetchQuestions = async () => {
     try {
-      const response = await fetch(`/api/user/activity/${params.id}/questions`)
+      const response = await fetch(`/api/user/activity/${params?.id as string}/questions`)
       if (response.ok) {
         const data = await response.json()
         setQuestions(data)
@@ -300,6 +301,21 @@ export default function UserActivityPreparePage() {
 
           toasts.success('Host is back online!')
         },
+        onQuizAlreadyStarted: () => {
+          console.log('[User] Quiz already started')
+          setIsJoiningLobby(false)
+          toasts.error('This activity has already started. You cannot join now.')
+          // Clear activity state
+          clearActivityState(params?.id as string, session?.user?.id)
+          // Redirect after a short delay
+          setTimeout(() => {
+            router.push('/user/activity')
+          }, 2000)
+        },
+        onQuizStarted: () => {
+          console.log('[User] Quiz started')
+          setQuizStarted(true)
+        },
       })
     } catch (error) {
       console.error("Error joining lobby:", error)
@@ -399,7 +415,7 @@ export default function UserActivityPreparePage() {
 
   const handleBackFromLobby = () => {
     // Clear activity state from localStorage
-    clearActivityState(params.id as string)
+    clearActivityState(params?.id as string, session?.user?.id)
 
     // Clear admin disconnect timers
     if (adminDisconnectTimerRef.current) {
@@ -429,7 +445,7 @@ export default function UserActivityPreparePage() {
   const handleRegenerateIcon = () => {
     const newIcon = getRandomUserIcon()
     setUserIcon(newIcon)
-    storeUserIcon(params.id as string, newIcon)
+    storeUserIcon(params?.id as string, newIcon)
   }
 
   // Cleanup PartyKit connection on unmount
@@ -505,7 +521,7 @@ export default function UserActivityPreparePage() {
             duration: activity?.answerTime || 15,
             questionIndex: index + 1,
             totalQuestions: questions.length,
-            correctAnswer: parseInt(aq.question.correctAnswer),
+            correctAnswer: parseInt(aq.question.correctAnswer, 10) || 0, // Default to 0 if parsing fails
           }))}
           activityKey={activity.accessKey!}
           activityId={activity.id}
@@ -550,7 +566,7 @@ export default function UserActivityPreparePage() {
         )}
         <Lobby
           activityKey={activity.accessKey!}
-          activityId={params.id as string}
+          activityId={params?.id as string}
           users={users}
           currentUserRole="USER"
           isFullscreen={isFullscreen}

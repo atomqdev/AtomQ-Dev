@@ -211,6 +211,11 @@ export function AdminQuiz({
 
           case 'SHOW_ANSWER':
             console.log('[AdminQuiz] SHOW_ANSWER received')
+            console.log('[AdminQuiz] Full payload:', JSON.stringify(payload, null, 2))
+            console.log('[AdminQuiz] payload.question:', payload.question)
+            console.log('[AdminQuiz] payload.options:', payload.options)
+            console.log('[AdminQuiz] payload.correctAnswer:', payload.correctAnswer)
+            console.log('[AdminQuiz] payload.correctAnswer type:', typeof payload.correctAnswer)
             // Clear answer timer
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
 
@@ -219,12 +224,27 @@ export function AdminQuiz({
               setQuestionStats(payload.questionStats)
             }
 
-            // Update current question with correct answer from payload
-            if (payload.correctAnswer !== undefined && currentQuestion) {
+            // Use full question data from payload instead of relying on currentQuestion
+            if (payload.question && payload.options) {
+              console.log('[AdminQuiz] Using full question data from payload')
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration || 15,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: typeof payload.correctAnswer === 'number' ? payload.correctAnswer : parseInt(payload.correctAnswer || '0', 10)
+              })
+            } else if (payload.correctAnswer !== undefined && currentQuestion) {
+              console.log('[AdminQuiz] Using fallback - updating correctAnswer only. currentQuestion:', currentQuestion)
+              // Fallback: just update correctAnswer if full question data not available
               setCurrentQuestion({
                 ...currentQuestion,
-                correctAnswer: payload.correctAnswer
+                correctAnswer: typeof payload.correctAnswer === 'number' ? payload.correctAnswer : parseInt(payload.correctAnswer || '0', 10)
               })
+            } else {
+              console.log('[AdminQuiz] ERROR: Neither full question data nor currentQuestion available!')
             }
             break
 
@@ -388,16 +408,10 @@ export function AdminQuiz({
 
   const playerCount = users.filter(u => u.role !== 'ADMIN').length
 
-  // Get current question from props using questionIndex
-  const currentQuestionFromProps = currentQuestion
-    ? questions[currentQuestion.questionIndex - 1] || null
-    : null
-
-  // Use question from props if available, otherwise fall back to WebSocket payload
-  // If payload has question text, use it. Otherwise use the question from props
-  const displayQuestion = (currentQuestion?.question || currentQuestionFromProps?.question)
-    ? (currentQuestion?.question ? currentQuestion : currentQuestionFromProps)
-    : (currentQuestionFromProps || currentQuestion)
+  // displayQuestion should always come from currentQuestion (server payload)
+  // If currentQuestion exists with question data, use it
+  // Only fall back to props if absolutely necessary
+  const displayQuestion = currentQuestion?.question ? currentQuestion : null
 
   // Calculate progress based on (n+1) steps
   const totalQuestions = questionCount || questions.length

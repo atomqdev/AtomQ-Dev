@@ -75,7 +75,7 @@ export interface PartyKitEventHandlers {
   onUserUpdate?: (users: User[]) => void
   onAdminConfirmed?: () => void
   onGetReady?: (payload: { questionIndex: number; totalQuestions: number; duration: number }) => void
-  onQuestionLoader?: () => void
+  onQuestionLoader?: (payload: { questionIndex: number; totalQuestions: number; duration: number; question: string; options: string[] }) => void
   onQuestionStart?: (question: Question) => void
   onQuestionStatsUpdate?: (stats: QuestionStats) => void
   onAnswerConfirmed?: (payload: { score: number; timeSpent: number }) => void
@@ -261,7 +261,7 @@ export class PartyKitClient {
         break
 
       case 'QUESTION_LOADER':
-        this.handlers.onQuestionLoader?.()
+        this.handlers.onQuestionLoader?.(payload)
         break
 
       case 'QUESTION_START':
@@ -483,6 +483,7 @@ export function retrieveUserIcon(activityId: string): number | null {
 // Activity State Persistence for localStorage
 export interface ActivityState {
   activityId: string
+  userId: string  // Add userId to distinguish users
   role: 'ADMIN' | 'USER'
   view: string
   phase?: string
@@ -496,7 +497,7 @@ export const ACTIVITY_STATE_KEY = 'activity_state'
 
 export function saveActivityState(state: ActivityState) {
   try {
-    localStorage.setItem(`${ACTIVITY_STATE_KEY}_${state.activityId}`, JSON.stringify({
+    localStorage.setItem(`${ACTIVITY_STATE_KEY}_${state.activityId}_${state.userId}`, JSON.stringify({
       ...state,
       timestamp: Date.now()
     }))
@@ -505,12 +506,28 @@ export function saveActivityState(state: ActivityState) {
   }
 }
 
-export function getActivityState(activityId: string): ActivityState | null {
+export function getActivityState(activityId: string, userId?: string): ActivityState | null {
   try {
+    // If userId is provided, try to get user-specific state
+    if (userId) {
+      const userData = localStorage.getItem(`${ACTIVITY_STATE_KEY}_${activityId}_${userId}`)
+      if (userData) {
+        const parsed = JSON.parse(userData)
+        // Check if state is less than 24 hours old
+        const isRecent = (Date.now() - parsed.timestamp) < 24 * 60 * 60 * 1000
+        if (isRecent) {
+          return parsed
+        } else {
+          // Clear old state
+          clearActivityState(activityId, userId)
+        }
+      }
+    }
+
+    // Fall back to old format (without userId) for backward compatibility
     const data = localStorage.getItem(`${ACTIVITY_STATE_KEY}_${activityId}`)
     if (data) {
       const parsed = JSON.parse(data)
-      // Check if state is less than 24 hours old
       const isRecent = (Date.now() - parsed.timestamp) < 24 * 60 * 60 * 1000
       if (isRecent) {
         return parsed
@@ -525,8 +542,12 @@ export function getActivityState(activityId: string): ActivityState | null {
   return null
 }
 
-export function clearActivityState(activityId: string) {
+export function clearActivityState(activityId: string, userId?: string) {
   try {
+    if (userId) {
+      localStorage.removeItem(`${ACTIVITY_STATE_KEY}_${activityId}_${userId}`)
+    }
+    // Also clear old format
     localStorage.removeItem(`${ACTIVITY_STATE_KEY}_${activityId}`)
   } catch (error) {
     console.error('[PartyKit] Failed to clear activity state:', error)

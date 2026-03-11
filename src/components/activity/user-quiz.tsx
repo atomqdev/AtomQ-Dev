@@ -450,16 +450,9 @@ export function UserQuiz({
     ? Math.max(...questionStats.optionCounts)
     : 1
 
-  // Get current question from props using questionIndex
-  const currentQuestionFromProps = currentQuestion
-    ? questions[currentQuestion.questionIndex - 1] || null
-    : null
-
-  // Use question from props if available, otherwise fall back to WebSocket payload
-  // If payload has question text, use it. Otherwise use the question from props
-  const displayQuestion = (currentQuestion?.question || currentQuestionFromProps?.question)
-    ? (currentQuestion?.question ? currentQuestion : currentQuestionFromProps)
-    : (currentQuestionFromProps || currentQuestion)
+  // displayQuestion should always come from currentQuestion (server payload)
+  // If currentQuestion exists with question data, use it
+  const displayQuestion = currentQuestion?.question ? currentQuestion : null
 
   // Get user's leaderboard entry and their rank
   const userEntry = leaderboard.find(entry => entry.userId === currentUser.id)
@@ -507,12 +500,12 @@ export function UserQuiz({
 
         {/* Right: Timer, User info & Theme */}
         <div className="flex items-center gap-2">
-          {phase === 'question' && displayQuestion && (
+          {phase === 'question' && displayQuestion && answerTime > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
               <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-100"
-                  style={{ width: `${(answerTime / displayQuestion.duration) * 100}%` }}
+                  style={{ width: `${Math.max(0, Math.min(100, (answerTime / (displayQuestion.duration || 15)) * 100))}%` }}
                 />
               </div>
               <span className="text-sm font-bold text-primary">{Math.ceil(answerTime)}s</span>

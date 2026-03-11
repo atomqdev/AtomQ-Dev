@@ -13,14 +13,14 @@ export default function ActivityTakePage() {
 
   useEffect(() => {
     // Get the username from localStorage
-    const storedUsername = localStorage.getItem(`activity_username_${params.id}`)
+    const storedUsername = localStorage.getItem(`activity_username_${params?.id as string}`)
     if (storedUsername) {
       setUsername(storedUsername)
     } else {
       // If no username, redirect back to prepare page
-      router.push(`/user/activity-prepare/${params.id}`)
+      router.push(`/user/activity-prepare/${params?.id as string}`)
     }
-  }, [params.id, router])
+  }, [params?.id as string, router])
 
   const handleBack = () => {
     router.push("/user/activity")

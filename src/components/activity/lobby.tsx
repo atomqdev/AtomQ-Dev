@@ -201,16 +201,18 @@ export function Lobby({
             {/* Big User Icon */}
             <div className="relative inline-block mb-6">
               <div className="w-48 h-48 rounded-full bg-gradient-to-br from-orange-400/20 to-orange-600/20 dark:from-orange-400/30 dark:to-orange-600/30 backdrop-blur-md border-4 border-orange-400/40 dark:border-orange-400/50 shadow-[0_0_40px_rgba(251,146,60,0.5)] dark:shadow-[0_0_50px_rgba(251,146,60,0.7)] flex items-center justify-center overflow-hidden">
-                <img
-                  src={getUserIconUrl(parseInt(currentUser.avatar))}
-                  alt={currentUser.nickname}
-                  className="w-40 h-40 rounded-full object-cover"
-                />
+                {currentUser && (
+                  <img
+                    src={getUserIconUrl(parseInt(currentUser.avatar))}
+                    alt={currentUser.nickname}
+                    className="w-40 h-40 rounded-full object-cover"
+                  />
+                )}
               </div>
             </div>
 
             {/* User Name */}
-            <h1 className="text-4xl font-bold mb-4">{currentUser.nickname}</h1>
+            <h1 className="text-4xl font-bold mb-4">{currentUser?.nickname}</h1>
 
             {/* Waiting Message */}
             <div className="flex items-center justify-center gap-2 text-muted-foreground">

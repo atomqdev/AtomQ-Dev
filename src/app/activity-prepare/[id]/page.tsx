@@ -63,6 +63,7 @@ export default function ActivityPreparePage() {
   const [isConnected, setIsConnected] = useState(false)
   const [quizStarted, setQuizStarted] = useState(false)
   const partyKitClientRef = useRef<PartyKitClient | null>(null)
+  const [shouldDisconnect, setShouldDisconnect] = useState(true) // Flag to control disconnect behavior
 
   useEffect(() => {
     if (status === "loading") return
@@ -79,34 +80,37 @@ export default function ActivityPreparePage() {
     }
 
     // Check for saved activity state
-    const savedState = getActivityState(params.id as string)
+    const savedState = getActivityState(params?.id as string, session?.user?.id)
     if (savedState && savedState.role === 'ADMIN') {
       // Only restore valid views for admin
       if (savedState.view === 'prepare' || savedState.view === 'lobby' || savedState.view === 'quiz') {
         setView(savedState.view as View)
       }
-      if (savedState.view === 'lobby' || savedState.view === 'quiz') {
-        // Auto-reconnect if they were in lobby or quiz
+      // Only auto-reconnect if they were in lobby or quiz AND not already connected
+      // This prevents reconnection on tab switch when connection is still active
+      if ((savedState.view === 'lobby' || savedState.view === 'quiz') && !isConnected && !partyKitClientRef.current) {
+        console.log('[Activity-Prepare] Auto-reconnecting to lobby/quiz from saved state')
         handleJoinLobby()
       }
     }
 
     fetchActivity()
     fetchQuestions()
-  }, [session, status, router, params.id])
+  }, [session, status, router, params?.id as string, isConnected])
 
   // Save activity state when view changes
   useEffect(() => {
     if (activity && session?.user) {
       const state: ActivityState = {
-        activityId: params.id as string,
+        activityId: params?.id as string,
+        userId: session.user.id,  // Add userId
         role: 'ADMIN',
         view: view,
         timestamp: Date.now()
       }
       saveActivityState(state)
     }
-  }, [view, activity, session, params.id])
+  }, [view, activity, session, params?.id as string])
 
   // Poll for server status updates when in CREATING state
   useEffect(() => {
@@ -119,7 +123,7 @@ export default function ActivityPreparePage() {
     const pollInterval = setInterval(async () => {
       try {
         console.log('[Activity-Prepare] Polling server status...')
-        const response = await fetch(`/api/admin/activities/${params.id}/server`)
+        const response = await fetch(`/api/admin/activities/${params?.id as string}/server`)
         if (response.ok) {
           const data = await response.json()
           console.log('[Activity-Prepare] Server status:', data.serverStatus)
@@ -143,11 +147,11 @@ export default function ActivityPreparePage() {
       console.log('[Activity-Prepare] Cleaning up poll interval')
       clearInterval(pollInterval)
     }
-  }, [activity, params.id])
+  }, [activity, params?.id as string])
 
   const fetchActivity = async () => {
     try {
-      const response = await fetch(`/api/admin/activities/${params.id}`)
+      const response = await fetch(`/api/admin/activities/${params?.id as string}`)
       if (response.ok) {
         const data = await response.json()
         console.log('[Activity-Prepare] Fetched activity:', {
@@ -174,7 +178,7 @@ export default function ActivityPreparePage() {
 
   const fetchQuestions = async () => {
     try {
-      const response = await fetch(`/api/admin/activities/${params.id}/questions`)
+      const response = await fetch(`/api/admin/activities/${params?.id as string}/questions`)
       if (response.ok) {
         const data = await response.json()
         setQuestions(data)
@@ -307,7 +311,7 @@ export default function ActivityPreparePage() {
         duration: activity?.answerTime || 15,
         questionIndex: index + 1,
         totalQuestions: questions.length,
-        correctAnswer: parseInt(aq.question.correctAnswer),
+        correctAnswer: parseInt(aq.question.correctAnswer, 10) || 0, // Default to 0 if parsing fails
       }
       console.log(`[Admin] Formatting question ${index + 1}:`, formattedQuestion)
       return formattedQuestion
@@ -398,6 +402,21 @@ export default function ActivityPreparePage() {
     }
   }, [view])
 
+  // Handle visibility change to prevent redirect on tab switch
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log('[Activity-Prepare] Visibility changed:', document.hidden ? 'hidden' : 'visible')
+      // When tab becomes visible again, PartyKit WebSocket should auto-reconnect
+      // We don't need to manually reconnect or redirect
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   const handleToggleFullscreen = () => {
     if (checkFullscreen()) {
       // Exit fullscreen
@@ -415,7 +434,10 @@ export default function ActivityPreparePage() {
 
   const handleBackFromLobby = () => {
     // Clear activity state from localStorage
-    clearActivityState(params.id as string)
+    clearActivityState(params?.id as string, session?.user?.id)
+
+    // Set flag to allow disconnect
+    setShouldDisconnect(true)
 
     // Close the room to notify all users
     if (partyKitClientRef.current) {
@@ -433,14 +455,14 @@ export default function ActivityPreparePage() {
     setIsConnected(false)
   }
 
-  // Cleanup PartyKit connection on unmount
+  // Cleanup PartyKit connection on unmount - only if shouldDisconnect is true
   useEffect(() => {
     return () => {
-      if (partyKitClientRef.current) {
+      if (shouldDisconnect && partyKitClientRef.current) {
         partyKitClientRef.current.disconnect()
       }
     }
-  }, [])
+  }, [shouldDisconnect])
 
   if (status === "loading" || loading) {
     return (
@@ -485,7 +507,7 @@ export default function ActivityPreparePage() {
             duration: activity?.answerTime || 15,
             questionIndex: index + 1,
             totalQuestions: questions.length,
-            correctAnswer: parseInt(aq.question.correctAnswer),
+            correctAnswer: parseInt(aq.question.correctAnswer, 10) || 0, // Default to 0 if parsing fails
           }))}
           activityKey={activity.accessKey!}
           activityId={activity.id}
