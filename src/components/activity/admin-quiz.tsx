@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { PartyKitClient, Question, QuestionStats, LeaderboardEntry, getUserIconUrl, clearActivityState } from "@/lib/partykit-client"
 import { Play, Users, ChevronRight, Eye, Trophy, RotateCcw, LogOut, Minimize2, Sun, Moon, AlertTriangle } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -83,6 +84,19 @@ export function AdminQuiz({
             setQuestionIndex(payload.questionIndex)
             setGetReadyTime(payload.duration || 5)
 
+            // Set current question from payload
+            if (payload.question) {
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: payload.correctAnswer ?? questions[payload.questionIndex - 1]?.correctAnswer ?? 0
+              })
+            }
+
             // Start countdown for get ready phase
             let time = payload.duration || 5
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
@@ -112,6 +126,19 @@ export function AdminQuiz({
             console.log('[AdminQuiz] QUESTION_LOADER received')
             setPhase('question_loader')
             setLoaderTime(5)
+
+            // Set current question from payload
+            if (payload.question) {
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: payload.correctAnswer ?? questions[payload.questionIndex - 1]?.correctAnswer ?? 0
+              })
+            }
 
             // Start countdown for loader phase
             let lTime = 5
@@ -190,6 +217,14 @@ export function AdminQuiz({
             setPhase('show_answer')
             if (payload.questionStats) {
               setQuestionStats(payload.questionStats)
+            }
+
+            // Update current question with correct answer from payload
+            if (payload.correctAnswer !== undefined && currentQuestion) {
+              setCurrentQuestion({
+                ...currentQuestion,
+                correctAnswer: payload.correctAnswer
+              })
             }
             break
 
@@ -656,7 +691,9 @@ export function AdminQuiz({
                     <h2 className="text-2xl font-bold mb-2">
                       Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                     </h2>
-                    <p className="text-xl text-muted-foreground">{displayQuestion.question}</p>
+                    <div className="text-xl text-muted-foreground">
+                      <RichTextDisplay content={displayQuestion.question} />
+                    </div>
                   </div>
                 )}
 
@@ -700,7 +737,9 @@ export function AdminQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
+                  <div className="text-2xl font-bold">
+                    <RichTextDisplay content={displayQuestion.question} />
+                  </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
@@ -763,7 +802,9 @@ export function AdminQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
+                  <div className="text-2xl font-bold">
+                    <RichTextDisplay content={displayQuestion.question} />
+                  </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>

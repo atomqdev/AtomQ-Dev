@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { PartyKitClient, Question, QuestionStats, LeaderboardEntry, getUserIconUrl, clearActivityState } from "@/lib/partykit-client"
 import { Play, Users, Trophy, LogOut, Minimize2, Sun, Moon, Check, X, Home, AlertCircle, Clock } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -187,6 +188,19 @@ export function UserQuiz({
             setPointsEarned(0)
             setTimeTaken(0)
 
+            // Set current question from payload
+            if (payload.question) {
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: payload.correctAnswer ?? questions[payload.questionIndex - 1]?.correctAnswer ?? 0
+              })
+            }
+
             // Start countdown for get ready phase
             let time = payload.duration || 5
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
@@ -216,6 +230,19 @@ export function UserQuiz({
             console.log('[UserQuiz] QUESTION_LOADER received')
             setPhase('question_loader')
             setLoaderTime(5)
+
+            // Set current question from payload
+            if (payload.question) {
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: payload.correctAnswer ?? questions[payload.questionIndex - 1]?.correctAnswer ?? 0
+              })
+            }
 
             // Start countdown for loader phase
             let lTime = 5
@@ -309,14 +336,26 @@ export function UserQuiz({
               setQuestionStats(payload.questionStats)
             }
 
-            // Check if user's answer is correct
-            if (currentQuestion && myAnswer !== null) {
-              const correct = myAnswer === currentQuestion.correctAnswer
+            // Update current question with correct answer from payload
+            if (payload.correctAnswer !== undefined && currentQuestion) {
+              setCurrentQuestion({
+                ...currentQuestion,
+                correctAnswer: payload.correctAnswer
+              })
+            }
+
+            // Check if user's answer is correct (use payload.correctAnswer if available)
+            const correctAnswer = payload.correctAnswer !== undefined
+              ? payload.correctAnswer
+              : currentQuestion?.correctAnswer ?? 0
+
+            if (myAnswer !== null) {
+              const correct = myAnswer === correctAnswer
               setIsCorrect(correct)
-              
+
               // Add to score breakdown
               const breakdown: ScoreBreakdown = {
-                questionIndex: currentQuestion.questionIndex,
+                questionIndex: currentQuestion?.questionIndex || questionIndex,
                 points: pointsEarned,
                 timeTaken: timeSpent,
                 isCorrect: correct,
@@ -644,7 +683,9 @@ export function UserQuiz({
                     <h2 className="text-2xl font-bold mb-2">
                       Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                     </h2>
-                    <p className="text-xl text-muted-foreground">{displayQuestion.question}</p>
+                    <div className="text-xl text-muted-foreground">
+                      <RichTextDisplay content={displayQuestion.question} />
+                    </div>
                   </div>
                 )}
 
@@ -688,7 +729,9 @@ export function UserQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
+                  <div className="text-2xl font-bold">
+                    <RichTextDisplay content={displayQuestion.question} />
+                  </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>
@@ -749,7 +792,9 @@ export function UserQuiz({
               <div className="space-y-6">
                 {/* Question at top */}
                 <div className="text-center pb-6 border-b">
-                  <h2 className="text-2xl font-bold">{displayQuestion.question}</h2>
+                  <div className="text-2xl font-bold">
+                    <RichTextDisplay content={displayQuestion.question} />
+                  </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Question {displayQuestion.questionIndex}/{displayQuestion.totalQuestions}
                   </p>

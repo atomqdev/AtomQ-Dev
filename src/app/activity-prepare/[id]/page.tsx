@@ -302,7 +302,7 @@ export default function ActivityPreparePage() {
       const options = JSON.parse(aq.question.options)
       const formattedQuestion = {
         id: aq.question.id,
-        text: aq.question.content,
+        question: aq.question.content,
         options: Array.isArray(options) ? options : [],
         duration: activity?.answerTime || 15,
         questionIndex: index + 1,
