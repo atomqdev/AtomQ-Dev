@@ -128,18 +128,37 @@ export function AdminQuiz({
           case 'QUESTION_START':
             console.log('[AdminQuiz] QUESTION_START received')
             console.log('[AdminQuiz] Full payload:', JSON.stringify(payload, null, 2))
-            console.log('[AdminQuiz] Payload.question field:', payload.question)
             // Clear any running timers
             if (getReadyTimerRef.current) clearInterval(getReadyTimerRef.current)
             if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
             if (answerTimerRef.current) clearInterval(answerTimerRef.current)
 
             setPhase('question')
-            setCurrentQuestion(payload)
-            setQuestionStats(null)
             setQuestionIndex(payload.questionIndex)
             setAnswerTime(payload.duration)
             questionStartTimeRef.current = Date.now()
+
+            // Try to get question text from payload, otherwise look it up from props
+            if (payload.question) {
+              setCurrentQuestion({
+                id: payload.questionId,
+                question: payload.question,
+                options: payload.options,
+                duration: payload.duration,
+                questionIndex: payload.questionIndex,
+                totalQuestions: payload.totalQuestions,
+                correctAnswer: payload.correctAnswer ?? questions[payload.questionIndex - 1]?.correctAnswer ?? 0
+              })
+            } else {
+              // Look up question from props
+              const questionFromProps = questions[payload.questionIndex - 1]
+              if (questionFromProps) {
+                setCurrentQuestion(questionFromProps)
+              } else {
+                setCurrentQuestion(payload)
+              }
+            }
+            setQuestionStats(null)
 
             // Start answer timer
             answerTimerRef.current = setInterval(() => {
@@ -340,7 +359,10 @@ export function AdminQuiz({
     : null
 
   // Use question from props if available, otherwise fall back to WebSocket payload
-  const displayQuestion = currentQuestionFromProps || currentQuestion
+  // If payload has question text, use it. Otherwise use the question from props
+  const displayQuestion = (currentQuestion?.question || currentQuestionFromProps?.question)
+    ? (currentQuestion?.question ? currentQuestion : currentQuestionFromProps)
+    : (currentQuestionFromProps || currentQuestion)
 
   // Calculate progress based on (n+1) steps
   const totalQuestions = questionCount || questions.length

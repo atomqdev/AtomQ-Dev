@@ -81,7 +81,6 @@ export default function ActivityPreparePage() {
     // Check for saved activity state
     const savedState = getActivityState(params.id as string)
     if (savedState && savedState.role === 'ADMIN') {
-      console.log('[Activity-Prepare] Found saved state:', savedState)
       // Only restore valid views for admin
       if (savedState.view === 'prepare' || savedState.view === 'lobby' || savedState.view === 'quiz') {
         setView(savedState.view as View)
@@ -208,12 +207,8 @@ export default function ActivityPreparePage() {
       return
     }
 
-    // Enable fullscreen before joining lobby
-    const fullscreenEnabled = await enterFullscreen()
-    if (!fullscreenEnabled) {
-      toasts.error('Please enable fullscreen to continue')
-      return
-    }
+    // Note: Fullscreen requires user gesture, so we won't auto-enable it
+    // Users can manually toggle it using the fullscreen button in the UI
 
     console.log('[Admin] Attempting to join lobby with access key:', activity.accessKey)
 
@@ -307,7 +302,7 @@ export default function ActivityPreparePage() {
       const options = JSON.parse(aq.question.options)
       const formattedQuestion = {
         id: aq.question.id,
-        question: aq.question.content,
+        text: aq.question.content,
         options: Array.isArray(options) ? options : [],
         duration: activity?.answerTime || 15,
         questionIndex: index + 1,

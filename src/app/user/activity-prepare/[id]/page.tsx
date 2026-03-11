@@ -89,7 +89,6 @@ export default function UserActivityPreparePage() {
     // Check for saved activity state
     const savedState = getActivityState(params.id as string)
     if (savedState && savedState.role === 'USER') {
-      console.log('[User Activity-Prepare] Found saved state:', savedState)
       setUsername(savedState.username || session.user.name || '')
       // Only restore valid views for user
       if (savedState.view === 'join' || savedState.view === 'lobby' || savedState.view === 'quiz') {
@@ -185,13 +184,8 @@ export default function UserActivityPreparePage() {
 
     setIsJoiningLobby(true)
 
-    // Enable fullscreen before joining lobby
-    const fullscreenEnabled = await enterFullscreen()
-    if (!fullscreenEnabled) {
-      toasts.error('Please enable fullscreen to continue')
-      setIsJoiningLobby(false)
-      return
-    }
+    // Note: Fullscreen requires user gesture, so we won't auto-enable it
+    // Users can manually toggle it using the fullscreen button in the UI
 
     try {
       // Initialize PartyKit client

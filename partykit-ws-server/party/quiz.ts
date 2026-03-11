@@ -308,6 +308,7 @@ export default class QuizServer implements Party.Server {
         questionId: question.id,
         question: question.text,
         options: question.options,
+        correctAnswer: question.correctAnswer,
         duration,
         questionIndex: questionIndex + 1,
         totalQuestions: room.questions.length
