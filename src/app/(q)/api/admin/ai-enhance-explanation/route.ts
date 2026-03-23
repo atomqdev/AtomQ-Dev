@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { UserRole } from "@prisma/client"
-import OpenAI from 'openai'
+import OpenAI from "openai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,12 @@ export async function POST(request: NextRequest) {
       mode
     } = body
 
-    console.log("AI Enhance Request:", { mode, hasQuestion: !!questionContent, hasOptions: !!options, hasExplanation: !!currentExplanation })
+    console.log("AI Enhance Request:", {
+      mode,
+      hasQuestion: !!questionContent,
+      hasOptions: !!options,
+      hasExplanation: !!currentExplanation
+    })
 
     if (mode === "beautify" && !currentExplanation) {
       return NextResponse.json(
@@ -35,104 +40,99 @@ export async function POST(request: NextRequest) {
 
     if (mode === "enhance" && (!questionContent || !options || !correctAnswer)) {
       return NextResponse.json(
-        { message: "Question content, options, and correct answer are required for enhance mode" },
+        {
+          message: "Question content, options, and correct answer are required for enhance mode"
+        },
         { status: 400 }
       )
     }
 
-    // Build the prompt based on the mode
-    let systemPrompt = ""
+    // Build prompts
+    let systemPrompt = `
+You are an expert educator.
+
+Return ONLY valid HTML.
+Do NOT include markdown, backticks, or explanations.
+Output must start with an HTML tag.
+`
+
     let userPrompt = ""
 
     if (mode === "enhance") {
-      // Enhance & Beautify mode
       const correctAnswers = correctAnswer.split('|').map((a: string) => a.trim())
+
       const optionList = options.map((opt: string, idx: number) => {
         const isCorrect = correctAnswers.includes(opt.trim())
         return `${idx + 1}. ${opt}${isCorrect ? ' (CORRECT)' : ''}`
       }).join('\n')
 
-      systemPrompt = "You are an expert educator who creates clear, well-formatted explanations for quiz questions. You respond ONLY with HTML content, no conversational text."
-
-      userPrompt = `You are an expert educator. I need you to enhance and beautify a question explanation.
-
+      userPrompt = `
 Question Content: ${questionContent}
 
 Options:
 ${optionList}
 
-Current Explanation (if any): ${currentExplanation || "No current explanation"}
+Current Explanation: ${currentExplanation || "None"}
 
-Please create a comprehensive and detailed explanation that:
-1. For EACH option, explain whether it's CORRECT or WRONG and WHY
-2. Highlight the CORRECT option in GREEN color using: <span style="color: #16a34a;"><strong>Option X</strong></span>
-3. Highlight WRONG options in RED color using: <span style="color: #dc2626;"><strong>Option X</strong></span>
-4. Below each highlighted option, provide the explanation in normal text (no color)
-5. Make important points/keywords bold using <strong> tags
-6. Structure the explanation in a clear, educational way that helps students understand the concept
+Generate a detailed explanation:
 
-The explanation should be in HTML format suitable for a rich text editor. Use proper HTML tags like <p>, <ul>, <li>, <strong>, <span>, etc.
-
-Return ONLY the HTML content, no other text or explanations.`
+Rules:
+1. Explain EACH option (correct or wrong)
+2. Correct → <span style="color: #16a34a;"><strong>Option X</strong></span>
+3. Wrong → <span style="color: #dc2626;"><strong>Option X</strong></span>
+4. Explanation below each option (normal text)
+5. Use <strong> for key points
+6. Use clean HTML: <p>, <ul>, <li>, etc.
+`
     } else {
-      // Beautify only mode
-      systemPrompt = "You are an expert educator who creates clear, well-formatted explanations for quiz questions. You respond ONLY with HTML content, no conversational text."
+      userPrompt = `
+Current Explanation:
+${currentExplanation}
 
-      userPrompt = `You are an expert educator. I need you to beautify an existing explanation for a question.
+Beautify and format it:
 
-Current Explanation: ${currentExplanation}
-
-Please reformat and beautify this explanation by:
-1. Identifying options mentioned and highlighting CORRECT options in GREEN using: <span style="color: #16a34a;"><strong>[option text]</strong></span>
-2. Highlighting WRONG options in RED using: <span style="color: #dc2626;"><strong>[option text]</strong></span>
-3. Keeping all the original content and explanations
-4. Make important points/keywords bold using <strong> tags
-5. Structure it in a clear, readable format using proper HTML
-
-The explanation should be in HTML format suitable for a rich text editor. Use proper HTML tags like <p>, <ul>, <li>, <strong>, <span>, etc.
-
-Return ONLY the HTML content, no other text or explanations.`
+Rules:
+1. Highlight correct in GREEN
+2. Highlight wrong in RED
+3. Keep original meaning
+4. Use <strong> for key points
+5. Use proper HTML formatting
+`
     }
 
-    console.log("Initializing OpenAI SDK")
-
-    // Create OpenAI instance
+    // Init OpenAI
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     })
-    console.log("OpenAI SDK initialized successfully")
 
-    // Call AI API
-    console.log("Calling AI API for chat completion")
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
-      messages: [
+    console.log("Calling OpenAI Responses API")
+
+    const response = await openai.responses.create({
+      model: "gpt-5-nano",
+      input: [
         {
-          role: 'system',
+          role: "system",
           content: systemPrompt
         },
         {
-          role: 'user',
+          role: "user",
           content: userPrompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
+      max_output_tokens: 2000
     })
 
-    console.log("AI API response received:", JSON.stringify(completion).substring(0, 200))
-
-    const enhancedExplanation = completion.choices?.[0]?.message?.content || ''
+    const enhancedExplanation = response.output_text || ""
 
     if (!enhancedExplanation) {
-      console.error("Empty response from AI API:", completion)
+      console.error("Empty AI response:", response)
       return NextResponse.json(
-        { message: "Failed to generate explanation - empty response" },
+        { message: "Failed to generate explanation" },
         { status: 500 }
       )
     }
 
-    console.log("Successfully generated explanation, length:", enhancedExplanation.length)
+    console.log("Generated explanation length:", enhancedExplanation.length)
 
     return NextResponse.json({
       explanation: enhancedExplanation
@@ -140,11 +140,11 @@ Return ONLY the HTML content, no other text or explanations.`
 
   } catch (error: any) {
     console.error("Error enhancing explanation:", error)
-    console.error("Error type:", error?.constructor?.name)
-    console.error("Error message:", error?.message)
-    console.error("Error stack:", error?.stack)
+
     return NextResponse.json(
-      { message: `AI API error: ${error?.message || 'Unknown error'}` },
+      {
+        message: `AI API error: ${error?.message || "Unknown error"}`
+      },
       { status: 500 }
     )
   }
