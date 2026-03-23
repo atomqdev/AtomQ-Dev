@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain } from "lucide-react"
+import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain, Sparkles, Undo2 } from "lucide-react"
 import { format } from "date-fns"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
@@ -89,6 +89,11 @@ export default function QuestionGroupPage() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+
+  // AI Enhancement states
+  const [aiEnhancing, setAiEnhancing] = useState(false)
+  const [explanationHistory, setExplanationHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
 
   const columns: ColumnDef<Question>[] = [
     {
@@ -360,6 +365,9 @@ export default function QuestionGroupPage() {
       difficulty: question.difficulty,
       isActive: question.isActive
     })
+    // Reset history when editing a new question
+    setExplanationHistory([])
+    setHistoryIndex(-1)
     setIsDialogOpen(true)
   }
 
@@ -402,6 +410,8 @@ export default function QuestionGroupPage() {
       difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
       isActive: true
     })
+    setExplanationHistory([])
+    setHistoryIndex(-1)
   }
 
   const addOption = () => {
@@ -450,6 +460,70 @@ export default function QuestionGroupPage() {
         correctAnswer: isChecked ? option : "",
         correctAnswers: isChecked ? [option] : []
       })
+    }
+  }
+
+  // Save current explanation to history before making changes
+  const saveToHistory = (explanation: string) => {
+    if (explanation && explanation !== explanationHistory[historyIndex]) {
+      const newHistory = explanationHistory.slice(0, historyIndex + 1)
+      newHistory.push(explanation)
+      setExplanationHistory(newHistory)
+      setHistoryIndex(newHistory.length - 1)
+    }
+  }
+
+  // Handle AI Enhancement
+  const handleAIEnhance = async (mode: 'enhance' | 'beautify') => {
+    // Save current explanation to history before enhancing
+    if (formData.explanation) {
+      saveToHistory(formData.explanation)
+    }
+
+    setAiEnhancing(true)
+    try {
+      const response = await fetch('/api/admin/ai-enhance-explanation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          questionContent: formData.content,
+          options: formData.options,
+          correctAnswer: formData.correctAnswer,
+          currentExplanation: formData.explanation,
+          mode
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setFormData({ ...formData, explanation: data.explanation })
+        toast.success(mode === 'enhance' ? 'Explanation enhanced and beautified!' : 'Explanation beautified!')
+      } else {
+        const errorData = await response.json()
+        toast.error(`Error: ${errorData.message}`)
+      }
+    } catch (error) {
+      console.error("Error enhancing explanation:", error)
+      toast.error("Failed to enhance explanation. Please try again.")
+    } finally {
+      setAiEnhancing(false)
+    }
+  }
+
+  // Handle Undo
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setFormData({ ...formData, explanation: explanationHistory[newIndex] })
+      toast.success("Undone to previous version")
+    } else if (historyIndex === 0) {
+      // If we're at the first history item, clear the explanation
+      setHistoryIndex(-1)
+      setFormData({ ...formData, explanation: "" })
+      toast.success("Undone to original")
     }
   }
 
@@ -897,6 +971,42 @@ export default function QuestionGroupPage() {
                     placeholder="Enter explanation..."
                     className="min-h-[100px]"
                   />
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAIEnhance('enhance')}
+                      disabled={aiEnhancing || !formData.content || formData.options.filter(o => o.trim()).length === 0}
+                      className="flex-1"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {aiEnhancing ? 'Enhancing...' : 'Enhance & Beautify'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAIEnhance('beautify')}
+                      disabled={aiEnhancing || !formData.explanation}
+                      className="flex-1"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {aiEnhancing ? 'Beautifying...' : 'Beautify'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUndo}
+                      disabled={historyIndex < 0}
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <strong>Enhance & Beautify:</strong> Adds detailed explanations for each option • <strong>Beautify:</strong> Formats existing explanation with colors
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2">

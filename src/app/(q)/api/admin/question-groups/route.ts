@@ -31,6 +31,19 @@ export async function GET(
           select: {
             questions: true
           }
+        },
+        questions: {
+          include: {
+            _count: {
+              select: {
+                reportedQuestions: {
+                  where: {
+                    status: 'PENDING'
+                  }
+                }
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -38,7 +51,18 @@ export async function GET(
       }
     })
 
-    return NextResponse.json(questionGroups)
+    // Calculate total reported questions count for each group
+    const questionGroupsWithReportedCount = questionGroups.map(group => ({
+      ...group,
+      _count: {
+        ...group._count,
+        reportedQuestions: group.questions.reduce((sum, q) => sum + q._count.reportedQuestions, 0)
+      },
+      // Remove the questions array to avoid sending too much data
+      questions: undefined
+    }))
+
+    return NextResponse.json(questionGroupsWithReportedCount)
   } catch (error) {
     console.error("Error fetching question groups:", error)
     return NextResponse.json(
@@ -96,11 +120,35 @@ export async function POST(
           select: {
             questions: true
           }
+        },
+        questions: {
+          include: {
+            _count: {
+              select: {
+                reportedQuestions: {
+                  where: {
+                    status: 'PENDING'
+                  }
+                }
+              }
+            }
+          }
         }
       }
     })
 
-    return NextResponse.json(questionGroup, { status: 201 })
+    // Calculate total reported questions count
+    const questionGroupWithReportedCount = {
+      ...questionGroup,
+      _count: {
+        ...questionGroup._count,
+        reportedQuestions: questionGroup.questions.reduce((sum, q) => sum + q._count.reportedQuestions, 0)
+      },
+      // Remove the questions array to avoid sending too much data
+      questions: undefined
+    }
+
+    return NextResponse.json(questionGroupWithReportedCount, { status: 201 })
   } catch (error) {
     console.error("Error creating question group:", error)
     return NextResponse.json(

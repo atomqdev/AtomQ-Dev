@@ -84,6 +84,7 @@ interface QuestionGroup {
   }
   _count: {
     questions: number
+    reportedQuestions: number
   }
 }
 
@@ -164,6 +165,22 @@ export default function QuestionGroupsPage() {
       cell: ({ row }) => {
         const group = row.original
         return group._count?.questions || 0
+      },
+    },
+    {
+      accessorKey: "_count.reportedQuestions",
+      header: "Reported",
+      cell: ({ row }) => {
+        const group = row.original
+        const reportedCount = group._count?.reportedQuestions || 0
+        return (
+          <div className="flex items-center gap-2">
+            <span>{reportedCount}</span>
+            {reportedCount > 0 && (
+              <TriangleAlert className="h-4 w-4 text-yellow-600" />
+            )}
+          </div>
+        )
       },
     },
     {
@@ -462,6 +479,7 @@ export default function QuestionGroupsPage() {
       description: group.description || "",
       isActive: group.isActive,
       questions: group._count?.questions || 0,
+      reportedQuestions: group._count?.reportedQuestions || 0,
       createdBy: group.creator?.name || group.creator?.email || "",
       createdAt: group.createdAt,
     }))
