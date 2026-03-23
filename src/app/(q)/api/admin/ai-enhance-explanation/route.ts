@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { UserRole } from "@prisma/client"
-import ZAI from 'z-ai-web-dev-sdk'
+import OpenAI from 'openai'
 
 export async function POST(request: NextRequest) {
   try {
@@ -94,16 +94,18 @@ The explanation should be in HTML format suitable for a rich text editor. Use pr
 Return ONLY the HTML content, no other text or explanations.`
     }
 
-    console.log("Initializing ZAI SDK")
+    console.log("Initializing OpenAI SDK")
 
-    // Create ZAI instance
-    const zai = await ZAI.create()
-    console.log("ZAI SDK initialized successfully")
+    // Create OpenAI instance
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    })
+    console.log("OpenAI SDK initialized successfully")
 
     // Call AI API
     console.log("Calling AI API for chat completion")
-    const completion = await zai.chat.completions.create({
-      model: 'glm-4-flash',
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
       messages: [
         {
           role: 'system',
