@@ -34,8 +34,8 @@ export async function POST(
         id: true,
         title: true,
         status: true,
-        startTime: true,
-        endTime: true,
+        startDate: true,
+        endDate: true,
         maxAttempts: true,
         quizQuestions: {
           select: {
@@ -61,27 +61,27 @@ export async function POST(
 
     // Check time constraints
     const now = new Date()
-    if (quiz.startTime) {
-      const startTime = new Date(quiz.startTime)
+    if (quiz.startDate) {
+      const startDate = new Date(quiz.startDate)
 
-      if (startTime > now) {
+      if (startDate > now) {
         return NextResponse.json(
           { message: "Quiz has not started yet" },
           { status: 400 }
         )
       }
 
-      // Allow 30 minutes after start time to begin
-      const thirtyMinutesAfterStart = new Date(startTime.getTime() + 30 * 60 * 1000)
+      // Allow 30 minutes after start date to begin
+      const thirtyMinutesAfterStart = new Date(startDate.getTime() + 30 * 60 * 1000)
       if (now > thirtyMinutesAfterStart) {
         return NextResponse.json(
-          { message: "Quiz start window has expired. You must start within 30 minutes of the start time." },
+          { message: "Quiz start window has expired. You must start within 30 minutes of the start date." },
           { status: 400 }
         )
       }
     }
 
-    if (quiz.endTime && new Date(quiz.endTime) < now) {
+    if (quiz.endDate && new Date(quiz.endDate) < now) {
       return NextResponse.json(
         { message: "Quiz has expired" },
         { status: 400 }

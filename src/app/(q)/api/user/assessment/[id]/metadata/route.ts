@@ -30,8 +30,10 @@ export async function GET(
         description: true,
         timeLimit: true,
         startTime: true,
+        endtime: true,
         accessKey: true,
-        maxTabs: true,
+        tabswitches: true,
+        autosubmit: true,
         disableCopyPaste: true,
         campus: {
           select: {
@@ -59,7 +61,8 @@ export async function GET(
           title: true,
           description: true,
           timeLimit: true,
-          startTime: true,
+          startDate: true,
+          endDate: true,
           checkAnswerEnabled: true,
           campus: {
             select: {

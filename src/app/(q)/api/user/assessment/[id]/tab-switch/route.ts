@@ -75,10 +75,10 @@ export async function POST(
     // Get assessment/quiz to check max tabs setting
     let assessment = await db.assessment.findUnique({
       where: { id: assessmentId },
-      select: { maxTabs: true },
+      select: { tabswitches: true },
     })
 
-    let maxTabs = assessment?.maxTabs || MAX_TAB_SWITCHES
+    let maxTabs = assessment?.tabswitches || MAX_TAB_SWITCHES
 
     // Check existing tab switches based on type
     let existingSwitches: any[] = []

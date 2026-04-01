@@ -91,8 +91,8 @@ export async function GET(
           description: true,
           timeLimit: true,
           status: true,
-          startTime: true,
-          endTime: true,
+          startDate: true,
+          endDate: true,
           maxAttempts: true,
           showAnswers: true,
           checkAnswerEnabled: true,
@@ -123,14 +123,14 @@ export async function GET(
 
       // Check time constraints
       const now = new Date()
-      if (quiz.startTime && new Date(quiz.startTime) > now) {
+      if (quiz.startDate && new Date(quiz.startDate) > now) {
         return NextResponse.json(
           { success: false, message: "Quiz has not started yet" },
           { status: 400 }
         )
       }
 
-      if (quiz.endTime && new Date(quiz.endTime) < now) {
+      if (quiz.endDate && new Date(quiz.endDate) < now) {
         return NextResponse.json(
           { success: false, message: "Quiz has expired" },
           { status: 400 }
@@ -203,8 +203,8 @@ export async function GET(
             description: true,
             timeLimit: true,
             status: true,
-            startTime: true,
-            endTime: true,
+            startDate: true,
+            endDate: true,
             maxAttempts: true,
             showAnswers: true,
             checkAnswerEnabled: true,

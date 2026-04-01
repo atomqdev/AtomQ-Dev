@@ -69,8 +69,8 @@ export async function PUT(
       maxAttempts,
       showAnswers,
       checkAnswerEnabled,
-      startTime,
-      endTime
+      startDate,
+      endDate
     } = await request.json()
 
     const quiz = await db.quiz.update({
@@ -87,8 +87,8 @@ export async function PUT(
         maxAttempts: maxAttempts != null && maxAttempts !== "" ? parseInt(String(maxAttempts)) : null,
         showAnswers,
         checkAnswerEnabled,
-        startTime: startTime ? new Date(startTime) : null,
-        endTime: endTime ? new Date(endTime) : null
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null
       }
     })
 

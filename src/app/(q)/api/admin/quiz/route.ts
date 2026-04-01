@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
       negativePoints, 
       randomOrder, 
       maxAttempts, 
-      startTime, 
-      endTime,
+      startDate, 
+      endDate,
       checkAnswerEnabled
     } = body
 
@@ -164,8 +164,8 @@ export async function POST(request: NextRequest) {
         negativePoints: negativePoints || 0.5,
         randomOrder: randomOrder || false,
         maxAttempts: maxAttempts && maxAttempts !== "" ? parseInt(maxAttempts) : null,
-        startTime: startTime ? new Date(startTime) : null,
-        endTime: endTime ? new Date(endTime) : null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
         checkAnswerEnabled: checkAnswerEnabled || false,
         creatorId: session.user.id,
       },

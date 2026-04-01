@@ -57,7 +57,7 @@ export async function GET(
         ? Math.round(submittedAttempts.reduce((sum, a) => sum + (a.timeTaken || 0), 0) / submittedAttempts.length)
         : 0,
       hasAccessKey: !!assessment.accessKey,
-      maxTabs: assessment.maxTabs,
+      tabswitches: assessment.tabswitches,
       disableCopyPaste: assessment.disableCopyPaste,
     };
 
@@ -137,7 +137,7 @@ export async function GET(
         title: assessment.title,
         difficulty: assessment.difficulty,
         timeLimit: assessment.timeLimit,
-        maxTabs: assessment.maxTabs,
+        tabswitches: assessment.tabswitches,
         disableCopyPaste: assessment.disableCopyPaste,
         hasAccessKey: !!assessment.accessKey,
         questionCount: assessment.assessmentQuestions.length,

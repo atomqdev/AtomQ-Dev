@@ -67,7 +67,6 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
-import { DateTimePicker } from "@/components/ui/datetime-picker"
 
 // Helper function to format dates in dd/mm/yyyy format
 const formatDateDDMMYYYY = (dateString: string) => {
@@ -101,8 +100,8 @@ interface Quiz {
   negativePoints?: number
   randomOrder: boolean
   maxAttempts?: number
-  startTime?: string
-  endTime?: string
+  startDate?: string
+  endDate?: string
   createdAt: string
   checkAnswerEnabled?: boolean
   _count: {
@@ -121,8 +120,8 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   maxAttempts: string
-  startTime: string
-  endTime: string
+  startDate: string
+  endDate: string
   checkAnswerEnabled: boolean
 }
 
@@ -136,8 +135,8 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   maxAttempts: string
-  startTime: string
-  endTime: string
+  startDate: string
+  endDate: string
   checkAnswerEnabled: boolean
 }
 
@@ -185,8 +184,8 @@ export default function QuizzesPage() {
     negativePoints: "",
     randomOrder: false,
     maxAttempts: "",
-    startTime: "",
-    endTime: "",
+    startDate: "",
+    endDate: "",
     checkAnswerEnabled: false,
   })
 
@@ -200,8 +199,8 @@ export default function QuizzesPage() {
     negativePoints: "",
     randomOrder: false,
     maxAttempts: "",
-    startTime: "",
-    endTime: "",
+    startDate: "",
+    endDate: "",
     checkAnswerEnabled: false,
   })
 
@@ -280,19 +279,19 @@ export default function QuizzesPage() {
       },
     },
     {
-      accessorKey: "startTime",
+      accessorKey: "startDate",
       header: "Start Date",
       cell: ({ row }) => {
-        const startTime = row.getValue("startTime") as string
-        return startTime ? formatDateTime(startTime) : "Not set"
+        const startDate = row.getValue("startDate") as string
+        return startDate ? formatDateDDMMYYYY(startDate) : "Not set"
       },
     },
     {
-      accessorKey: "endTime",
+      accessorKey: "endDate",
       header: "End Date",
       cell: ({ row }) => {
-        const endTime = row.getValue("endTime") as string
-        return endTime ? formatDateTime(endTime) : "Not set"
+        const endDate = row.getValue("endDate") as string
+        return endDate ? formatDateDDMMYYYY(endDate) : "Not set"
       },
     },
     {
@@ -388,10 +387,10 @@ export default function QuizzesPage() {
     setSubmitLoading(true)
 
     // Validate date inputs
-    if (createFormData.startTime && createFormData.endTime) {
-      const startTime = new Date(createFormData.startTime)
-      const endTime = new Date(createFormData.endTime)
-      if (endTime <= startTime) {
+    if (createFormData.startDate && createFormData.endDate) {
+      const startDate = new Date(createFormData.startDate)
+      const endDate = new Date(createFormData.endDate)
+      if (endDate <= startDate) {
         toasts.error("End date must be after start date")
         setSubmitLoading(false)
         return
@@ -399,6 +398,14 @@ export default function QuizzesPage() {
     }
 
     try {
+      // Convert date strings to UTC midnight
+      const formatDateToUTC = (dateString: string | null | undefined) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        // Set to UTC midnight
+        return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
+      };
+
       const response = await fetch("/api/admin/quiz", {
         method: "POST",
         headers: {
@@ -409,8 +416,8 @@ export default function QuizzesPage() {
           timeLimit: createFormData.timeLimit ? parseInt(createFormData.timeLimit) : null,
           negativePoints: createFormData.negativePoints ? parseFloat(createFormData.negativePoints) : null,
           maxAttempts: createFormData.maxAttempts === "" ? null : parseInt(createFormData.maxAttempts),
-          startTime: createFormData.startTime || null,
-          endTime: createFormData.endTime || null,
+          startDate: formatDateToUTC(createFormData.startDate),
+          endDate: formatDateToUTC(createFormData.endDate),
         }),
       })
 
@@ -437,10 +444,10 @@ export default function QuizzesPage() {
     if (!selectedQuiz) return
 
     // Validate date inputs
-    if (editFormData.startTime && editFormData.endTime) {
-      const startTime = new Date(editFormData.startTime)
-      const endTime = new Date(editFormData.endTime)
-      if (endTime <= startTime) {
+    if (editFormData.startDate && editFormData.endDate) {
+      const startDate = new Date(editFormData.startDate)
+      const endDate = new Date(editFormData.endDate)
+      if (endDate <= startDate) {
         toasts.error("End date must be after start date")
         setSubmitLoading(false)
         return
@@ -448,6 +455,14 @@ export default function QuizzesPage() {
     }
 
     try {
+      // Convert date strings to UTC midnight
+      const formatDateToUTC = (dateString: string | null | undefined) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        // Set to UTC midnight
+        return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
+      };
+
       const response = await fetch(`/api/admin/quiz/${selectedQuiz.id}`, {
         method: "PUT",
         headers: {
@@ -458,8 +473,8 @@ export default function QuizzesPage() {
           timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
           negativePoints: editFormData.negativePoints ? parseFloat(editFormData.negativePoints) : null,
           maxAttempts: editFormData.maxAttempts === "" ? null : parseInt(editFormData.maxAttempts),
-          startTime: editFormData.startTime || null,
-          endTime: editFormData.endTime || null,
+          startDate: formatDateToUTC(editFormData.startDate),
+          endDate: formatDateToUTC(editFormData.endDate),
         }),
       })
 
@@ -539,16 +554,14 @@ export default function QuizzesPage() {
   const openEditDialog = (quiz: Quiz) => {
     setSelectedQuiz(quiz)
 
-    // Format datetime for input fields
-    const formatDateTimeLocal = (dateString?: string) => {
+    // Format date for input fields (date only)
+    const formatDateLocal = (dateString?: string) => {
       if (!dateString) return ""
       const date = new Date(dateString)
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      return `${year}-${month}-${day}T${hours}:${minutes}`
+      return `${year}-${month}-${day}`
     }
 
     setEditFormData({
@@ -561,8 +574,8 @@ export default function QuizzesPage() {
       negativePoints: quiz.negativePoints?.toString() || "",
       randomOrder: quiz.randomOrder,
       maxAttempts: quiz.maxAttempts?.toString() || "",
-      startTime: formatDateTimeLocal(quiz.startTime),
-      endTime: formatDateTimeLocal(quiz.endTime),
+      startDate: formatDateLocal(quiz.startDate),
+      endDate: formatDateLocal(quiz.endDate),
       checkAnswerEnabled: quiz.checkAnswerEnabled || false,
     })
     setIsEditDialogOpen(true)
@@ -705,8 +718,8 @@ export default function QuizzesPage() {
       negativePoints: "",
       randomOrder: false,
       maxAttempts: "",
-      startTime: "",
-      endTime: "",
+      startDate: "",
+      endDate: "",
       checkAnswerEnabled: false,
     })
   }
@@ -722,8 +735,8 @@ export default function QuizzesPage() {
       negativePoints: "",
       randomOrder: false,
       maxAttempts: "",
-      startTime: "",
-      endTime: "",
+      startDate: "",
+      endDate: "",
       checkAnswerEnabled: false,
     })
   }
@@ -980,19 +993,21 @@ export default function QuizzesPage() {
                 )}
               </div>
               <div className="grid gap-3">
-                <DateTimePicker
-                  id="create-start-time"
-                  value={createFormData.startTime}
-                  onChange={(value) => setCreateFormData({ ...createFormData, startTime: value })}
-                  label="Start Date & Time (Optional)"
+                <Label htmlFor="create-start-date">Start Date (Optional)</Label>
+                <Input
+                  id="create-start-date"
+                  type="date"
+                  value={createFormData.startDate}
+                  onChange={(e) => setCreateFormData({ ...createFormData, startDate: e.target.value })}
                 />
               </div>
               <div className="grid gap-3">
-                <DateTimePicker
-                  id="create-end-time"
-                  value={createFormData.endTime}
-                  onChange={(value) => setCreateFormData({ ...createFormData, endTime: value })}
-                  label="End Date & Time (Optional)"
+                <Label htmlFor="create-end-date">End Date (Optional)</Label>
+                <Input
+                  id="create-end-date"
+                  type="date"
+                  value={createFormData.endDate}
+                  onChange={(e) => setCreateFormData({ ...createFormData, endDate: e.target.value })}
                 />
               </div>
               <div className="grid gap-3">
@@ -1154,19 +1169,21 @@ export default function QuizzesPage() {
                 )}
               </div>
               <div className="grid gap-3">
-                <DateTimePicker
-                  id="edit-start-time"
-                  value={editFormData.startTime}
-                  onChange={(value) => setEditFormData({ ...editFormData, startTime: value })}
-                  label="Start Date & Time (Optional)"
+                <Label htmlFor="edit-start-date">Start Date (Optional)</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
                 />
               </div>
               <div className="grid gap-3">
-                <DateTimePicker
-                  id="edit-end-time"
-                  value={editFormData.endTime}
-                  onChange={(value) => setEditFormData({ ...editFormData, endTime: value })}
-                  label="End Date & Time (Optional)"
+                <Label htmlFor="edit-end-date">End Date (Optional)</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
                 />
               </div>
               <div className="grid gap-3">

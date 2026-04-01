@@ -444,13 +444,16 @@ async function main() {
   // ========================================
   console.log('\n📋 Part 5: Creating Assessment with timed settings and tab switches...')
   
-  // Calculate start time (10 mins from now)
+  // Calculate start time (10 mins from now) and end time (70 mins from now)
   const now = new Date()
   const startTime = new Date(now.getTime() + 10 * 60 * 1000)
+  const endtime = new Date(now.getTime() + 70 * 60 * 1000)
 
   console.log(`   Start Time: ${startTime.toISOString()}`)
+  console.log(`   End Time: ${endtime.toISOString()}`)
   console.log(`   Time Limit: 60 minutes`)
-  console.log(`   Max Tabs: 10 (Disable Copy/Paste)`)
+  console.log(`   Max Tab Switches: 10 (Disable Copy/Paste)`)
+  console.log(`   Auto Submit: true`)
 
   let assessment = await prisma.assessment.findFirst({
     where: {
@@ -473,10 +476,12 @@ async function main() {
         negativeMarking: false,
         negativePoints: 0,
         randomOrder: false,
-        maxTabs: 10,
+        tabswitches: 10,
         disableCopyPaste: true,
+        autosubmit: true,
         accessKey: accessKey,
         startTime: startTime,
+        endtime: endtime,
         creatorId: creator.id,
         campusId: campus2.id,
       },
@@ -542,13 +547,13 @@ async function main() {
   // ========================================
   console.log('\n🎯 Part 6: Creating Test Quiz with date range...')
 
-  // Calculate quiz start date (current date/time) and end date (1 month from now)
+  // Calculate quiz start date (current date) and end date (1 month from now)
   const quizStartDate = new Date()
   const quizEndDate = new Date()
   quizEndDate.setMonth(quizEndDate.getMonth() + 1) // 1 month from now
 
-  console.log(`   Quiz Start: ${quizStartDate.toISOString()}`)
-  console.log(`   Quiz End: ${quizEndDate.toISOString()}`)
+  console.log(`   Quiz Start Date: ${quizStartDate.toISOString()}`)
+  console.log(`   Quiz End Date: ${quizEndDate.toISOString()}`)
 
   let quiz = await prisma.quiz.findFirst({
     where: {
@@ -570,7 +575,8 @@ async function main() {
         randomOrder: false,
         maxAttempts: null, // Unlimited
         showAnswers: false,
-        startTime: quizStartDate,
+        startDate: quizStartDate,
+        endDate: quizEndDate,
         creatorId: creator.id,
         campusId: campus2.id,
         checkAnswerEnabled: false,
@@ -653,9 +659,11 @@ async function main() {
   
   console.log('\n📋 Assessment: Timed Assessment Test')
   console.log(`   Start Time: ${startTime.toISOString()}`)
+  console.log(`   End Time: ${endtime.toISOString()}`)
   console.log(`   Time Limit: 60 minutes`)
-  console.log(`   Max Tabs: 10`)
+  console.log(`   Max Tab Switches: 10`)
   console.log(`   Disable Copy/Paste: Yes`)
+  console.log(`   Auto Submit: true`)
   console.log(`   Access Key: ${assessment.accessKey || 'N/A'}`)
   console.log(`   Questions: ${createdAssessmentQuestions.length}`)
   console.log(`   Enrolled Users: ${users2.length}`)
@@ -663,6 +671,7 @@ async function main() {
   console.log('\n🎯 Quiz: Monthly Test Quiz')
   console.log(`   Start Date: ${quizStartDate.toISOString()}`)
   console.log(`   End Date: ${quizEndDate.toISOString()}`)
+  console.log(`   Time Limit: None (Date-based availability)`)
   console.log(`   Questions: ${createdAssessmentQuestions.length}`)
   console.log(`   Enrolled Users: ${users2.length}`)
   

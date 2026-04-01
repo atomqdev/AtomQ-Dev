@@ -16,8 +16,8 @@ export async function createQuizAction(creatorId: string, formData: FormData) {
     randomOrder: formData.get('randomOrder') === 'true',
     maxAttempts: formData.get('maxAttempts') ? Number(formData.get('maxAttempts')) : undefined,
     showAnswers: formData.get('showAnswers') === 'true',
-    startTime: formData.get('startTime') as string,
-    endTime: formData.get('endTime') as string,
+    startDate: formData.get('startDate') as string,
+    endDate: formData.get('endDate') as string,
     checkAnswerEnabled: formData.get('checkAnswerEnabled') === 'true',
   }
 
@@ -42,8 +42,8 @@ export async function createQuizAction(creatorId: string, formData: FormData) {
         randomOrder: validatedFields.data.randomOrder,
         maxAttempts: validatedFields.data.maxAttempts,
         showAnswers: validatedFields.data.showAnswers,
-        startTime: validatedFields.data.startTime ? new Date(validatedFields.data.startTime) : null,
-        endTime: validatedFields.data.endTime ? new Date(validatedFields.data.endTime) : null,
+        startDate: validatedFields.data.startDate ? new Date(validatedFields.data.startDate) : null,
+        endDate: validatedFields.data.endDate ? new Date(validatedFields.data.endDate) : null,
         checkAnswerEnabled: validatedFields.data.checkAnswerEnabled,
         creatorId,
       }
@@ -74,8 +74,8 @@ export async function updateQuizAction(quizId: string, formData: FormData) {
     randomOrder: formData.get('randomOrder') === 'true',
     maxAttempts: formData.get('maxAttempts') ? Number(formData.get('maxAttempts')) : undefined,
     showAnswers: formData.get('showAnswers') === 'true',
-    startTime: formData.get('startTime') as string,
-    endTime: formData.get('endTime') as string,
+    startDate: formData.get('startDate') as string,
+    endDate: formData.get('endDate') as string,
     checkAnswerEnabled: formData.get('checkAnswerEnabled') === 'true',
   }
 
@@ -102,8 +102,8 @@ export async function updateQuizAction(quizId: string, formData: FormData) {
         randomOrder: validatedFields.data.randomOrder,
         maxAttempts: validatedFields.data.maxAttempts,
         showAnswers: validatedFields.data.showAnswers,
-        startTime: validatedFields.data.startTime ? new Date(validatedFields.data.startTime) : null,
-        endTime: validatedFields.data.endTime ? new Date(validatedFields.data.endTime) : null,
+        startDate: validatedFields.data.startDate ? new Date(validatedFields.data.startDate) : null,
+        endDate: validatedFields.data.endDate ? new Date(validatedFields.data.endDate) : null,
         checkAnswerEnabled: validatedFields.data.checkAnswerEnabled,
       }
     })

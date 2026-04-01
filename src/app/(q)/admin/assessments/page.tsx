@@ -114,8 +114,10 @@ interface Assessment {
   negativePoints?: number
   randomOrder: boolean
   startTime?: string
-  maxTabs?: number
+  endtime?: string
+  tabswitches?: number
   disableCopyPaste: boolean
+  autosubmit: boolean
   accessKey?: string
   createdAt: string
   _count: {
@@ -135,9 +137,11 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
-  maxTabs: string
+  tabswitches: string
   disableCopyPaste: boolean
+  autosubmit: boolean
   accessKey: string
 }
 
@@ -151,9 +155,11 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
-  maxTabs: string
+  tabswitches: string
   disableCopyPaste: boolean
+  autosubmit: boolean
   accessKey: string
 }
 
@@ -202,9 +208,11 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
-    maxTabs: "",
+    tabswitches: "",
     disableCopyPaste: false,
+    autosubmit: false,
     accessKey: "",
   })
 
@@ -218,9 +226,11 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
-    maxTabs: "",
+    tabswitches: "",
     disableCopyPaste: false,
+    autosubmit: false,
     accessKey: "",
   })
 
@@ -349,6 +359,14 @@ export default function AssessmentsPage() {
       },
     },
     {
+      accessorKey: "endtime",
+      header: "End Time",
+      cell: ({ row }) => {
+        const endtime = row.getValue("endtime") as string
+        return endtime ? formatDateTime(endtime) : "Not set"
+      },
+    },
+    {
       accessorKey: "createdAt",
       header: ({ column }) => {
         return (
@@ -450,9 +468,11 @@ export default function AssessmentsPage() {
           timeLimit: createFormData.timeLimit ? parseInt(createFormData.timeLimit) : null,
           negativePoints: createFormData.negativePoints ? parseFloat(createFormData.negativePoints) : null,
           startTime: createFormData.startTime || null,
+          endtime: createFormData.endtime || null,
           campusId: createFormData.campusId || null,
-          maxTabs: createFormData.maxTabs ? parseInt(createFormData.maxTabs) : null,
+          tabswitches: createFormData.tabswitches ? parseInt(createFormData.tabswitches) : null,
           disableCopyPaste: createFormData.disableCopyPaste,
+          autosubmit: createFormData.autosubmit,
           accessKey: createFormData.accessKey || null,
         }),
       })
@@ -490,9 +510,11 @@ export default function AssessmentsPage() {
           timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
           negativePoints: editFormData.negativePoints ? parseFloat(editFormData.negativePoints) : null,
           startTime: editFormData.startTime || null,
+          endtime: editFormData.endtime || null,
           campusId: editFormData.campusId || null,
-          maxTabs: editFormData.maxTabs ? parseInt(editFormData.maxTabs) : null,
+          tabswitches: editFormData.tabswitches ? parseInt(editFormData.tabswitches) : null,
           disableCopyPaste: editFormData.disableCopyPaste,
+          autosubmit: editFormData.autosubmit,
           accessKey: editFormData.accessKey || null,
         }),
       })
@@ -595,9 +617,11 @@ export default function AssessmentsPage() {
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder,
       startTime: formatDateTimeLocal(assessment.startTime),
+      endtime: formatDateTimeLocal(assessment.endtime),
       campusId: assessment.campus?.id || "",
-      maxTabs: assessment.maxTabs?.toString() || "",
+      tabswitches: assessment.tabswitches?.toString() || "",
       disableCopyPaste: assessment.disableCopyPaste,
+      autosubmit: assessment.autosubmit,
       accessKey: assessment.accessKey || "",
     })
     setIsEditDialogOpen(true)
@@ -740,9 +764,11 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
+      endtime: "",
       campusId: "",
-      maxTabs: "",
+      tabswitches: "",
       disableCopyPaste: false,
+      autosubmit: false,
       accessKey: "",
     })
   }
@@ -758,9 +784,11 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
+      endtime: "",
       campusId: "",
-      maxTabs: "",
+      tabswitches: "",
       disableCopyPaste: false,
+      autosubmit: false,
       accessKey: "",
     })
   }
@@ -943,15 +971,34 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="maxTabs">Max Tab Switches</Label>
+              <Label htmlFor="endtime">End Time</Label>
+              <DateTimePicker
+                id="endtime"
+                value={createFormData.endtime}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, endtime: value }))}
+                placeholder="Select date and time"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tabswitches">Max Tab Switches</Label>
               <Input
-                id="maxTabs"
+                id="tabswitches"
                 type="number"
                 min="0"
-                value={createFormData.maxTabs}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, maxTabs: e.target.value }))}
+                value={createFormData.tabswitches}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, tabswitches: e.target.value }))}
                 placeholder="Leave empty for unlimited"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="autosubmit"
+                checked={createFormData.autosubmit}
+                onCheckedChange={(checked) => setCreateFormData(prev => ({ ...prev, autosubmit: checked }))}
+              />
+              <Label htmlFor="autosubmit">Auto Submit</Label>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -1127,15 +1174,34 @@ export default function AssessmentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-maxTabs">Max Tab Switches</Label>
+              <Label htmlFor="edit-endtime">End Time</Label>
+              <DateTimePicker
+                id="edit-endtime"
+                value={editFormData.endtime}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, endtime: value }))}
+                placeholder="Select date and time"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-tabswitches">Max Tab Switches</Label>
               <Input
-                id="edit-maxTabs"
+                id="edit-tabswitches"
                 type="number"
                 min="0"
-                value={editFormData.maxTabs}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, maxTabs: e.target.value }))}
+                value={editFormData.tabswitches}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, tabswitches: e.target.value }))}
                 placeholder="Leave empty for unlimited"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-autosubmit"
+                checked={editFormData.autosubmit}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, autosubmit: checked }))}
+              />
+              <Label htmlFor="edit-autosubmit">Auto Submit</Label>
             </div>
 
             <div className="flex items-center space-x-2">

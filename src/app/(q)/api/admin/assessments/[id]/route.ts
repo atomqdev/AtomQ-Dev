@@ -77,9 +77,11 @@ export async function PUT(
       negativePoints,
       randomOrder,
       startTime,
+      endtime,
       campusId,
-      maxTabs,
+      tabswitches,
       disableCopyPaste,
+      autosubmit,
       accessKey,
     } = data;
 
@@ -97,9 +99,11 @@ export async function PUT(
         negativePoints: negativeMarking ? parseFloat(negativePoints) : null,
         randomOrder,
         startTime: startTime ? new Date(startTime) : null,
+        endtime: endtime ? new Date(endtime) : null,
         campusId: campusId || null,
-        maxTabs: maxTabs ? parseInt(maxTabs) : null,
+        tabswitches: tabswitches ? parseInt(tabswitches) : null,
         disableCopyPaste: disableCopyPaste || false,
+        autosubmit: autosubmit || false,
         accessKey: accessKey || null,
       },
       include: {

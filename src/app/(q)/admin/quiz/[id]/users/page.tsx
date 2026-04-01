@@ -125,10 +125,11 @@ export default function QuizUsersPage() {
       const response = await fetch(`/api/admin/quiz/${quizId}/users`)
       if (response.ok) {
         const data = await response.json()
-        setUsers(data)
+        setUsers(Array.isArray(data.users) ? data.users : [])
       }
     } catch (error) {
       console.error("Error fetching enrolled users:", error)
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -148,10 +149,11 @@ export default function QuizUsersPage() {
       const response = await fetch(`/api/admin/students/available?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setAvailableUsers(data)
+        setAvailableUsers(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error("Error fetching available users:", error)
+      setAvailableUsers([])
     }
   }
 
@@ -242,6 +244,7 @@ export default function QuizUsersPage() {
 
   // Get unique campuses for filters
   const uniqueCampuses = useMemo(() => {
+    if (!Array.isArray(users)) return []
     const campuses = users
       .map(user => user.campus?.shortName)
       .filter(Boolean) as string[]
@@ -250,6 +253,7 @@ export default function QuizUsersPage() {
 
   // Get unique departments for filters
   const uniqueDepartments = useMemo(() => {
+    if (!Array.isArray(users)) return []
     const departments = users
       .map(user => user.department?.name)
       .filter(Boolean) as string[]
@@ -258,6 +262,7 @@ export default function QuizUsersPage() {
 
   // Get unique batches for filters
   const uniqueBatches = useMemo(() => {
+    if (!Array.isArray(users)) return []
     const batches = users
       .map(user => user.batch?.name)
       .filter(Boolean) as string[]
@@ -266,6 +271,7 @@ export default function QuizUsersPage() {
 
   // Get unique sections for filters
   const uniqueSections = useMemo(() => {
+    if (!Array.isArray(users)) return []
     const sections = users
       .map(user => user.section)
       .filter(Boolean) as string[]
@@ -274,6 +280,7 @@ export default function QuizUsersPage() {
 
   // Get unique campuses for enrollment filters
   const enrollUniqueCampuses = useMemo(() => {
+    if (!Array.isArray(availableUsers)) return []
     const campuses = availableUsers
       .map(user => user.campus?.shortName)
       .filter(Boolean) as string[]
@@ -282,6 +289,7 @@ export default function QuizUsersPage() {
 
   // Get unique departments for enrollment filters
   const enrollUniqueDepartments = useMemo(() => {
+    if (!Array.isArray(availableUsers)) return []
     const departments = availableUsers
       .map(user => user.department?.name)
       .filter(Boolean) as string[]
@@ -290,6 +298,7 @@ export default function QuizUsersPage() {
 
   // Get unique batches for enrollment filters
   const enrollUniqueBatches = useMemo(() => {
+    if (!Array.isArray(availableUsers)) return []
     const batches = availableUsers
       .map(user => user.batch?.name)
       .filter(Boolean) as string[]
@@ -298,6 +307,7 @@ export default function QuizUsersPage() {
 
   // Get unique sections for enrollment filters
   const enrollUniqueSections = useMemo(() => {
+    if (!Array.isArray(availableUsers)) return []
     const sections = availableUsers
       .map(user => user.section)
       .filter(Boolean) as string[]

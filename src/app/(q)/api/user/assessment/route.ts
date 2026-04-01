@@ -125,9 +125,11 @@ export async function GET(request: NextRequest) {
         description: assessment.description || "",
         timeLimit: assessment.timeLimit,
         difficulty: assessment.difficulty,
-        maxTabs: assessment.maxTabs,
+        tabswitches: assessment.tabswitches,
+        autosubmit: assessment.autosubmit,
         disableCopyPaste: assessment.disableCopyPaste,
         startTime: assessment.startTime,
+        endtime: assessment.endtime,
         questionCount: assessment._count.assessmentQuestions,
         attempts: completedAttempts.length,
         bestScore: completedAttempts.length > 0

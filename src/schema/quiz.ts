@@ -13,8 +13,8 @@ export interface CreateQuizFormData {
   randomOrder?: boolean
   maxAttempts?: number
   showAnswers?: boolean
-  startTime?: string
-  endTime?: string
+  startDate?: string
+  endDate?: string
   checkAnswerEnabled?: boolean
 }
 
@@ -29,8 +29,8 @@ export interface UpdateQuizFormData {
   randomOrder?: boolean
   maxAttempts?: number
   showAnswers?: boolean
-  startTime?: string
-  endTime?: string
+  startDate?: string
+  endDate?: string
   checkAnswerEnabled?: boolean
 }
 
@@ -45,8 +45,8 @@ export const createQuizSchema = z.object({
   randomOrder: z.boolean().default(false),
   maxAttempts: z.number().positive().optional(),
   showAnswers: z.boolean().default(false),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   checkAnswerEnabled: z.boolean().default(false),
 })
 
@@ -62,8 +62,8 @@ export const updateQuizSchema = z.object({
   randomOrder: z.boolean().optional(),
   maxAttempts: z.number().positive().optional(),
   showAnswers: z.boolean().optional(),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   checkAnswerEnabled: z.boolean().optional(),
 })
 

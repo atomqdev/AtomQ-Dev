@@ -154,8 +154,8 @@ model Quiz {
   randomOrder        Boolean         @default(false)
   maxAttempts        Int?
   showAnswers        Boolean         @default(false)
-  startTime          DateTime?       @db.Timestamptz(6)
-  endTime            DateTime?       @db.Timestamptz(6)
+  startDate          DateTime?       @db.Timestamptz(6)
+  endDate            DateTime?       @db.Timestamptz(6)
   creatorId          String
   campusId           String?
   campus             Campus?         @relation(fields: [campusId], references: [id], onDelete: SetNull)
@@ -171,7 +171,7 @@ model Quiz {
   @@index([creatorId])
   @@index([campusId])
   @@index([status, difficulty])
-  @@index([startTime, endTime])
+  @@index([startDate, endDate])
   @@map("quizzes")
 }
 
@@ -250,11 +250,13 @@ model Assessment {
   negativePoints     Float?
   randomOrder        Boolean         @default(false)
   startTime          DateTime?       @db.Timestamptz(6)
+  endtime            DateTime?       @db.Timestamptz(6)
   creatorId          String
   campusId           String?
   campus             Campus?         @relation(fields: [campusId], references: [id], onDelete: SetNull)
-  maxTabs            Int?
+  tabswitches        Int?
   disableCopyPaste   Boolean         @default(false)
+  autosubmit         Boolean         @default(false)
   accessKey          String?         @unique @db.VarChar(20)
   createdAt          DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
@@ -267,7 +269,7 @@ model Assessment {
   @@index([creatorId])
   @@index([campusId])
   @@index([status, difficulty])
-  @@index([startTime])
+  @@index([startTime, endtime])
   @@index([accessKey])
   @@map("assessments")
 }
