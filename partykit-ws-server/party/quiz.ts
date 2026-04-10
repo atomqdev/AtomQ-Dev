@@ -16,7 +16,9 @@ export default class QuizServer implements Party.Server {
   private quizStore: QuizStore;
   private timerService: TimerService;
   private connections: Map<string, Party.Connection> = new Map();
-  
+  private adminDisconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly ADMIN_DISCONNECT_TIMEOUT = 30000; // 30 seconds before ending quiz
+
   // Fix: Use Party.Room (it exists, TypeScript might just need to recognize it)
   constructor(public room: Party.Room) {
     this.quizStore = new QuizStore();
@@ -29,9 +31,24 @@ export default class QuizServer implements Party.Server {
   onConnect(connection: Party.Connection, ctx: Party.ConnectionContext): void {
     console.log(`Connected: ${connection.id}`);
     this.connections.set(connection.id, connection);
-    
+
     // Send initial sync time
     this.sendSyncTime(connection);
+
+    // Check if this is a reconnection - clear admin disconnect timer if present
+    const activityKey = this.room.id;
+    if (this.adminDisconnectTimers.has(activityKey)) {
+      console.log(`Admin reconnected to room ${activityKey}. Clearing disconnect timer.`);
+      clearTimeout(this.adminDisconnectTimers.get(activityKey)!);
+      this.adminDisconnectTimers.delete(activityKey);
+
+      // Broadcast admin reconnected message
+      this.room.broadcast(JSON.stringify({
+        type: 'ADMIN_RECONNECTED',
+        payload: { activityKey },
+        timestamp: Date.now()
+      }));
+    }
   }
 
   /**
@@ -84,7 +101,7 @@ export default class QuizServer implements Party.Server {
    * Handle user joining lobby
    */
   private handleJoinLobby(data: JoinLobbyMessage, connection: Party.Connection): void {
-    const { userId, nickname, avatar, activityKey, role } = data.payload;
+    const { userId, nickname, avatar, activityKey, role, rollNumber } = data.payload;
 
     // Check if quiz has already started (block late joiners)
     if (role === 'USER' && this.quizStore.hasQuizStarted(activityKey)) {
@@ -107,6 +124,7 @@ export default class QuizServer implements Party.Server {
       joinedAt: Date.now(),
       totalScore: 0,
       answers: [],
+      rollNumber,
     };
 
     // Add to store
@@ -129,7 +147,7 @@ export default class QuizServer implements Party.Server {
       });
     }
 
-    console.log(`User ${nickname} (${role}) joined room ${activityKey}`);
+    console.log(`User ${nickname} (${role})${rollNumber ? ` [${rollNumber}]` : ''} joined room ${activityKey}`);
   }
 
   /**
@@ -166,7 +184,21 @@ export default class QuizServer implements Party.Server {
     }));
 
     // Start quiz
-    this.quizStore.startQuiz(activityKey, questions);
+    // Validate questions before starting
+    const validatedQuestions = questions.map((q, idx) => {
+      const correctAnswer = typeof q.correctAnswer === 'number' ? q.correctAnswer : parseInt(String(q.correctAnswer), 10);
+      console.log(`[QuizServer] Question ${idx + 1} - correctAnswer validation:`, {
+        original: q.correctAnswer,
+        parsed: correctAnswer,
+        isValid: !isNaN(correctAnswer)
+      });
+      return {
+        ...q,
+        correctAnswer: isNaN(correctAnswer) ? 0 : correctAnswer
+      };
+    });
+
+    this.quizStore.startQuiz(activityKey, validatedQuestions);
 
     // Begin quiz flow
     await this.runQuizFlow(activityKey);
@@ -199,10 +231,7 @@ export default class QuizServer implements Party.Server {
     // Update current question index
     room.currentQuestionIndex = questionIndex;
 
-    // Get Ready Screen (5 seconds)
-    await this.getReadyPhase(activityKey, questionIndex);
-
-    // Question Loader (5 seconds)
+    // Skip GET_READY - go directly to Question Loader (5 seconds)
     await this.questionLoaderPhase(activityKey, questionIndex);
 
     // Active Question (15 seconds)
@@ -268,7 +297,7 @@ export default class QuizServer implements Party.Server {
         questionIndex: questionIndex + 1,
         totalQuestions: room.questions.length,
         questionId: question.id,
-        question: question.text,
+        question: question.question,
         options: question.options,
         correctAnswer: question.correctAnswer,
       }
@@ -295,7 +324,7 @@ export default class QuizServer implements Party.Server {
         questionIndex: questionIndex + 1,
         totalQuestions: room.questions.length,
         questionId: question.id,
-        question: question.text,
+        question: question.question,
         options: question.options,
         correctAnswer: question.correctAnswer,
       }
@@ -310,19 +339,19 @@ export default class QuizServer implements Party.Server {
   private async questionActivePhase(activityKey: string, questionIndex: number): Promise<void> {
     const room = this.quizStore.getRoom(activityKey);
     if (!room) return;
-    
+
     const question = room.questions[questionIndex];
     const duration = question.duration || 15;
-    
+
     // Update room state
     this.quizStore.setQuizState(activityKey, 'QUESTION_ACTIVE');
-    
+
     // Broadcast question start
     this.room.broadcast(JSON.stringify({
       type: 'QUESTION_START',
       payload: {
         questionId: question.id,
-        question: question.text,
+        question: question.question,
         options: question.options,
         correctAnswer: question.correctAnswer,
         duration,
@@ -366,19 +395,28 @@ export default class QuizServer implements Party.Server {
 
     this.quizStore.setQuizState(activityKey, 'SHOW_ANSWER');
 
-    // Broadcast answer with stats
+    const payload = {
+      questionId: question.id,
+      question: question.question,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      duration: question.duration || 15,
+      questionIndex: questionIndex + 1,
+      totalQuestions: room.questions.length,
+      questionStats: stats || {
+        questionId: question.id,
+        totalResponses: 0,
+        optionCounts: [0, 0, 0, 0],
+        responseTimeline: []
+      }
+    };
+
+    console.log('[QuizServer] SHOW_ANSWER payload:', JSON.stringify(payload, null, 2));
+
+    // Broadcast answer with FULL question data for admin to display
     this.room.broadcast(JSON.stringify({
       type: 'SHOW_ANSWER',
-      payload: {
-        questionId: question.id,
-        correctAnswer: question.correctAnswer,
-        questionStats: stats || {
-          questionId: question.id,
-          totalResponses: 0,
-          optionCounts: [0, 0, 0, 0],
-          responseTimeline: []
-        }
-      }
+      payload
     }));
 
     // Show answer for 3 seconds
@@ -543,10 +581,30 @@ export default class QuizServer implements Party.Server {
     const role = (connection as any).role;
 
     if (userId && activityKey) {
-      // If admin disconnects, end the quiz for everyone
+      // If admin disconnects, start a timer before ending the quiz
       if (role === 'ADMIN') {
-        console.log(`Admin ${userId} disconnected from room ${activityKey}. Ending quiz for all users.`);
-        this.handleAdminDisconnect(activityKey);
+        console.log(`Admin ${userId} disconnected from room ${activityKey}. Starting disconnect timer.`);
+
+        // Clear any existing timer for this room
+        if (this.adminDisconnectTimers.has(activityKey)) {
+          clearTimeout(this.adminDisconnectTimers.get(activityKey)!);
+        }
+
+        // Start new timer to end quiz after timeout
+        const timer = setTimeout(() => {
+          console.log(`Admin ${userId} did not reconnect within ${this.ADMIN_DISCONNECT_TIMEOUT}ms. Ending quiz.`);
+          this.handleAdminDisconnect(activityKey);
+          this.adminDisconnectTimers.delete(activityKey);
+        }, this.ADMIN_DISCONNECT_TIMEOUT);
+
+        this.adminDisconnectTimers.set(activityKey, timer);
+
+        // Broadcast admin disconnected warning (but don't end quiz yet)
+        this.room.broadcast(JSON.stringify({
+          type: 'ADMIN_LEFT',
+          payload: { activityKey },
+          timestamp: Date.now()
+        }));
       } else {
         this.quizStore.removeUser(activityKey, userId);
         this.broadcastUserUpdate(activityKey);

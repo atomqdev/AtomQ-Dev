@@ -61,6 +61,7 @@ export interface JoinLobbyMessage extends BaseMessage {
     avatar: string;
     activityKey: string;
     role: UserRole;
+    rollNumber?: string;
   };
 }
 
@@ -283,6 +284,7 @@ export interface User {
   joinedAt: number;
   totalScore: number;
   answers: UserAnswer[];
+  rollNumber?: string;
 }
 
 export interface UserInfo {
@@ -304,7 +306,7 @@ export interface UserAnswer {
 
 export interface Question {
   id: string;
-  text: string;
+  question: string;
   options: string[];
   correctAnswer: number;
   duration: number;
