@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { Loader2 } from "lucide-react"
 import { UserRole } from "@prisma/client"
 import { usePersistentSidebar } from "@/hooks/use-persistent-sidebar"
+import HexagonLoader from "@/components/Loader/Loading"
 
 export default function AdminLayout({
   children,
@@ -30,25 +31,19 @@ export default function AdminLayout({
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+        <div className="flex items-center justify-center h-[90vh]"><HexagonLoader size={80} /></div>
     )
   }
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+        <div className="flex items-center justify-center h-[90vh]"><HexagonLoader size={80} /></div>
     )
   }
 
   if (!session || session.user.role !== UserRole.ADMIN) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+        <div className="flex items-center justify-center h-[90vh]"><HexagonLoader size={80} /></div>
     )
   }
 
