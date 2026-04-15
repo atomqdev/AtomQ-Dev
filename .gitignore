@@ -51,3 +51,5 @@ server.log
 
 # Skills directory
 /skills/
+# next-agents-md
+.next-docs/
