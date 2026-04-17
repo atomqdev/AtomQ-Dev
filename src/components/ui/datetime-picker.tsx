@@ -20,6 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import {
+  formatDateDDMMYYYY,
+  getDateParts,
+  getTimeParts,
+  parseDateWithTimezone
+} from "@/lib/date-utils"
 
 interface DateTimePickerProps {
   value?: string
@@ -132,11 +138,19 @@ export function DateTimePicker({
 
   const formatDisplayDate = () => {
     if (!date) return ""
-    const newDate = new Date(date)
+    const newDate = parseDateWithTimezone(date)
     const hours24 = ampm === "PM" ? (parseInt(hours) % 12) + 12 : parseInt(hours) % 12
     newDate.setHours(hours24)
     newDate.setMinutes(parseInt(minutes))
-    return format(newDate, "MMM dd, yyyy 'at' hh:mm a")
+
+    // Use dd/mm/yyyy format for display
+    const dateParts = formatDateDDMMYYYY(newDate)
+    const timeParts = {
+      hours: String(hours24).padStart(2, '0'),
+      minutes: minutes.padStart(2, '0')
+    }
+
+    return `${dateParts} ${timeParts.hours}:${timeParts.minutes}`
   }
 
   return (

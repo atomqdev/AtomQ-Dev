@@ -11,18 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Clock, FileText, AlertCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import {
+  formatDateDDMMYYYY,
+  parseDateWithTimezone
+} from "@/lib/date-utils"
 
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
-
+// Local helper for formatDateTime with AM/PM (used for assessment display)
 const formatDateTime = (dateString: string) => {
-  const date = new Date(dateString)
+  const date = parseDateWithTimezone(dateString)
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()

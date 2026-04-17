@@ -17,7 +17,8 @@ export default function HexagonLoader({ size = 80, className = "" }: { size?: nu
             const angle = (i * Math.PI) / 3
             const x = centerX + radius * Math.cos(angle)
             const y = centerY + radius * Math.sin(angle)
-            points.push(`${x},${y}`)
+            // Round to 2 decimal places to ensure consistent rendering between server and client
+            points.push(`${x.toFixed(2)},${y.toFixed(2)}`)
         }
         return `M ${points.join(' L ')} Z`
     }

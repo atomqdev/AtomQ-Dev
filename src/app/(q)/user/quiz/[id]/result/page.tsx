@@ -24,15 +24,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
-
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
+import { formatDateDDMMYYYY } from "@/lib/date-utils"
 
 interface QuizResult {
   id: string

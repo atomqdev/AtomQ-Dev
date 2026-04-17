@@ -59,33 +59,54 @@ export async function POST(
       )
     }
 
-    // Check time constraints
+    // Check time constraints with IST timezone
     const now = new Date()
-    if (quiz.startDate) {
-      const startDate = new Date(quiz.startDate)
+    const nowTimestamp = now.getTime()
 
-      if (startDate > now) {
+    if (quiz.startDate) {
+      let startDateTimestamp
+
+      const isoString = new Date(quiz.startDate).toISOString()
+      // Check if this is midnight UTC (intended as date-only in local timezone)
+      if (isoString.includes('T00:00:00')) {
+        // Extract YYYY-MM-DD from ISO string
+        const [year, month, day] = isoString.split('T')[0].split('-').map(Number)
+
+        // Create date in IST timezone (midnight)
+        startDateTimestamp = new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
+      } else {
+        // Has specific time set, use as-is
+        startDateTimestamp = new Date(quiz.startDate).getTime()
+      }
+
+      if (startDateTimestamp > nowTimestamp) {
         return NextResponse.json(
           { message: "Quiz has not started yet" },
           { status: 400 }
         )
       }
+    }
 
-      // Allow 30 minutes after start date to begin
-      const thirtyMinutesAfterStart = new Date(startDate.getTime() + 30 * 60 * 1000)
-      if (now > thirtyMinutesAfterStart) {
+    if (quiz.endDate) {
+      let endDateTimestamp
+
+      const isoString = new Date(quiz.endDate).toISOString()
+      // Check if this is midnight UTC
+      if (isoString.includes('T00:00:00')) {
+        // Treat as end of day in IST timezone
+        const [year, month, day] = isoString.split('T')[0].split('-').map(Number)
+        endDateTimestamp = new Date(year, month - 1, day, 23, 59, 59, 999).getTime()
+      } else {
+        // Has specific time set, use as-is
+        endDateTimestamp = new Date(quiz.endDate).getTime()
+      }
+
+      if (endDateTimestamp < nowTimestamp) {
         return NextResponse.json(
-          { message: "Quiz start window has expired. You must start within 30 minutes of the start date." },
+          { message: "Quiz has expired" },
           { status: 400 }
         )
       }
-    }
-
-    if (quiz.endDate && new Date(quiz.endDate) < now) {
-      return NextResponse.json(
-        { message: "Quiz has expired" },
-        { status: 400 }
-      )
     }
 
     // Check if user has access to this quiz with optimized query

@@ -63,15 +63,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
-
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
+import { formatDateDDMMYYYY } from "@/lib/date-utils"
 
 // Debounce hook to prevent too many API calls
 function useDebounce<T>(value: T, delay: number): T {
@@ -407,8 +399,8 @@ export default function UsersPage() {
       },
       meta: { defaultHidden: true },
       cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt"))
-        return formatDateDDMMYYYY(date.toISOString())
+        const createdAt = row.getValue("createdAt") as string
+        return formatDateDDMMYYYY(createdAt)
       },
     },
     {

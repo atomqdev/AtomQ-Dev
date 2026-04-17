@@ -22,25 +22,7 @@ import { toasts } from "@/lib/toasts"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useQuizCacheStore } from "@/stores/quiz-cache"
 import HexagonLoader from "@/components/Loader/Loading"
-
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string | Date | null | undefined) => {
-  if (!dateString) return "N/A"
-  
-  try {
-    const date = new Date(dateString)
-    // Check if date is valid
-    if (isNaN(date.getTime())) return "N/A"
-    
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
-  } catch (error) {
-    console.error('Error formatting date:', error)
-    return "N/A"
-  }
-}
+import { formatDateDDMMYYYY } from "@/lib/date-utils"
 
 interface UserStats {
   totalQuizzes: number

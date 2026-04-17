@@ -67,26 +67,29 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
+import {
+  formatDateDDMMYYYY,
+  formatDateDDMMYYYYTime,
+  parseDateWithTimezone
+} from "@/lib/date-utils"
 
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
+// Local helper function to format dates for input fields (YYYY-MM-DD)
+const formatDateLocal = (dateString?: string) => {
+  if (!dateString) return ""
+  const date = parseDateWithTimezone(dateString)
   const year = date.getFullYear()
-  return `${day}/${month}/${year}`
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-// Helper function to format dates and time in dd/mm/yyyy HH:mm format
-const formatDateTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${minutes}`
-}
+// Local helper function to format dates to UTC midnight
+const formatDateToUTC = (dateString: string | null | undefined) => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  // Set to UTC midnight
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
+};
 
 interface Quiz {
   id: string
@@ -316,8 +319,8 @@ export default function QuizzesPage() {
         )
       },
       cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt"))
-        return formatDateDDMMYYYY(date.toISOString())
+        const createdAt = row.getValue("createdAt") as string
+        return formatDateDDMMYYYY(createdAt)
       },
     },
     {
@@ -398,14 +401,6 @@ export default function QuizzesPage() {
     }
 
     try {
-      // Convert date strings to UTC midnight
-      const formatDateToUTC = (dateString: string | null | undefined) => {
-        if (!dateString) return null;
-        const date = new Date(dateString);
-        // Set to UTC midnight
-        return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
-      };
-
       const response = await fetch("/api/admin/quiz", {
         method: "POST",
         headers: {
@@ -455,14 +450,6 @@ export default function QuizzesPage() {
     }
 
     try {
-      // Convert date strings to UTC midnight
-      const formatDateToUTC = (dateString: string | null | undefined) => {
-        if (!dateString) return null;
-        const date = new Date(dateString);
-        // Set to UTC midnight
-        return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
-      };
-
       const response = await fetch(`/api/admin/quiz/${selectedQuiz.id}`, {
         method: "PUT",
         headers: {
@@ -553,16 +540,6 @@ export default function QuizzesPage() {
 
   const openEditDialog = (quiz: Quiz) => {
     setSelectedQuiz(quiz)
-
-    // Format date for input fields (date only)
-    const formatDateLocal = (dateString?: string) => {
-      if (!dateString) return ""
-      const date = new Date(dateString)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
 
     setEditFormData({
       title: quiz.title,

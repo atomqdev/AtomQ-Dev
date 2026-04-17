@@ -12,26 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { Clock, FileText, Trophy, AlertCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
-
-// Helper function to format dates in dd/mm/yyyy format
-const formatDateDDMMYYYY = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
-
-// Helper function to format dates in dd/mm/yyyy HH:mm format
-const formatDateDDMMYYYYTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${minutes}`
-}
+import {
+  formatDateDDMMYYYY,
+  formatDateDDMMYYYYTime,
+  parseDateWithTimezone
+} from "@/lib/date-utils"
 
 interface Quiz {
   id: string
@@ -48,7 +33,12 @@ interface Quiz {
   lastAttemptDate: string | null
   canAttempt: boolean
   attemptStatus: string
+  detailedStatus: string
   hasInProgress: boolean
+  startDateFormatted: string | null
+  endDateFormatted: string | null
+  startTimeFormatted: string | null
+  endTimeFormatted: string | null
 }
 
 
@@ -128,14 +118,20 @@ export default function UserQuizPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
+  const getStatusBadge = (status: string, detailedStatus: string) => {
+    switch (detailedStatus) {
+      case "upcoming":
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs py-1 px-2"><Clock className="w-3 h-3 mr-1" />Upcoming</Badge>
       case "in_progress":
         return <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs py-1 px-2"><Play className="w-3 h-3 mr-1" />In Progress</Badge>
+      case "available":
+        return <Badge variant="default" className="bg-green-100 text-green-800 text-xs py-1 px-2"><Play className="w-3 h-3 mr-1" />Available</Badge>
       case "expired":
         return <Badge variant="destructive" className="text-xs py-1 px-2"><AlertCircle className="w-3 h-3 mr-1" />Expired</Badge>
+      case "max_attempts_reached":
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Max Attempts</Badge>
+      case "completed":
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs py-1 px-2"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>
       default:
         return <Badge variant="outline" className="text-xs py-1 px-2">Not Started</Badge>
     }
@@ -241,7 +237,7 @@ export default function UserQuizPage() {
               <CardHeader className="flex-shrink-0 pb-3 px-4">
                 <div className="flex justify-between items-start gap-2 mb-2">
                   <CardTitle className="text-base font-semibold line-clamp-2 flex-1">{quiz.title}</CardTitle>
-                  {getStatusBadge(quiz.attemptStatus)}
+                  {getStatusBadge(quiz.attemptStatus, quiz.detailedStatus)}
                 </div>
                 <CardDescription className="text-sm line-clamp-2">{quiz.description}</CardDescription>
               </CardHeader>
@@ -288,7 +284,7 @@ export default function UserQuizPage() {
                   <Alert className="border-yellow-200 bg-yellow-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
                     <AlertDescription className="text-yellow-800 text-xs leading-tight">
-                      <span className="font-semibold">Not available</span> from {formatDateDDMMYYYY(quiz.startTime)}
+                      <span className="font-semibold">Not available</span> from {quiz.startDateFormatted}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -297,7 +293,7 @@ export default function UserQuizPage() {
                   <Alert className="border-red-200 bg-red-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-red-600" />
                     <AlertDescription className="text-red-800 text-xs leading-tight">
-                      <span className="font-semibold">Expired</span> on {formatDateDDMMYYYY(quiz.endTime)}
+                      <span className="font-semibold">Expired</span> on {quiz.endDateFormatted}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -306,7 +302,7 @@ export default function UserQuizPage() {
                   <Alert className="border-green-200 bg-green-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-green-600" />
                     <AlertDescription className="text-green-800 text-xs leading-tight">
-                      <span className="font-semibold">Available</span> until {formatDateDDMMYYYY(quiz.endTime)}
+                      <span className="font-semibold">Available</span> until {quiz.endDateFormatted}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -317,29 +313,34 @@ export default function UserQuizPage() {
                   onClick={() => handleStartQuiz(quiz.id)}
                   disabled={!quiz.canAttempt}
                   isLoading={startingQuizId === quiz.id}
-                  loadingText={quiz.hasInProgress ? "Continuing..." : quiz.attemptStatus === "completed" ? "Retaking..." : "Starting..."}
+                  loadingText={quiz.hasInProgress ? "Continuing..." : quiz.detailedStatus === "available" ? "Starting..." : "Retaking..."}
                   className="w-full h-9 text-sm"
-                  variant={quiz.hasInProgress ? "default" : "default"}
+                  variant={quiz.hasInProgress ? "default" : quiz.detailedStatus === "available" ? "default" : "outline"}
                 >
-                  {quiz.hasInProgress ? (
+                  {quiz.detailedStatus === "upcoming" ? (
+                    <>
+                      <Clock className="w-3.5 h-3.5 mr-1.5" />
+                      Not Available
+                    </>
+                  ) : quiz.detailedStatus === "expired" ? (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
+                      Expired
+                    </>
+                  ) : quiz.detailedStatus === "max_attempts_reached" ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      Max Attempts
+                    </>
+                  ) : quiz.hasInProgress ? (
                     <>
                       <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                      Continue
+                      Resume
                     </>
                   ) : quiz.attemptStatus === "completed" ? (
                     <>
                       <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
                       Retake
-                    </>
-                  ) : quiz.attemptStatus === "expired" ? (
-                    <>
-                      <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
-                      Expired
-                    </>
-                  ) : quiz.startTime && new Date(quiz.startTime) > new Date() ? (
-                    <>
-                      <Clock className="w-3.5 h-3.5 mr-1.5" />
-                      Not Available
                     </>
                   ) : (
                     <>

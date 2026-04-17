@@ -4,6 +4,12 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole, QuizStatus, AttemptStatus } from "@prisma/client"
+import {
+  formatDateDDMMYYYY,
+  formatDateDDMMYYYYTime,
+  getISTTimestamp,
+  parseDateWithTimezone
+} from "@/lib/date-utils"
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,45 +72,77 @@ export async function GET(request: NextRequest) {
       attemptsByQuiz.get(attempt.quizId).push(attempt)
     })
 
-    // Format response
+    // Format response with comprehensive status calculation
     const formattedQuizzes = userQuizzes.map(quiz => {
       const attempts = attemptsByQuiz.get(quiz.id) || []
       const completedAttempts = attempts.filter((a: any) => a.status === AttemptStatus.SUBMITTED)
       const inProgressAttempt = attempts.find((a: any) => a.status === AttemptStatus.IN_PROGRESS)
-      
+
+      // Calculate detailed status based on multiple factors
       let canAttempt = true
       let attemptStatus = 'not_started'
-      
-      if (inProgressAttempt) {
+      let detailedStatus = 'not_started'
+
+      // Get current time as timestamp
+      const now = new Date()
+      const nowTimestamp = now.getTime()
+
+      // Parse dates with timezone awareness
+      let startDateTimestamp = null
+      let endDateTimestamp = null
+
+      if (quiz.startDate) {
+        const dateObj = parseDateWithTimezone(quiz.startDate)
+        startDateTimestamp = dateObj.getTime()
+      }
+
+      if (quiz.endDate) {
+        const dateObj = parseDateWithTimezone(quiz.endDate)
+        endDateTimestamp = dateObj.getTime()
+      }
+
+      // Debug logging
+      console.log(`Quiz "${quiz.title}" Status Check:`, {
+        startDate: quiz.startDate,
+        startDateTimestamp,
+        endDate: quiz.endDate,
+        endDateTimestamp,
+        nowTimestamp
+      })
+
+      // Check time constraints using timestamp comparison
+      if (startDateTimestamp && startDateTimestamp > nowTimestamp) {
+        canAttempt = false
+        attemptStatus = 'not_started'
+        detailedStatus = 'upcoming'
+      } else if (endDateTimestamp && endDateTimestamp < nowTimestamp) {
+        canAttempt = false
+        attemptStatus = 'expired'
+        detailedStatus = 'expired'
+      } else if (inProgressAttempt) {
+        canAttempt = true
         attemptStatus = 'in_progress'
+        detailedStatus = 'in_progress'
       } else if (completedAttempts.length > 0) {
         attemptStatus = 'completed'
-        
+
         // Check if user can attempt again based on maxAttempts
         if (quiz.maxAttempts !== null && completedAttempts.length >= quiz.maxAttempts) {
           canAttempt = false
+          detailedStatus = 'max_attempts_reached'
+        } else {
+          canAttempt = true
+          detailedStatus = 'available'
         }
+      } else {
+        // No attempts yet - quiz is available
+        detailedStatus = 'available'
       }
 
-      // Check time constraints with proper timezone handling
-      const now = new Date()
-      const startDate = quiz.startDate ? new Date(quiz.startDate) : null
-      const endDate = quiz.endDate ? new Date(quiz.endDate) : null
-      
-      if (startDate && startDate > now) {
-        canAttempt = false
-        attemptStatus = 'not_started'
-      }
-      
-      if (endDate && endDate < now) {
-        canAttempt = false
-        attemptStatus = 'expired'
-      }
-      
       // Additional validation: ensure end date is after start date if both are set
-      if (startDate && endDate && endDate <= startDate) {
+      if (startDateTimestamp && endDateTimestamp && endDateTimestamp <= startDateTimestamp) {
         canAttempt = false
-        attemptStatus = 'not_started'
+        detailedStatus = 'invalid_schedule'
       }
 
       return {
@@ -118,15 +156,21 @@ export async function GET(request: NextRequest) {
         endDate: quiz.endDate,
         questionCount: quiz._count.quizQuestions,
         attempts: completedAttempts.length,
-        bestScore: completedAttempts.length > 0 
+        bestScore: completedAttempts.length > 0
           ? Math.max(...completedAttempts.map((a: any) => a.score || 0))
           : null,
-        lastAttemptDate: completedAttempts.length > 0 
-          ? completedAttempts[0].submittedAt 
+        lastAttemptDate: completedAttempts.length > 0
+          ? completedAttempts[0].submittedAt
           : null,
         canAttempt,
         attemptStatus,
-        hasInProgress: !!inProgressAttempt
+        detailedStatus,
+        hasInProgress: !!inProgressAttempt,
+        // Add formatted dates for frontend
+        startDateFormatted: formatDateDDMMYYYY(quiz.startDate),
+        endDateFormatted: formatDateDDMMYYYY(quiz.endDate),
+        startTimeFormatted: formatDateDDMMYYYYTime(quiz.startDate),
+        endTimeFormatted: formatDateDDMMYYYYTime(quiz.endDate)
       }
     })
 
