@@ -119,13 +119,13 @@ export default function AssessmentSubmissionsPage() {
         submission.status,
         submission.score?.toString() || "",
         submission.totalPoints?.toString() || "",
-        submission.score && submission.totalPoints 
-          ? `${((submission.score / submission.totalPoints) * 100).toFixed(1)}%` 
+        submission.score && submission.totalPoints
+          ? `${((submission.score / submission.totalPoints) * 100).toFixed(1)}%`
           : "",
         submission.timeTaken ? `${Math.round(submission.timeTaken / 60)}` : "",
-        submission.startedAt ? new Date(submission.startedAt).toLocaleString() : "",
-        submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : "",
-        new Date(submission.createdAt).toLocaleString()
+        submission.startedAt ? new Date(submission.startedAt).toLocaleString('en-IN', { hour12: true }) : "",
+        submission.submittedAt ? new Date(submission.submittedAt).toLocaleString('en-IN', { hour12: true }) : "",
+        new Date(submission.createdAt).toLocaleString('en-IN', { hour12: true })
       ])
     ].map(row =>
       row.map(cell => {
@@ -342,7 +342,7 @@ export default function AssessmentSubmissionsPage() {
                     <TableCell>
                       {submission.startedAt ? (
                         <span className="text-sm">
-                          {new Date(submission.startedAt).toLocaleString()}
+                          {new Date(submission.startedAt).toLocaleString('en-IN', { hour12: true })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">Not started</span>
@@ -351,7 +351,7 @@ export default function AssessmentSubmissionsPage() {
                     <TableCell>
                       {submission.submittedAt ? (
                         <span className="text-sm">
-                          {new Date(submission.submittedAt).toLocaleString()}
+                          {new Date(submission.submittedAt).toLocaleString('en-IN', { hour12: true })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">Not submitted</span>

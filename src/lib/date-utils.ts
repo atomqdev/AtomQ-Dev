@@ -22,7 +22,7 @@ export function formatDateDDMMYYYY(date: Date | string | null): string | null {
 }
 
 /**
- * Format date to dd/mm/yyyy HH:mm format in IST timezone
+ * Format date to dd/mm/yyyy HH:mm format in IST timezone (12-hour format with AM/PM)
  * @param date - Date object, string, or null
  * @returns Formatted date-time string or null
  */
@@ -33,13 +33,15 @@ export function formatDateDDMMYYYYTime(date: Date | string | null): string | nul
   const day = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const year = d.getFullYear()
-  const hours = String(d.getHours()).padStart(2, '0')
+  const hours24 = d.getHours()
+  const hours = hours24 % 12 || 12 // Convert to 12-hour format
   const minutes = String(d.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${minutes}`
+  const ampm = hours24 >= 12 ? 'PM' : 'AM'
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`
 }
 
 /**
- * Format date to dd/mm/yyyy HH:mm:ss format in IST timezone
+ * Format date to dd/mm/yyyy HH:mm:ss format in IST timezone (12-hour format with AM/PM)
  * @param date - Date object, string, or null
  * @returns Formatted date-time string or null
  */
@@ -50,10 +52,12 @@ export function formatDateDDMMYYYYTimeSeconds(date: Date | string | null): strin
   const day = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const year = d.getFullYear()
-  const hours = String(d.getHours()).padStart(2, '0')
+  const hours24 = d.getHours()
+  const hours = hours24 % 12 || 12 // Convert to 12-hour format
   const minutes = String(d.getMinutes()).padStart(2, '0')
   const seconds = String(d.getSeconds()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
+  const ampm = hours24 >= 12 ? 'PM' : 'AM'
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} ${ampm}`
 }
 
 /**
@@ -219,32 +223,38 @@ export function getDateParts(date: Date | string | null): { day: string; month: 
 }
 
 /**
- * Get time parts for display in HH:mm format
+ * Get time parts for display in HH:mm format (12-hour format with AM/PM)
  * @param date - Date object, string, or null
- * @returns Object with hours, minutes properties or null
+ * @returns Object with hours, minutes, ampm properties or null
  */
-export function getTimeParts(date: Date | string | null): { hours: string; minutes: string } | null {
+export function getTimeParts(date: Date | string | null): { hours: string; minutes: string; ampm: string } | null {
   if (!date) return null
 
   const d = new Date(date)
+  const hours24 = d.getHours()
+  const hours = String(hours24 % 12 || 12).padStart(2, '0') // Convert to 12-hour format
   return {
-    hours: String(d.getHours()).padStart(2, '0'),
-    minutes: String(d.getMinutes()).padStart(2, '0')
+    hours,
+    minutes: String(d.getMinutes()).padStart(2, '0'),
+    ampm: hours24 >= 12 ? 'PM' : 'AM'
   }
 }
 
 /**
- * Get time parts with seconds for display in HH:mm:ss format
+ * Get time parts with seconds for display in HH:mm:ss format (12-hour format with AM/PM)
  * @param date - Date object, string, or null
- * @returns Object with hours, minutes, seconds properties or null
+ * @returns Object with hours, minutes, seconds, ampm properties or null
  */
-export function getTimePartsWithSeconds(date: Date | string | null): { hours: string; minutes: string; seconds: string } | null {
+export function getTimePartsWithSeconds(date: Date | string | null): { hours: string; minutes: string; seconds: string; ampm: string } | null {
   if (!date) return null
 
   const d = new Date(date)
+  const hours24 = d.getHours()
+  const hours = String(hours24 % 12 || 12).padStart(2, '0') // Convert to 12-hour format
   return {
-    hours: String(d.getHours()).padStart(2, '0'),
+    hours,
     minutes: String(d.getMinutes()).padStart(2, '0'),
-    seconds: String(d.getSeconds()).padStart(2, '0')
+    seconds: String(d.getSeconds()).padStart(2, '0'),
+    ampm: hours24 >= 12 ? 'PM' : 'AM'
   }
 }

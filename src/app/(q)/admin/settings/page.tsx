@@ -405,11 +405,11 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span>Last updated:</span>
-                    <span>{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString() : 'Never'}</span>
+                    <span>{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN', { hour12: true }) : 'Never'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Created:</span>
-                    <span>{settings?.createdAt ? new Date(settings.createdAt).toLocaleString() : 'Unknown'}</span>
+                    <span>{settings?.createdAt ? new Date(settings.createdAt).toLocaleString('en-IN', { hour12: true }) : 'Unknown'}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between">

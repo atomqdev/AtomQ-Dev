@@ -252,7 +252,7 @@ export default function AssessmentAnalysisPage() {
                 <div>
                   <div className="text-sm font-medium">Start Time</div>
                   <div className="text-xs text-muted-foreground">
-                    {new Date(assessment.startTime).toLocaleString()}
+                    {new Date(assessment.startTime).toLocaleString('en-IN', { hour12: true })}
                   </div>
                 </div>
                 <Badge variant="default" className="ml-auto">Set</Badge>

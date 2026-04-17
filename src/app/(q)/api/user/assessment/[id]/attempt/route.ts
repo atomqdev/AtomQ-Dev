@@ -222,15 +222,15 @@ export async function POST(
         const timeUntilStart = Math.abs(diffMinutes)
         const hours = Math.floor(timeUntilStart / 60)
         const minutes = Math.floor(timeUntilStart % 60)
-        
+
         let timeMessage = `${Math.ceil(timeUntilStart)} minutes`
         if (hours > 0) {
           timeMessage = `${hours} hour${hours > 1 ? 's' : ''} and ${minutes} minute${minutes !== 1 ? 's' : ''}`
         }
 
         return NextResponse.json(
-          { 
-            message: `Assessment has not started yet. It will be available in ${timeMessage}.` 
+          {
+            message: `Assessment has not started yet. It will be available in ${timeMessage}.`
           },
           { status: 403 }
         )
@@ -239,8 +239,23 @@ export async function POST(
       // After time window
       if (diffMinutes > TIME_WINDOW_MINUTES) {
         return NextResponse.json(
-          { 
-            message: `This assessment is no longer available. It was available for ${TIME_WINDOW_MINUTES} minutes after start time.` 
+          {
+            message: `This assessment is no longer available. It was available for ${TIME_WINDOW_MINUTES} minutes after start time.`
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Check if assessment has expired based on endtime
+    if (assessment.endtime) {
+      const endTime = new Date(assessment.endtime)
+      const now = new Date()
+
+      if (endTime < now) {
+        return NextResponse.json(
+          {
+            message: `This assessment has expired and is no longer available.`
           },
           { status: 403 }
         )

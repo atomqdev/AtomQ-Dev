@@ -91,15 +91,17 @@ const formatDateDDMMYYYY = (dateString: string) => {
   return `${day}/${month}/${year}`
 }
 
-// Helper function to format dates with time
+// Helper function to format dates with time (12-hour format)
 const formatDateTime = (dateString: string) => {
   const date = new Date(dateString)
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
+  const hours24 = date.getHours()
+  const hours = hours24 % 12 || 12 // Convert to 12-hour format
   const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${minutes}`
+  const ampm = hours24 >= 12 ? 'PM' : 'AM'
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`
 }
 
 interface Assessment {
@@ -137,7 +139,6 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -155,7 +156,6 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -208,7 +208,6 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -226,7 +225,6 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -299,6 +297,14 @@ export default function AssessmentsPage() {
       },
     },
     {
+      accessorKey: "startTime",
+      header: "Start Time",
+      cell: ({ row }) => {
+        const startTime = row.getValue("startTime") as string
+        return startTime ? formatDateTime(startTime) : "Not set"
+      },
+    },
+    {
       accessorKey: "timeLimit",
       header: "Duration",
       cell: ({ row }) => {
@@ -348,22 +354,6 @@ export default function AssessmentsPage() {
         ) : (
           <span className="text-muted-foreground text-sm">Not set</span>
         )
-      },
-    },
-    {
-      accessorKey: "startTime",
-      header: "Start Time",
-      cell: ({ row }) => {
-        const startTime = row.getValue("startTime") as string
-        return startTime ? formatDateTime(startTime) : "Not set"
-      },
-    },
-    {
-      accessorKey: "endtime",
-      header: "End Time",
-      cell: ({ row }) => {
-        const endtime = row.getValue("endtime") as string
-        return endtime ? formatDateTime(endtime) : "Not set"
       },
     },
     {
@@ -468,7 +458,6 @@ export default function AssessmentsPage() {
           timeLimit: createFormData.timeLimit ? parseInt(createFormData.timeLimit) : null,
           negativePoints: createFormData.negativePoints ? parseFloat(createFormData.negativePoints) : null,
           startTime: createFormData.startTime || null,
-          endtime: createFormData.endtime || null,
           campusId: createFormData.campusId || null,
           tabswitches: createFormData.tabswitches ? parseInt(createFormData.tabswitches) : null,
           disableCopyPaste: createFormData.disableCopyPaste,
@@ -510,7 +499,6 @@ export default function AssessmentsPage() {
           timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
           negativePoints: editFormData.negativePoints ? parseFloat(editFormData.negativePoints) : null,
           startTime: editFormData.startTime || null,
-          endtime: editFormData.endtime || null,
           campusId: editFormData.campusId || null,
           tabswitches: editFormData.tabswitches ? parseInt(editFormData.tabswitches) : null,
           disableCopyPaste: editFormData.disableCopyPaste,
@@ -617,7 +605,6 @@ export default function AssessmentsPage() {
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder,
       startTime: formatDateTimeLocal(assessment.startTime),
-      endtime: formatDateTimeLocal(assessment.endtime),
       campusId: assessment.campus?.id || "",
       tabswitches: assessment.tabswitches?.toString() || "",
       disableCopyPaste: assessment.disableCopyPaste,
@@ -764,7 +751,6 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
-      endtime: "",
       campusId: "",
       tabswitches: "",
       disableCopyPaste: false,
@@ -784,7 +770,6 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
-      endtime: "",
       campusId: "",
       tabswitches: "",
       disableCopyPaste: false,
@@ -968,16 +953,6 @@ export default function AssessmentsPage() {
                   placeholder="Select date and time"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="endtime">End Time</Label>
-              <DateTimePicker
-                id="endtime"
-                value={createFormData.endtime}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, endtime: value }))}
-                placeholder="Select date and time"
-              />
             </div>
 
             <div className="space-y-2">
@@ -1171,16 +1146,6 @@ export default function AssessmentsPage() {
                   placeholder="Select date and time"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-endtime">End Time</Label>
-              <DateTimePicker
-                id="edit-endtime"
-                value={editFormData.endtime}
-                onChange={(value) => setEditFormData(prev => ({ ...prev, endtime: value }))}
-                placeholder="Select date and time"
-              />
             </div>
 
             <div className="space-y-2">

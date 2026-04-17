@@ -22,9 +22,10 @@ const formatDateTime = (dateString: string) => {
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
+  const hours24 = date.getHours()
+  const hours = hours24 % 12 || 12 // Convert to 12-hour format (0 becomes 12)
   const minutes = String(date.getMinutes()).padStart(2, '0')
-  const ampm = date.getHours() >= 12 ? 'PM' : 'AM'
+  const ampm = hours24 >= 12 ? 'PM' : 'AM'
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`
 }
 
@@ -101,11 +102,10 @@ export default function UserAssessmentsPage() {
     }
   }
 
-  const handleStartAssessment = async (assessmentId: string, status: string) => {
-    // Only allow navigation for in_progress status
-    if (status === "in_progress") {
-      router.push(`/user/assessment/${assessmentId}/take`)
-    }
+  const handleStartAssessment = (assessmentId: string, attemptStatus: string) => {
+    // Redirect to take page for both new attempts and in-progress
+    // Access key will be collected on the take page if needed
+    router.push(`/user/assessment/${assessmentId}/take`)
   }
 
   const getStatusBadge = (status: string, isAutoSubmitted: boolean = false) => {

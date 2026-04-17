@@ -91,6 +91,29 @@ export async function GET(
       )
     }
 
+    // Check if assessment has expired
+    if (isAssessment && assessment.endtime) {
+      const endTime = new Date(assessment.endtime)
+      const now = new Date()
+
+      if (endTime < now) {
+        return NextResponse.json(
+          { message: "This assessment has expired and is no longer available." },
+          { status: 403 }
+        )
+      }
+    } else if (!isAssessment && assessment.endDate) {
+      const endDate = new Date(assessment.endDate)
+      const now = new Date()
+
+      if (endDate < now) {
+        return NextResponse.json(
+          { message: "This quiz has expired and is no longer available." },
+          { status: 403 }
+        )
+      }
+    }
+
     // Check enrollment based on type
     let enrollment
     let hasExistingAttempt = false

@@ -534,7 +534,7 @@ export default function ReportedQuestionsPage() {
                 <div>
                   <h4 className="font-semibold text-sm text-muted-foreground mb-1">Reported At</h4>
                   <p className="font-medium">
-                    {format(new Date(selectedReport.createdAt), "MMM d, yyyy HH:mm")}
+                    {format(new Date(selectedReport.createdAt), "MMM d, yyyy h:mm a")}
                   </p>
                 </div>
               </div>

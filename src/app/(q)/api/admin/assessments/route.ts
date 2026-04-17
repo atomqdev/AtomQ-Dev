@@ -107,13 +107,20 @@ export async function POST(request: NextRequest) {
       negativePoints,
       randomOrder,
       startTime,
-      endtime,
       campusId,
       tabswitches,
       disableCopyPaste,
       autosubmit,
       accessKey,
     } = data;
+
+    // Calculate endtime from startTime + duration if both are provided
+    let endtime: Date | null = null;
+    if (startTime && timeLimit) {
+      const startDate = new Date(startTime);
+      const durationMinutes = parseInt(timeLimit);
+      endtime = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+    }
 
     const assessment = await db.assessment.create({
       data: {
@@ -126,7 +133,7 @@ export async function POST(request: NextRequest) {
         negativePoints: negativeMarking ? parseFloat(negativePoints) : null,
         randomOrder,
         startTime: startTime ? new Date(startTime) : null,
-        endtime: endtime ? new Date(endtime) : null,
+        endtime,
         campusId: campusId || null,
         tabswitches: tabswitches ? parseInt(tabswitches) : null,
         disableCopyPaste: disableCopyPaste || false,
