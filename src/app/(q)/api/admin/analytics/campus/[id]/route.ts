@@ -109,7 +109,15 @@ export async function GET(
     });
 
     return NextResponse.json({
-      campus,
+      campus: {
+        id: campus.id,
+        name: campus.name,
+        shortName: campus.shortName,
+        location: campus.location,
+      },
+      users: campus.users,
+      batches: campus.batches,
+      departments: campus.departments,
       quizzes,
       assessments,
       topPerformers,
