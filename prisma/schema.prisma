@@ -22,7 +22,6 @@ model Campus {
   users        User[]
   quizzes      Quiz[]
   assessments  Assessment[]
-  activities   Activity[]
   registrationCodes RegistrationCode[]
 
   @@index([isActive])
@@ -52,7 +51,6 @@ model Department {
   campusId String
   campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
   users    User[]
-  activities Activity[]
   registrationCodes RegistrationCode[]
 
   @@index([campusId])
@@ -89,8 +87,9 @@ model User {
   quizTabSwitches     QuizTabSwitch[]
   createdQuizzes       Quiz[]             @relation("QuizCreator")
   createdAssessments   Assessment[]       @relation("AssessmentCreator")
-  createdActivities    Activity[]         @relation("ActivityCreator")
   questionGroups       QuestionGroup[]
+  quizGroups           QuizGroup[]
+  assessmentGroups     AssessmentGroup[]
   reportedQuestions    ReportedQuestion[]
 
   @@index([email])
@@ -104,7 +103,6 @@ model User {
 model QuestionGroup {
   id          String     @id @default(cuid())
   name        String     @db.VarChar(255)
-  description String?    @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime   @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
@@ -115,6 +113,36 @@ model QuestionGroup {
   @@index([creatorId])
   @@index([isActive])
   @@map("question_groups")
+}
+
+model QuizGroup {
+  id          String     @id @default(cuid())
+  name        String     @db.VarChar(255)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  quizzes     Quiz[]
+  creatorId   String
+  creator     User       @relation(fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([isActive])
+  @@map("quiz_groups")
+}
+
+model AssessmentGroup {
+  id          String     @id @default(cuid())
+  name        String     @db.VarChar(255)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  assessments Assessment[]
+  creatorId   String
+  creator     User       @relation(fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([isActive])
+  @@map("assessment_groups")
 }
 
 model Question {
@@ -131,7 +159,6 @@ model Question {
   updatedAt     DateTime        @updatedAt @db.Timestamptz(6)
   quizQuestions       QuizQuestion[]
   assessmentQuestions AssessmentQuestion[]
-  activityQuestions   ActivityQuestion[]
   groupId             String
   group               QuestionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   reportedQuestions   ReportedQuestion[]
@@ -167,11 +194,14 @@ model Quiz {
   quizUsers          QuizUser[]
   creator            User            @relation("QuizCreator", fields: [creatorId], references: [id])
   checkAnswerEnabled Boolean         @default(false)
+  groupId            String?
+  group              QuizGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([creatorId])
   @@index([campusId])
   @@index([status, difficulty])
   @@index([startDate, endDate])
+  @@index([groupId])
   @@map("quizzes")
 }
 
@@ -265,12 +295,15 @@ model Assessment {
   assessmentUsers    AssessmentUser[]
   tabSwitches       AssessmentTabSwitch[]
   creator            User            @relation("AssessmentCreator", fields: [creatorId], references: [id])
+  groupId            String?
+  group              AssessmentGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([creatorId])
   @@index([campusId])
   @@index([status, difficulty])
   @@index([startTime, endtime])
   @@index([accessKey])
+  @@index([groupId])
   @@map("assessments")
 }
 
@@ -437,13 +470,6 @@ enum StudentSection {
   F
 }
 
-enum ActivityServerStatus {
-  INACTIVE
-  CREATING
-  CREATED
-  ERROR
-}
-
 model AssessmentTabSwitch {
   id            String   @id @default(cuid())
   attemptId     String
@@ -474,43 +500,4 @@ model QuizTabSwitch {
   @@map("quiz_tab_switches")
 }
 
-model Activity {
-  id           String               @id @default(cuid())
-  title        String               @db.VarChar(500)
-  description  String?              @db.Text
-  campusId     String?
-  campus       Campus?              @relation(fields: [campusId], references: [id], onDelete: SetNull)
-  departmentId String?
-  department   Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  section      StudentSection       @default(A)
-  answerTime   Int?                 // in seconds
-  maxDuration  Int?                 // in minutes
-  accessKey    String               @unique @db.VarChar(20)
-  creatorId    String
-  serverStatus ActivityServerStatus @default(INACTIVE)
-  serverPort   Int?
-  createdAt    DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime             @updatedAt @db.Timestamptz(6)
-  activityQuestions ActivityQuestion[]
-  creator      User                 @relation("ActivityCreator", fields: [creatorId], references: [id])
-
-  @@index([creatorId])
-  @@index([campusId, departmentId])
-  @@index([accessKey])
-  @@index([serverStatus])
-  @@map("activities")
-}
-
-model ActivityQuestion {
-  id         String   @id @default(cuid())
-  activityId String
-  questionId String
-  order      Int
-  points     Float    @default(1.0)
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-
-  @@unique([activityId, questionId])
-  @@map("activity_questions")
-}
 

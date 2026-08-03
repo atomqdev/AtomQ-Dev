@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -20,7 +20,7 @@ export async function GET(
 
     const { id } = await params
 
-    const questionGroup = await db.questionGroup.findUnique({
+    const assessmentGroup = await db.assessmentGroup.findUnique({
       where: { id },
       include: {
         creator: {
@@ -30,30 +30,24 @@ export async function GET(
             email: true
           }
         },
-        questions: {
-          where: { isActive: true },
-          orderBy: {
-            createdAt: "desc"
-          }
-        },
         _count: {
           select: {
-            questions: true
+            assessments: true
           }
         }
       }
     })
 
-    if (!questionGroup) {
+    if (!assessmentGroup) {
       return NextResponse.json(
-        { message: "Question group not found" },
+        { message: "Assessment group not found" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(questionGroup)
+    return NextResponse.json(assessmentGroup)
   } catch (error) {
-    console.error("Error fetching question group:", error)
+    console.error("Error fetching assessment group:", error)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -67,7 +61,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -77,29 +71,24 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const {
-      name,
-      isActive
-    } = body
+    const { name, isActive } = body
 
-    // Check if question group exists
-    const existingGroup = await db.questionGroup.findUnique({
+    const existingGroup = await db.assessmentGroup.findUnique({
       where: { id }
     })
 
     if (!existingGroup) {
       return NextResponse.json(
-        { message: "Question group not found" },
+        { message: "Assessment group not found" },
         { status: 404 }
       )
     }
 
-    // Update the question group
-    const questionGroup = await db.questionGroup.update({
+    const assessmentGroup = await db.assessmentGroup.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(isActive !== undefined && { isActive })
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive) })
       },
       include: {
         creator: {
@@ -111,15 +100,15 @@ export async function PUT(
         },
         _count: {
           select: {
-            questions: true
+            assessments: true
           }
         }
       }
     })
 
-    return NextResponse.json(questionGroup)
+    return NextResponse.json(assessmentGroup)
   } catch (error) {
-    console.error("Error updating question group:", error)
+    console.error("Error updating assessment group:", error)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -133,7 +122,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -143,26 +132,25 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if question group exists
-    const existingGroup = await db.questionGroup.findUnique({
+    const existingGroup = await db.assessmentGroup.findUnique({
       where: { id }
     })
 
     if (!existingGroup) {
       return NextResponse.json(
-        { message: "Question group not found" },
+        { message: "Assessment group not found" },
         { status: 404 }
       )
     }
 
-    // Delete the question group (this will also delete associated questions due to cascade)
-    await db.questionGroup.delete({
+    // Deleting the group sets groupId=null on assessments (onDelete: SetNull)
+    await db.assessmentGroup.delete({
       where: { id }
     })
 
-    return NextResponse.json({ message: "Question group deleted successfully" })
+    return NextResponse.json({ message: "Assessment group deleted successfully" })
   } catch (error) {
-    console.error("Error deleting question group:", error)
+    console.error("Error deleting assessment group:", error)
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

@@ -33,7 +33,6 @@ import {
   SunDim,
   Maximize,
   Minimize,
-  Gamepad2,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { flushSync } from "react-dom";
@@ -57,18 +56,13 @@ const adminNavItems = [
   },
   {
     title: "Quiz",
-    href: "/admin/quiz",
+    href: "/admin/quiz-group",
     icon: BookOpen,
   },
   {
     title: "Assessments",
-    href: "/admin/assessments",
+    href: "/admin/assessment-group",
     icon: FileCheck,
-  },
-  {
-    title: "Activities",
-    href: "/admin/activity",
-    icon: Gamepad2,
   },
   {
     title: "Questions",
@@ -202,7 +196,7 @@ export function AppSidebar({
       <ScrollArea className="flex-1 px-2 py-4">
         <nav className="space-y-1">
           {adminNavItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}

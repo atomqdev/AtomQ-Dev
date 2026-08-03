@@ -1,0 +1,701 @@
+     1→     1→import { PrismaClient, UserRole, DifficultyLevel, QuizStatus, QuestionType, StudentSection } from '@prisma/client'
+     2→     2→import bcrypt from 'bcryptjs'
+     3→     3→
+     4→     4→const prisma = new PrismaClient()
+     5→     5→
+     6→     6→async function main() {
+     7→     7→  console.log('🌱 Starting sample data seeding...')
+     8→     8→
+     9→     9→  // ========================================
+    10→    10→  // PART 1: Create/Find Campus 1 (Test Seed Organization)
+    11→    11→  // ========================================
+    12→    12→  console.log('\n📍 Part 1: Creating Campus 1...')
+    13→    13→  let campus1 = await prisma.campus.findFirst({
+    14→    14→    where: { name: 'Test Seed Organization' }
+    15→    15→  })
+    16→    16→
+    17→    17→  if (!campus1) {
+    18→    18→    campus1 = await prisma.campus.create({
+    19→    19→      data: {
+    20→    20→        name: 'Test Seed Organization',
+    21→    21→        shortName: 'TSO',
+    22→    22→        location: 'Test Location',
+    23→    23→        isActive: true,
+    24→    24→      },
+    25→    25→    })
+    26→    26→    console.log('✅ Created Campus 1:', campus1.name)
+    27→    27→  } else {
+    28→    28→    console.log('✅ Found existing Campus 1:', campus1.name)
+    29→    29→  }
+    30→    30→
+    31→    31→  // ========================================
+    32→    32→  // PART 2: Create Campus 2 with 3 Departments, 3 Batches, 4 Sections, 20 Users
+    33→    33→  // ========================================
+    34→    34→  console.log('\n📍 Part 2: Creating Campus 2 with 3 Departments, 3 Batches, 4 Sections, 20 Users...')
+    35→    35→  let campus2 = await prisma.campus.findFirst({
+    36→    36→    where: { name: 'Test Assessment Campus' }
+    37→    37→  })
+    38→    38→
+    39→    39→  if (!campus2) {
+    40→    40→    campus2 = await prisma.campus.create({
+    41→    41→      data: {
+    42→    42→        name: 'Test Assessment Campus',
+    43→    43→        shortName: 'TAC',
+    44→    44→        location: 'Assessment Test Location',
+    45→    45→        isActive: true,
+    46→    46→      },
+    47→    47→    })
+    48→    48→    console.log('✅ Created Campus 2:', campus2.name)
+    49→    49→  } else {
+    50→    50→    console.log('✅ Found existing Campus 2:', campus2.name)
+    51→    51→  }
+    52→    52→
+    53→    53→  // Create 3 Departments for Campus 2
+    54→    54→  console.log('\n📚 Creating 3 Departments for Campus 2...')
+    55→    55→  const departments2 = ['Engineering', 'Science', 'Business']
+    56→    56→  const createdDepartments2: any[] = []
+    57→    57→
+    58→    58→  for (const deptName of departments2) {
+    59→    59→    let dept = await prisma.department.findFirst({
+    60→    60→      where: {
+    61→    61→        name: deptName,
+    62→    62→        campusId: campus2.id
+    63→    63→      }
+    64→    64→    })
+    65→    65→
+    66→    66→    if (!dept) {
+    67→    67→      dept = await prisma.department.create({
+    68→    68→        data: {
+    69→    69→          name: deptName,
+    70→    70→          campusId: campus2.id,
+    71→    71→        },
+    72→    72→      })
+    73→    73→      console.log(`✅ Created department: ${dept.name}`)
+    74→    74→    } else {
+    75→    75→      console.log(`✅ Found existing department: ${dept.name}`)
+    76→    76→    }
+    77→    77→    createdDepartments2.push(dept)
+    78→    78→  }
+    79→    79→
+    80→    80→  // Create 3 Batches for Campus 2
+    81→    81→  console.log('\n📅 Creating 3 Batches for Campus 2...')
+    82→    82→  const batches2 = ['2021-2025', '2022-2026', '2023-2027']
+    83→    83→  const createdBatches2: any[] = []
+    84→    84→
+    85→    85→  for (const batchName of batches2) {
+    86→    86→    let batch = await prisma.batch.findFirst({
+    87→    87→      where: {
+    88→    88→        name: batchName,
+    89→    89→        campusId: campus2.id
+    90→    90→      }
+    91→    91→    })
+    92→    92→
+    93→    93→    if (!batch) {
+    94→    94→      batch = await prisma.batch.create({
+    95→    95→        data: {
+    96→    96→          name: batchName,
+    97→    97→          campusId: campus2.id,
+    98→    98→          isActive: true,
+    99→    99→        },
+   100→   100→      })
+   101→   101→      console.log(`✅ Created batch: ${batch.name}`)
+   102→   102→    } else {
+   103→   103→      console.log(`✅ Found existing batch: ${batch.name}`)
+   104→   104→    }
+   105→   105→    createdBatches2.push(batch)
+   106→   106→  }
+   107→   107→
+   108→   108→  // Create 20 Test Users for Campus 2 (distributed across 3 departments, 3 batches, 4 sections)
+   109→   109→  console.log('\n👥 Creating 20 Test Users for Campus 2...')
+   110→   110→  const users2: any[] = []
+   111→   111→
+   112→   112→  for (let i = 1; i <= 20; i++) {
+   113→   113→    const email = `assessmentuser${i}@test.org`
+   114→   114→    const password = await bcrypt.hash(email, 10) // Use email as password
+   115→   115→
+   116→   116→    // Calculate department (approx 6-7 users per department)
+   117→   117→    const deptIndex = Math.floor((i - 1) / 7) % 3
+   118→   118→    const departmentId = createdDepartments2[deptIndex].id
+   119→   119→
+   120→   120→    // Calculate batch (approx 6-7 users per batch)
+   121→   121→    const batchIndex = Math.floor((i - 1) / 7) % 3
+   122→   122→    const batchId = createdBatches2[batchIndex].id
+   123→   123→
+   124→   124→    // Calculate section (5 users per section, cycling through A, B, C, D)
+   125→   125→    const sectionIndex = Math.floor((i - 1) / 5) % 4
+   126→   126→    const sectionValues: StudentSection[] = ['A', 'B', 'C', 'D']
+   127→   127→    const section = sectionValues[sectionIndex]
+   128→   128→
+   129→   129→    // Generate unique UOID
+   130→   130→    const uoid = `TAC${String(i).padStart(3, '0')}`
+   131→   131→
+   132→   132→    let user = await prisma.user.findUnique({
+   133→   133→      where: { email }
+   134→   134→    })
+   135→   135→
+   136→   136→    if (!user) {
+   137→   137→      user = await prisma.user.create({
+   138→   138→        data: {
+   139→   139→          uoid,
+   140→   140→          email,
+   141→   141→          name: `Assessment Test User ${i}`,
+   142→   142→          password: password,
+   143→   143→          role: UserRole.USER,
+   144→   144→          campusId: campus2.id,
+   145→   145→          departmentId,
+   146→   146→          batchId,
+   147→   147→          section,
+   148→   148→          isActive: true,
+   149→   149→        },
+   150→   150→      })
+   151→   151→      console.log(`✅ Created user: ${email}`)
+   152→   152→      users2.push(user)
+   153→   153→    } else {
+   154→   154→      console.log(`✅ Found existing user: ${email}`)
+   155→   155→      users2.push(user)
+   156→   156→    }
+   157→   157→  }
+   158→   158→
+   159→   159→  console.log(`\n📊 User Distribution for Campus 2:`)
+   160→   160→  console.log(`   Total users: ${users2.length}`)
+   161→   161→  for (const dept of createdDepartments2) {
+   162→   162→    const count = users2.filter(u => u.departmentId === dept.id).length
+   163→   163→    console.log(`   ${dept.name}: ${count} users`)
+   164→   164→  }
+   165→   165→  for (const batch of createdBatches2) {
+   166→   166→    const count = users2.filter(u => u.batchId === batch.id).length
+   167→   167→    console.log(`   ${batch.name}: ${count} users`)
+   168→   168→  }
+   169→   169→
+   170→   170→  // ========================================
+   171→   171→  // PART 3: Find or create admin user as creator
+   172→   172→  // ========================================
+   173→   173→  console.log('\n🔑 Finding/Creating admin user for assessments...')
+   174→   174→  let creator = await prisma.user.findFirst({
+   175→   175→    where: { role: UserRole.ADMIN }
+   176→   176→  })
+   177→   177→
+   178→   178→  if (!creator) {
+   179→   179→    creator = await prisma.user.create({
+   180→   180→      data: {
+   181→   181→        uoid: 'ADMIN01',
+   182→   182→        email: 'testadmin@seed.org',
+   183→   183→        name: 'Test Admin for Seed',
+   184→   184→        password: await bcrypt.hash('testadmin@seed.org', 10), // Use email as password
+   185→   185→        role: UserRole.ADMIN,
+   186→   186→        isActive: true,
+   187→   187→      },
+   188→   188→    })
+   189→   189→    console.log('✅ Created admin user for seed data')
+   190→   190→  }
+   191→   191→
+   192→   192→  // ========================================
+   193→   193→  // PART 4: Create Assessment Question Group with 20 AWS Questions
+   194→   194→  // ========================================
+   195→   195→  console.log('\n📝 Part 4: Creating Assessment Question Group with 20 AWS Questions...')
+   196→   196→  let assessmentQuestionGroup = await prisma.questionGroup.findFirst({
+   197→   197→    where: {
+   198→   198→      name: 'Assessment AWS Questions',
+   199→   199→      creatorId: creator.id
+   200→   200→    }
+   201→   201→  })
+   202→   202→
+   203→   203→  if (!assessmentQuestionGroup) {
+   204→   204→    assessmentQuestionGroup = await prisma.questionGroup.create({
+   205→   205→      data: {
+   206→   206→        name: 'Assessment AWS Questions',
+   207→   207→        description: 'Question group for assessment testing with AWS-related questions covering various services',
+   208→   208→        isActive: true,
+   209→   209→        creatorId: creator.id,
+   210→   210→      },
+   211→   211→    })
+   212→   212→    console.log('✅ Created question group:', assessmentQuestionGroup.name)
+   213→   213→  } else {
+   214→   214→    console.log('✅ Found existing question group:', assessmentQuestionGroup.name)
+   215→   215→  }
+   216→   216→
+   217→   217→  // Create 20 AWS questions for assessment
+   218→   218→  console.log('\n❓ Creating 20 AWS Questions for Assessment...')
+   219→   219→  const awsAssessmentQuestions = [
+   220→   220→    {
+   221→   221→      title: 'Amazon EC2 Instance Types',
+   222→   222→      content: 'Which EC2 instance type provides GPU-based acceleration for machine learning workloads?',
+   223→   223→      type: QuestionType.MULTIPLE_CHOICE,
+   224→   224→      options: JSON.stringify(['P2', 'P3', 'P3dn', 'G4dn', 'G5']),
+   225→   225→      correctAnswer: 'P3',
+   226→   226→      explanation: 'P3 instances provide GPU-based acceleration with NVIDIA Tesla V100 GPUs for ML workloads.',
+   227→   227→      difficulty: DifficultyLevel.MEDIUM
+   228→   228→    },
+   229→   229→    {
+   230→   230→      title: 'Elastic Load Balancing Features',
+   231→   231→      content: 'ELB supports which of the following traffic routing policies?',
+   232→   232→      type: QuestionType.MULTI_SELECT,
+   233→   233→      options: JSON.stringify(['Round Robin', 'Least Connections', 'IP Hash', 'Least Latency']),
+   234→   234→      correctAnswer: '["Round Robin","Least Connections"]',
+   235→   235→      explanation: 'ELB supports multiple traffic routing policies including Round Robin, Least Connections, IP Hash, and Least Latency routing.',
+   236→   236→      difficulty: DifficultyLevel.HARD
+   237→   237→    },
+   238→   238→    {
+   239→   239→      title: 'S3 Storage Classes',
+   240→   240→      content: 'Which S3 storage class is designed for archiving data with rare access?',
+   241→   241→      type: QuestionType.MULTIPLE_CHOICE,
+   242→   242→      options: JSON.stringify(['Standard', 'Standard-IA', 'Glacier', 'One Zone-IA']),
+   243→   243→      correctAnswer: 'Glacier',
+   244→   244→      explanation: 'S3 Glacier is designed for data archiving with rare access at the lowest storage cost.',
+   245→   245→      difficulty: DifficultyLevel.EASY
+   246→   246→    },
+   247→   247→    {
+   248→   248→      title: 'AWS Lambda Triggers',
+   249→   249→      content: 'AWS Lambda can be triggered synchronously by which of the following services?',
+   250→   250→      type: QuestionType.MULTI_SELECT,
+   251→   251→      options: JSON.stringify(['Amazon S3', 'Amazon DynamoDB', 'Amazon Kinesis', 'Amazon SQS']),
+   252→   252→      correctAnswer: '["Amazon S3","Amazon SQS"]',
+   253→   253→      explanation: 'Lambda can be triggered synchronously by Amazon S3 (object events) and Amazon SQS (message events). Kinesis and DynamoDB use stream/event-based triggers.',
+   254→   254→      difficulty: DifficultyLevel.MEDIUM
+   255→   255→    },
+   256→   256→    {
+   257→   257→      title: 'RDS Read Replicas',
+   258→   258→      content: 'True or False: Amazon RDS Read Replicas can be used to scale read operations for databases.',
+   259→   259→      type: QuestionType.TRUE_FALSE,
+   260→   260→      options: JSON.stringify(['True', 'False']),
+   261→   261→      correctAnswer: 'True',
+   262→   262→      explanation: 'RDS Read Replicas allow you to scale read operations beyond the capacity of a single DB instance.',
+   263→   263→      difficulty: DifficultyLevel.EASY
+   264→   264→    },
+   265→   265→    {
+   266→   266→      title: 'VPC Peering',
+   267→   267→      content: 'VPC peering allows you to connect two VPCs to enable _______.',
+   268→   268→      type: QuestionType.FILL_IN_BLANK,
+   269→   269→      options: JSON.stringify(['private networks', 'public networks', 'different regions', 'same region']),
+   270→   270→      correctAnswer: 'private networks',
+   271→   271→      explanation: 'VPC peering allows you to connect two VPCs to enable private networks to communicate with each other.',
+   272→   272→      difficulty: DifficultyLevel.MEDIUM
+   273→   273→    },
+   274→   274→    {
+   275→   275→      title: 'CloudWatch Alarms',
+   276→   276→      content: 'Which AWS CloudWatch metric type is used for monitoring CPU utilization?',
+   277→   277→      type: QuestionType.MULTIPLE_CHOICE,
+   278→   278→      options: JSON.stringify(['CPUUtilization', 'NetworkIn', 'NetworkOut', 'DiskReadBytes']),
+   279→   279→      correctAnswer: 'CPUUtilization',
+   280→   280→      explanation: 'CPUUtilization is the standard metric for monitoring CPU usage percentage in CloudWatch.',
+   281→   281→      difficulty: DifficultyLevel.EASY
+   282→   282→    },
+   283→   283→    {
+   284→   284→      title: 'IAM Policy Elements',
+   285→   285→      content: 'Which of the following are core elements of an IAM policy? (Select all that apply)',
+   286→   286→      type: QuestionType.MULTI_SELECT,
+   287→   287→      options: JSON.stringify(['Version', 'Statement', 'Effect', 'Action', 'Resource']),
+   288→   288→      correctAnswer: '["Version","Statement","Effect","Action","Resource"]',
+   289→   289→      explanation: 'All five elements (Version, Statement, Effect, Action, and Resource) are core components of an IAM policy.',
+   290→   290→      difficulty: DifficultyLevel.HARD
+   291→   291→    },
+   292→   292→    {
+   293→   293→      title: 'DynamoDB Read Capacity',
+   294→   294→      content: 'True or False: DynamoDB auto scaling can increase read capacity based on traffic patterns.',
+   295→   295→      type: QuestionType.TRUE_FALSE,
+   296→   296→      options: JSON.stringify(['True', 'False']),
+   297→   297→      correctAnswer: 'True',
+   298→   298→      explanation: 'DynamoDB auto scaling automatically adjusts read capacity based on actual traffic patterns to maintain performance.',
+   299→   299→      difficulty: DifficultyLevel.MEDIUM
+   300→   300→    },
+   301→   301→    {
+   302→   302→      title: 'S3 Versioning',
+   303→   303→      content: 'True or False: Amazon S3 versioning keeps multiple versions of an object in the same bucket.',
+   304→   304→      type: QuestionType.TRUE_FALSE,
+   305→   305→      options: JSON.stringify(['True', 'False']),
+   306→   306→      correctAnswer: 'True',
+   307→   307→      explanation: 'S3 versioning preserves, retrieves, and restores every version of every object stored in your bucket.',
+   308→   308→      difficulty: DifficultyLevel.EASY
+   309→   309→    },
+   310→   310→    {
+   311→   311→      title: 'EBS Volume Types',
+   312→   312→      content: 'Which EBS volume type is optimized for boot volumes and provides low latency?',
+   313→   313→      type: QuestionType.MULTIPLE_CHOICE,
+   314→   314→      options: JSON.stringify(['gp2', 'gp3', 'io1', 'io2', 'st1']),
+   315→   315→      correctAnswer: 'gp2',
+   316→   316→      explanation: 'gp2 (General Purpose SSD) is the default and is optimized for boot volumes and provides low latency.',
+   317→   317→      difficulty: DifficultyLevel.MEDIUM
+   318→   318→    },
+   319→   319→    {
+   320→   320→      title: 'Route 53 Routing Policies',
+   321→   321→      content: 'Which Route 53 routing policy routes traffic based on the health of your resources?',
+   322→   322→      type: QuestionType.MULTIPLE_CHOICE,
+   323→   323→      options: JSON.stringify(['Simple', 'Weighted', 'Latency', 'Failover', 'Geolocation']),
+   324→   324→      correctAnswer: 'Health Check',
+   325→   325→      explanation: 'Failover routing policy routes traffic to other resources when the primary resources are unhealthy.',
+   326→   326→      difficulty: DifficultyLevel.HARD
+   327→   327→    },
+   328→   328→    {
+   329→   329→      title: 'Direct Connect',
+   330→   330→      content: 'AWS Direct Connect allows you to establish _______ between your VPC and your on-premises network.',
+   331→   331→      type: QuestionType.FILL_IN_BLANK,
+   332→   332→      options: JSON.stringify(['private connection', 'VPN connection', 'public connection', 'dedicated connection']),
+   333→   333→      correctAnswer: 'dedicated connection',
+   334→   334→      explanation: 'AWS Direct Connect establishes a dedicated network connection from your on-premises network to AWS VPC.',
+   335→   335→      difficulty: DifficultyLevel.MEDIUM
+   336→   336→    },
+   337→   337→    {
+   338→   338→      title: 'SNS Message Filtering',
+   339→   339→      content: 'Which SNS feature allows subscribers to receive only messages that match a specific criteria?',
+   340→   340→      type: QuestionType.MULTIPLE_CHOICE,
+   341→   341→      options: JSON.stringify(['Message Filtering', 'Topic Subscription', 'Platform Application', 'Fanout']),
+   342→   342→      correctAnswer: 'Message Filtering',
+   343→   343→      explanation: 'SNS message filtering allows subscribers to receive only the messages that match specific criteria they are interested in.',
+   344→   344→      difficulty: DifficultyLevel.HARD
+   345→   345→    },
+   346→   346→    {
+   347→   347→      title: 'EKS Cluster',
+   348→   348→      content: 'True or False: Amazon EKS automatically manages the Kubernetes control plane for you.',
+   349→   349→      type: QuestionType.TRUE_FALSE,
+   350→   350→      options: JSON.stringify(['True', 'False']),
+   351→   351→      correctAnswer: 'True',
+   352→   352→      explanation: 'EKS (Elastic Kubernetes Service) automatically manages the Kubernetes control plane, including the API server and etcd.',
+   353→   353→      difficulty: DifficultyLevel.EASY
+   354→   354→    },
+   355→   355→    {
+   356→   356→      title: 'CloudTrail',
+   357→   357→      content: 'AWS CloudTrail enables _______ of API calls made in your account.',
+   358→   358→      type: QuestionType.FILL_IN_BLANK,
+   359→   359→      options: JSON.stringify(['monitoring', 'auditing', 'logging', 'encryption']),
+   360→   360→      correctAnswer: 'auditing',
+   361→   361→      explanation: 'AWS CloudTrail provides auditing of AWS API calls by recording who made what call from which IP and when.',
+   362→   362→      difficulty: DifficultyLevel.MEDIUM
+   363→   363→    },
+   364→   364→    {
+   365→   365→      title: 'Auto Scaling Groups',
+   366→   366→      content: 'Which of the following are valid Auto Scaling metrics for scale-out policies?',
+   367→   367→      type: QuestionType.MULTI_SELECT,
+   368→   368→      options: JSON.stringify(['CPUUtilization', 'NetworkIn', 'RequestCount', 'ALBRequestCountPerTarget']),
+   369→   369→      correctAnswer: '["CPUUtilization","RequestCount"]',
+   370→   370→      explanation: 'CPUUtilization and RequestCount are commonly used metrics for scaling out when demand increases.',
+   371→   371→      difficulty: DifficultyLevel.HARD
+   372→   372→    },
+   373→   373→    {
+   374→   374→      title: 'ACM Certificate Import',
+   375→   375→      content: 'True or False: AWS Certificate Manager (ACM) supports importing third-party SSL certificates.',
+   376→   376→      type: QuestionType.TRUE_FALSE,
+   377→   377→      options: JSON.stringify(['True', 'False']),
+   378→   378→      correctAnswer: 'True',
+   379→   379→      explanation: 'ACM allows you to import SSL/TLS certificates from third-party certificate authorities into ACM for use with AWS services.',
+   380→   380→      difficulty: DifficultyLevel.EASY
+   381→   381→    },
+   382→   382→    {
+   383→   383→      title: 'SQS Message Retention',
+   384→   384→      content: 'What is the maximum message retention period for Amazon SQS standard queues?',
+   385→   385→      type: QuestionType.MULTIPLE_CHOICE,
+   386→   386→      options: JSON.stringify(['7 days', '14 days', '30 days', '365 days']),
+   387→   387→      correctAnswer: '14 days',
+   388→   388→      explanation: 'Amazon SQS standard queues retain messages for up to 14 days by default, which is the maximum retention period.',
+   389→   389→      difficulty: DifficultyLevel.MEDIUM
+   390→   390→    },
+   391→   391→    {
+   392→   392→      title: 'CloudFormation Stack',
+   393→   393→      content: 'Which CloudFormation template section is required and defines AWS resources to create?',
+   394→   394→      type: QuestionType.MULTIPLE_CHOICE,
+   395→   395→      options: JSON.stringify(['Parameters', 'Resources', 'Outputs', 'Conditions']),
+   396→   396→      correctAnswer: 'Resources',
+   397→   397→      explanation: 'The Resources section is required in a CloudFormation template and defines the AWS resources to create and configure.',
+   398→   398→      difficulty: DifficultyLevel.EASY
+   399→   399→    }
+   400→   400→  ]
+   401→   401→
+   402→   402→  const createdAssessmentQuestions: any[] = []
+   403→   403→  for (const q of awsAssessmentQuestions) {
+   404→   404→    let question = await prisma.question.findFirst({
+   405→   405→      where: {
+   406→   406→        groupId: assessmentQuestionGroup.id,
+   407→   407→        title: q.title
+   408→   408→      }
+   409→   409→    })
+   410→   410→
+   411→   411→    if (!question) {
+   412→   412→      question = await prisma.question.create({
+   413→   413→        data: {
+   414→   414→          title: q.title,
+   415→   415→          content: q.content,
+   416→   416→          type: q.type,
+   417→   417→          options: q.options,
+   418→   418→          correctAnswer: q.correctAnswer,
+   419→   419→          explanation: q.explanation,
+   420→   420→          difficulty: q.difficulty,
+   421→   421→          groupId: assessmentQuestionGroup.id,
+   422→   422→          isActive: true,
+   423→   423→        },
+   424→   424→      })
+   425→   425→      console.log(`✅ Created question: ${q.title} (${q.type})`)
+   426→   426→      createdAssessmentQuestions.push(question)
+   427→   427→    } else {
+   428→   428→      console.log(`✅ Found existing question: ${q.title}`)
+   429→   429→      createdAssessmentQuestions.push(question)
+   430→   430→    }
+   431→   431→  }
+   432→   432→
+   433→   433→  console.log(`\n📊 Assessment Question Formats Summary:`)
+   434→   434→  const formatCounts: Record<string, number> = {}
+   435→   435→  createdAssessmentQuestions.forEach(q => {
+   436→   436→    formatCounts[q.type] = (formatCounts[q.type] || 0) + 1
+   437→   437→  })
+   438→   438→  Object.entries(formatCounts).forEach(([format, count]) => {
+   439→   439→    console.log(`   ${format}: ${count} questions`)
+   440→   440→  })
+   441→   441→
+   442→   442→  // ========================================
+   443→   443→  // PART 5: Create Assessment with timing and tab switches
+   444→   444→  // ========================================
+   445→   445→  console.log('\n📋 Part 5: Creating Assessment with timed settings and tab switches...')
+   446→   446→  
+   447→   447→  // Calculate start time (10 mins from now) and end time (70 mins from now)
+   448→   448→  const now = new Date()
+   449→   449→  const startTime = new Date(now.getTime() + 10 * 60 * 1000)
+   450→   450→  const endtime = new Date(now.getTime() + 70 * 60 * 1000)
+   451→   451→
+   452→   452→  console.log(`   Start Time: ${startTime.toISOString()}`)
+   453→   453→  console.log(`   End Time: ${endtime.toISOString()}`)
+   454→   454→  console.log(`   Time Limit: 60 minutes`)
+   455→   455→  console.log(`   Max Tab Switches: 10 (Disable Copy/Paste)`)
+   456→   456→  console.log(`   Auto Submit: true`)
+   457→   457→
+   458→   458→  let assessment = await prisma.assessment.findFirst({
+   459→   459→    where: {
+   460→   460→      title: 'Timed Assessment Test',
+   461→   461→      campusId: campus2.id
+   462→   462→    }
+   463→   463→  })
+   464→   464→
+   465→   465→  if (!assessment) {
+   466→   466→    // Generate a random 6-character access key
+   467→   467→    const accessKey = Math.random().toString(36).substring(2, 8).toUpperCase()
+   468→   468→
+   469→   469→    assessment = await prisma.assessment.create({
+   470→   470→      data: {
+   471→   471→        title: 'Timed Assessment Test',
+   472→   472→        description: 'A timed assessment for testing tab switch monitoring and timed quiz functionality',
+   473→   473→        timeLimit: 60, // 60 minutes
+   474→   474→        difficulty: DifficultyLevel.MEDIUM,
+   475→   475→        status: QuizStatus.ACTIVE,
+   476→   476→        negativeMarking: false,
+   477→   477→        negativePoints: 0,
+   478→   478→        randomOrder: false,
+   479→   479→        tabswitches: 10,
+   480→   480→        disableCopyPaste: true,
+   481→   481→        autosubmit: true,
+   482→   482→        accessKey: accessKey,
+   483→   483→        startTime: startTime,
+   484→   484→        endtime: endtime,
+   485→   485→        creatorId: creator.id,
+   486→   486→        campusId: campus2.id,
+   487→   487→      },
+   488→   488→    })
+   489→   489→    console.log(`✅ Created assessment: ${assessment.title}`)
+   490→   490→    console.log(`   Access Key: ${accessKey}`)
+   491→   491→  } else {
+   492→   492→    console.log('✅ Found existing assessment:', assessment.title)
+   493→   493→  }
+   494→   494→
+   495→   495→  // Enroll all 20 users in the assessment
+   496→   496→  console.log('\n📋 Enrolling all 20 users in assessment...')
+   497→   497→  for (const user of users2) {
+   498→   498→    const existingAssessmentUser = await prisma.assessmentUser.findUnique({
+   499→   499→      where: {
+   500→   500→        assessmentId_userId: {
+   501→   501→          assessmentId: assessment.id,
+   502→   502→          userId: user.id
+   503→   503→        }
+   504→   504→      }
+   505→   505→    })
+   506→   506→
+   507→   507→    if (!existingAssessmentUser) {
+   508→   508→      await prisma.assessmentUser.create({
+   509→   509→        data: {
+   510→   510→          assessmentId: assessment.id,
+   511→   511→          userId: user.id,
+   512→   512→        },
+   513→   513→      })
+   514→   514→    }
+   515→   515→  }
+   516→   516→  console.log(`✅ Enrolled ${users2.length} users in assessment`)
+   517→   517→
+   518→   518→  // Add questions to assessment
+   519→   519→  console.log('\n➕ Adding assessment questions to assessment...')
+   520→   520→  for (let i = 0; i < createdAssessmentQuestions.length; i++) {
+   521→   521→    const question = createdAssessmentQuestions[i]
+   522→   522→    
+   523→   523→    const existingAssessmentQuestion = await prisma.assessmentQuestion.findUnique({
+   524→   524→      where: {
+   525→   525→        assessmentId_questionId: {
+   526→   526→          assessmentId: assessment.id,
+   527→   527→          questionId: question.id
+   528→   528→        }
+   529→   529→      }
+   530→   530→    })
+   531→   531→
+   532→   532→    if (!existingAssessmentQuestion) {
+   533→   533→      await prisma.assessmentQuestion.create({
+   534→   534→        data: {
+   535→   535→          assessmentId: assessment.id,
+   536→   536→          questionId: question.id,
+   537→   537→          order: i + 1,
+   538→   538→          points: 1.0,
+   539→   539→        },
+   540→   540→      })
+   541→   541→    }
+   542→   542→  }
+   543→   543→  console.log(`✅ Added ${createdAssessmentQuestions.length} questions to assessment`)
+   544→   544→
+   545→   545→  // ========================================
+   546→   546→  // PART 6: Create Test Quiz with date range
+   547→   547→  // ========================================
+   548→   548→  console.log('\n🎯 Part 6: Creating Test Quiz with date range...')
+   549→   549→
+   550→   550→  // Calculate quiz start date (current date) and end date (1 month from now)
+   551→   551→  const quizStartDate = new Date()
+   552→   552→  const quizEndDate = new Date()
+   553→   553→  quizEndDate.setMonth(quizEndDate.getMonth() + 1) // 1 month from now
+   554→   554→
+   555→   555→  console.log(`   Quiz Start Date: ${quizStartDate.toISOString()}`)
+   556→   556→  console.log(`   Quiz End Date: ${quizEndDate.toISOString()}`)
+   557→   557→
+   558→   558→  let quiz = await prisma.quiz.findFirst({
+   559→   559→    where: {
+   560→   560→      title: 'Monthly Test Quiz',
+   561→   561→      campusId: campus2.id
+   562→   562→    }
+   563→   563→  })
+   564→   564→
+   565→   565→  if (!quiz) {
+   566→   566→    quiz = await prisma.quiz.create({
+   567→   567→      data: {
+   568→   568→        title: 'Monthly Test Quiz',
+   569→   569→        description: 'A test quiz with date range spanning 1 month from seed time',
+   570→   570→        timeLimit: null, // No time limit
+   571→   571→        difficulty: DifficultyLevel.MEDIUM,
+   572→   572→        status: QuizStatus.ACTIVE,
+   573→   573→        negativeMarking: false,
+   574→   574→        negativePoints: 0,
+   575→   575→        randomOrder: false,
+   576→   576→        maxAttempts: null, // Unlimited
+   577→   577→        showAnswers: false,
+   578→   578→        startDate: quizStartDate,
+   579→   579→        endDate: quizEndDate,
+   580→   580→        creatorId: creator.id,
+   581→   581→        campusId: campus2.id,
+   582→   582→        checkAnswerEnabled: false,
+   583→   583→      },
+   584→   584→    })
+   585→   585→    console.log('✅ Created quiz:', quiz.title)
+   586→   586→  } else {
+   587→   587→    console.log('✅ Found existing quiz:', quiz.title)
+   588→   588→  }
+   589→   589→
+   590→   590→  // Enroll all 20 users in the quiz
+   591→   591→  console.log('\n📋 Enrolling all 20 users in quiz...')
+   592→   592→  for (const user of users2) {
+   593→   593→    const existingQuizUser = await prisma.quizUser.findUnique({
+   594→   594→      where: {
+   595→   595→        quizId_userId: {
+   596→   596→          quizId: quiz.id,
+   597→   597→          userId: user.id
+   598→   598→        }
+   599→   599→      }
+   600→   600→    })
+   601→   601→
+   602→   602→    if (!existingQuizUser) {
+   603→   603→      await prisma.quizUser.create({
+   604→   604→        data: {
+   605→   605→          quizId: quiz.id,
+   606→   606→          userId: user.id,
+   607→   607→        },
+   608→   608→      })
+   609→   609→    }
+   610→   610→  }
+   611→   611→  console.log(`✅ Enrolled ${users2.length} users in quiz`)
+   612→   612→
+   613→   613→  // Add questions to quiz
+   614→   614→  console.log('\n➕ Adding quiz questions to quiz...')
+   615→   615→  for (let i = 0; i < createdAssessmentQuestions.length; i++) {
+   616→   616→    const question = createdAssessmentQuestions[i]
+   617→   617→    
+   618→   618→    const existingQuizQuestion = await prisma.quizQuestion.findUnique({
+   619→   619→      where: {
+   620→   620→        quizId_questionId: {
+   621→   621→          quizId: quiz.id,
+   622→   622→          questionId: question.id
+   623→   623→        }
+   624→   624→      }
+   625→   625→    })
+   626→   626→
+   627→   627→    if (!existingQuizQuestion) {
+   628→   628→      await prisma.quizQuestion.create({
+   629→   629→        data: {
+   630→   630→          quizId: quiz.id,
+   631→   631→          questionId: question.id,
+   632→   632→          order: i + 1,
+   633→   633→          points: 1.0,
+   634→   634→        },
+   635→   635→      })
+   636→   636→    }
+   637→   637→  }
+   638→   638→  console.log(`✅ Added ${createdAssessmentQuestions.length} questions to quiz`)
+   639→   639→
+   640→   640→  // ========================================
+   641→   641→  // PART 7: Summary
+   642→   642→  // ========================================
+   643→   643→  console.log('\n' + '='.repeat(60))
+   644→   644→  console.log('✅ Sample data seeded successfully!')
+   645→   645→  console.log('='.repeat(60))
+   646→   646→  
+   647→   647→  console.log('\n📊 Summary:')
+   648→   648→  console.log('\n📍 Campus 1 - Test Seed Organization:')
+   649→   649→  console.log(`   Name: ${campus1.name}`)
+   650→   650→  console.log(`   Short Name: ${campus1.shortName}`)
+   651→   651→  
+   652→   652→  console.log('\n📍 Campus 2 - Test Assessment Campus:')
+   653→   653→  console.log(`   Name: ${campus2.name}`)
+   654→   654→  console.log(`   Short Name: ${campus2.shortName}`)
+   655→   655→  console.log(`   Departments: ${departments2.join(', ')}`)
+   656→   656→  console.log(`   Batches: ${batches2.join(', ')}`)
+   657→   657→  console.log(`   Sections: A, B, C, D`)
+   658→   658→  console.log(`   Users: ${users2.length} (assessmentuser1-20)`)
+   659→   659→  
+   660→   660→  console.log('\n📋 Assessment: Timed Assessment Test')
+   661→   661→  console.log(`   Start Time: ${startTime.toISOString()}`)
+   662→   662→  console.log(`   End Time: ${endtime.toISOString()}`)
+   663→   663→  console.log(`   Time Limit: 60 minutes`)
+   664→   664→  console.log(`   Max Tab Switches: 10`)
+   665→   665→  console.log(`   Disable Copy/Paste: Yes`)
+   666→   666→  console.log(`   Auto Submit: true`)
+   667→   667→  console.log(`   Access Key: ${assessment.accessKey || 'N/A'}`)
+   668→   668→  console.log(`   Questions: ${createdAssessmentQuestions.length}`)
+   669→   669→  console.log(`   Enrolled Users: ${users2.length}`)
+   670→   670→  
+   671→   671→  console.log('\n🎯 Quiz: Monthly Test Quiz')
+   672→   672→  console.log(`   Start Date: ${quizStartDate.toISOString()}`)
+   673→   673→  console.log(`   End Date: ${quizEndDate.toISOString()}`)
+   674→   674→  console.log(`   Time Limit: None (Date-based availability)`)
+   675→   675→  console.log(`   Questions: ${createdAssessmentQuestions.length}`)
+   676→   676→  console.log(`   Enrolled Users: ${users2.length}`)
+   677→   677→  
+   678→   678→  console.log('\n📝 Question Group: Assessment AWS Questions')
+   679→   679→  console.log(`   Total Questions: ${createdAssessmentQuestions.length}`)
+   680→   680→  
+   681→   681→  console.log('\n🔑 User Credentials:')
+   682→   682→  console.log('   Assessment Admin (Creator):')
+   683→   683→  console.log('   Email: testadmin@seed.org')
+   684→   684→  console.log('   Password: testadmin@seed.org')
+   685→   685→  console.log('\n   Assessment Users:')
+   686→   686→  console.log('   Email: assessmentuser{1-20}@test.org')
+   687→   687→  console.log('   Password: [use the same email as password]')
+   688→   688→  console.log('\n   Assessment Access Key:')
+   689→   689→  console.log(`   Timed Assessment Test: ${assessment.accessKey || 'N/A'}`)
+   690→   690→  console.log('\n' + '='.repeat(60))
+   691→   691→}
+   692→   692→
+   693→   693→main()
+   694→   694→  .catch((e) => {
+   695→   695→  console.error('❌ Error seeding sample data:', e)
+   696→   696→  process.exit(1)
+   697→   697→  })
+   698→   698→  .finally(async () => {
+   699→   699→  await prisma.$disconnect()
+   700→   700→  })
+   701→   701→

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
   Tooltip,
@@ -42,8 +41,6 @@ import {
 import {
   MoreHorizontal,
   Plus,
-  Download,
-  Upload,
   Edit,
   Trash2,
   Eye,
@@ -60,7 +57,6 @@ import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { format } from "date-fns"
-import Papa from "papaparse"
 
 // Helper function to format dates in dd/mm/yyyy format
 const formatDateDDMMYYYY = (dateString: string) => {
@@ -74,7 +70,6 @@ const formatDateDDMMYYYY = (dateString: string) => {
 interface QuestionGroup {
   id: string
   name: string
-  description?: string
   isActive: boolean
   createdAt: string
   creator: {
@@ -90,7 +85,6 @@ interface QuestionGroup {
 
 interface FormData {
   name: string
-  description: string
   isActive: boolean
 }
 
@@ -108,7 +102,6 @@ export default function QuestionGroupsPage() {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     name: "",
-    description: "",
     isActive: true,
   })
 
@@ -131,8 +124,6 @@ export default function QuestionGroupsPage() {
     unassign: 'pending',
     questions: 'pending'
   })
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const columns: ColumnDef<QuestionGroup>[] = [
     {
       accessorKey: "name",
@@ -150,14 +141,6 @@ export default function QuestionGroupsPage() {
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue("name")}</div>
       ),
-    },
-    {
-      accessorKey: "description",
-      header: "Description",
-      cell: ({ row }) => {
-        const description = row.getValue("description") as string
-        return description || "-"
-      },
     },
     {
       accessorKey: "_count.questions",
@@ -370,7 +353,6 @@ export default function QuestionGroupsPage() {
     setSelectedGroup(group)
     setFormData({
       name: group.name,
-      description: group.description || "",
       isActive: group.isActive,
     })
     setIsEditDialogOpen(true)
@@ -468,69 +450,8 @@ export default function QuestionGroupsPage() {
     setSelectedGroup(null)
     setFormData({
       name: "",
-      description: "",
       isActive: true,
     })
-  }
-
-  const handleExportGroups = () => {
-    const csvData = questionGroups.map(group => ({
-      name: group.name,
-      description: group.description || "",
-      isActive: group.isActive,
-      questions: group._count?.questions || 0,
-      reportedQuestions: group._count?.reportedQuestions || 0,
-      createdBy: group.creator?.name || group.creator?.email || "",
-      createdAt: group.createdAt,
-    }))
-
-    const csv = Papa.unparse(csvData)
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", "question-groups.csv")
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toasts.success("Question groups exported successfully")
-  }
-
-  const handleImportGroups = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      Papa.parse(file, {
-        complete: async (results) => {
-          try {
-            const response = await fetch("/api/admin/question-groups", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ importData: results.data }),
-            })
-
-            if (response.ok) {
-              const result = await response.json()
-              toasts.success(result.message || "Question groups imported successfully")
-              fetchQuestionGroups()
-            } else {
-              const error = await response.json()
-              toasts.error(error.message || "Import failed")
-            }
-          } catch (error) {
-            toasts.actionFailed("Question group import")
-          }
-        },
-        header: true,
-        skipEmptyLines: true,
-      })
-    }
   }
 
   if (loading) {
@@ -547,21 +468,6 @@ export default function QuestionGroupsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportGroups}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Button variant="outline" onClick={handleImportGroups}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Question Group
@@ -611,15 +517,6 @@ export default function QuestionGroupsPage() {
                   required
                 />
               </div>
-              <div className="grid gap-3">
-                <Label htmlFor="add-description">Description</Label>
-                <Textarea
-                  id="add-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="add-isActive"
@@ -656,15 +553,6 @@ export default function QuestionGroupsPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                />
-              </div>
-              <div className="grid gap-3">
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
                 />
               </div>
               <div className="flex items-center space-x-2">

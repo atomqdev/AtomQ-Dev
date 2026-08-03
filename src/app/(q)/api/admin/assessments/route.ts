@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const campusId = searchParams.get("campusId");
     const search = searchParams.get("search");
+    const groupId = searchParams.get("groupId");
 
     const skip = (page - 1) * limit;
 
@@ -28,6 +29,10 @@ export async function GET(request: NextRequest) {
 
     if (campusId && campusId !== "all") {
       where.campusId = campusId;
+    }
+
+    if (groupId && groupId !== "all") {
+      where.groupId = groupId;
     }
 
     if (search) {
@@ -112,6 +117,7 @@ export async function POST(request: NextRequest) {
       disableCopyPaste,
       autosubmit,
       accessKey,
+      groupId,
     } = data;
 
     // Calculate endtime from startTime + duration if both are provided
@@ -140,6 +146,7 @@ export async function POST(request: NextRequest) {
         autosubmit: autosubmit || false,
         accessKey: accessKey || null,
         creatorId: session.user.id,
+        ...(groupId ? { groupId } : {}),
       },
       include: {
         creator: {

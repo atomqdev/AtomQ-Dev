@@ -88,7 +88,6 @@ export async function POST(
     const body = await request.json()
     const {
       name,
-      description,
       isActive = true
     } = body
 
@@ -104,7 +103,6 @@ export async function POST(
     const questionGroup = await db.questionGroup.create({
       data: {
         name,
-        description,
         isActive,
         creatorId: session.user.id
       },

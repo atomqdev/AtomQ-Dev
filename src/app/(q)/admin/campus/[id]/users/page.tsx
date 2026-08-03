@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { Button } from "@/components/ui/button"
@@ -59,8 +59,9 @@ interface Campus {
   shortName: string
 }
 
-export default function CampusUsersPage({ params }: { params: { id: string } }) {
+export default function CampusUsersPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const { id } = use(params)
   const { session, status, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
   const [users, setUsers] = useState<User[]>([])
   const [campus, setCampus] = useState<Campus | null>(null)
@@ -74,11 +75,11 @@ export default function CampusUsersPage({ params }: { params: { id: string } }) 
 
     fetchCampus()
     fetchUsers()
-  }, [session, status, isAuthenticated, isAdmin, params.id])
+  }, [session, status, isAuthenticated, isAdmin, id])
 
   const fetchCampus = async () => {
     try {
-      const response = await fetch(`/api/admin/campus/${params.id}`)
+      const response = await fetch(`/api/admin/campus/${id}`)
       if (response.ok) {
         const data = await response.json()
         setCampus(data)
@@ -100,7 +101,7 @@ export default function CampusUsersPage({ params }: { params: { id: string } }) 
     }
 
     try {
-      const response = await fetch(`/api/admin/campus/${params.id}/users`)
+      const response = await fetch(`/api/admin/campus/${id}/users`)
       if (response.ok) {
         const data = await response.json()
         setUsers(data)

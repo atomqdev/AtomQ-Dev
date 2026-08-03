@@ -11,14 +11,14 @@ async function main() {
   await prisma.quizUser.deleteMany()
   await prisma.quizQuestion.deleteMany()
   await prisma.quiz.deleteMany()
+  await prisma.quizGroup.deleteMany()
   await prisma.assessmentAnswer.deleteMany()
   await prisma.assessmentTabSwitch.deleteMany()
   await prisma.assessmentAttempt.deleteMany()
   await prisma.assessmentUser.deleteMany()
   await prisma.assessmentQuestion.deleteMany()
   await prisma.assessment.deleteMany()
-  await prisma.activityQuestion.deleteMany()
-  await prisma.activity.deleteMany()
+  await prisma.assessmentGroup.deleteMany()
   await prisma.quizTabSwitch.deleteMany()
   await prisma.question.deleteMany()
   await prisma.questionGroup.deleteMany()
@@ -136,6 +136,128 @@ async function main() {
 
   console.log('Created sample users:', users.length, 'students')
 
+  // ========================================
+  // Create Question Group with sample questions
+  // ========================================
+  const questionGroup = await prisma.questionGroup.create({
+    data: {
+      name: 'General Knowledge',
+      isActive: true,
+      creatorId: admin.id,
+    },
+  })
+
+  const sampleQuestions = await Promise.all([
+    prisma.question.create({
+      data: {
+        title: 'Capital of France',
+        content: 'What is the capital city of France?',
+        type: QuestionType.MULTIPLE_CHOICE,
+        options: JSON.stringify(['Berlin', 'Paris', 'Madrid', 'Rome']),
+        correctAnswer: 'Paris',
+        explanation: 'Paris is the capital and most populous city of France.',
+        difficulty: DifficultyLevel.EASY,
+        groupId: questionGroup.id,
+      },
+    }),
+    prisma.question.create({
+      data: {
+        title: 'Primary Colors',
+        content: 'Which of the following are primary colors?',
+        type: QuestionType.MULTI_SELECT,
+        options: JSON.stringify(['Red', 'Green', 'Blue', 'Yellow']),
+        correctAnswer: '["Red","Blue","Yellow"]',
+        explanation: 'The traditional primary colors are Red, Blue, and Yellow.',
+        difficulty: DifficultyLevel.MEDIUM,
+        groupId: questionGroup.id,
+      },
+    }),
+  ])
+
+  console.log('Created question group:', questionGroup.name, 'with', sampleQuestions.length, 'questions')
+
+  // ========================================
+  // Create Quiz Groups with a sample quiz
+  // ========================================
+  const quizGroup1 = await prisma.quizGroup.create({
+    data: {
+      name: 'Programming Quizzes',
+      isActive: true,
+      creatorId: admin.id,
+    },
+  })
+
+  const quizGroup2 = await prisma.quizGroup.create({
+    data: {
+      name: 'Aptitude Quizzes',
+      isActive: true,
+      creatorId: admin.id,
+    },
+  })
+
+  const sampleQuiz = await prisma.quiz.create({
+    data: {
+      title: 'General Knowledge Quiz',
+      description: 'A short demo quiz covering general knowledge',
+      timeLimit: 10,
+      difficulty: DifficultyLevel.EASY,
+      status: QuizStatus.ACTIVE,
+      creatorId: admin.id,
+      campusId: campus1.id,
+      groupId: quizGroup1.id,
+      quizQuestions: {
+        create: sampleQuestions.map((q, i) => ({
+          questionId: q.id,
+          order: i + 1,
+          points: 1.0,
+        })),
+      },
+    },
+  })
+
+  console.log('Created quiz groups:', quizGroup1.name, '+', quizGroup2.name, '(sample quiz in', quizGroup1.name + ')')
+
+  // ========================================
+  // Create Assessment Groups with a sample assessment
+  // ========================================
+  const assessmentGroup1 = await prisma.assessmentGroup.create({
+    data: {
+      name: 'Technical Assessments',
+      isActive: true,
+      creatorId: admin.id,
+    },
+  })
+
+  const assessmentGroup2 = await prisma.assessmentGroup.create({
+    data: {
+      name: 'Soft Skills Assessments',
+      isActive: true,
+      creatorId: admin.id,
+    },
+  })
+
+  const sampleAssessment = await prisma.assessment.create({
+    data: {
+      title: 'General Knowledge Assessment',
+      description: 'A short demo assessment covering general knowledge',
+      timeLimit: 15,
+      difficulty: DifficultyLevel.MEDIUM,
+      status: QuizStatus.ACTIVE,
+      creatorId: admin.id,
+      campusId: campus1.id,
+      groupId: assessmentGroup1.id,
+      assessmentQuestions: {
+        create: sampleQuestions.map((q, i) => ({
+          questionId: q.id,
+          order: i + 1,
+          points: 1.0,
+        })),
+      },
+    },
+  })
+
+  console.log('Created assessment groups:', assessmentGroup1.name, '+', assessmentGroup2.name, '(sample assessment in', assessmentGroup1.name + ')')
+
   // Create default settings
   const settings = await prisma.settings.create({
     data: {
@@ -156,6 +278,9 @@ async function main() {
   console.log('🔑 Admin: admin@atomcode.dev / admin@atomcode.dev')
   console.log('👥 Sample Users: student@mit.edu, student@stanford.edu, student@harvard.edu / user123')
   console.log('🏫 Campuses: MIT, Stanford, Harvard')
+  console.log('📝 Question Group: General Knowledge (' + sampleQuestions.length + ' questions)')
+  console.log('🎯 Quiz Groups: Programming Quizzes (with sample quiz), Aptitude Quizzes')
+  console.log('📋 Assessment Groups: Technical Assessments (with sample assessment), Soft Skills Assessments')
 }
 
 main()

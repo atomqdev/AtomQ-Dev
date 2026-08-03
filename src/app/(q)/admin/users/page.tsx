@@ -45,7 +45,9 @@ import {
 import {
   MoreHorizontal,
   UserPlus,
-  Download,
+  FileSpreadsheet,
+  FileJson,
+  Upload,
   Edit,
   Trash2,
   ArrowUpDown,
@@ -142,6 +144,8 @@ export default function UsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({})
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false)
   const [tableKey, setTableKey] = useState(0)
+  const [importLoading, setImportLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -767,7 +771,7 @@ export default function UsersPage() {
     setBatches([])
   }
 
-  const handleExportUsers = () => {
+  const handleDownloadCSV = () => {
     const csvData = users.map(user => ({
       name: user.name,
       email: user.email,
@@ -790,7 +794,109 @@ export default function UsersPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    toasts.success("Users exported successfully")
+    URL.revokeObjectURL(url)
+    toasts.success("Users downloaded successfully")
+  }
+
+  const handleExportJSON = () => {
+    const exportData = users.map(user => ({
+      name: user.name,
+      email: user.email,
+      uoid: user.uoid || "",
+      role: user.role,
+      phone: user.phone || "",
+      isActive: user.isActive,
+      campus: user.campus || null,
+      campusShortName: user.campusShortName || null,
+      department: user.department || null,
+      batch: user.batch || null,
+      section: user.section || null,
+      registrationCode: user.registrationCode || null,
+      createdAt: user.createdAt,
+    }))
+
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: "application/json;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", "users.json")
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toasts.success(`Exported ${exportData.length} user${exportData.length !== 1 ? 's' : ''} as JSON`)
+  }
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Reset the input so the same file can be selected again
+    event.target.value = ""
+
+    if (!file.name.endsWith('.json')) {
+      toasts.error("Please select a JSON file")
+      return
+    }
+
+    setImportLoading(true)
+    try {
+      const text = await file.text()
+      let parsedData: unknown
+      try {
+        parsedData = JSON.parse(text)
+      } catch {
+        toasts.error("Invalid JSON file. Please check the file format.")
+        return
+      }
+
+      // Support both a raw array and an object with an `importData`/`users` array
+      let importArray: any[] = []
+      if (Array.isArray(parsedData)) {
+        importArray = parsedData
+      } else if (parsedData && typeof parsedData === 'object') {
+        const obj = parsedData as Record<string, unknown>
+        if (Array.isArray(obj.importData)) {
+          importArray = obj.importData as any[]
+        } else if (Array.isArray(obj.users)) {
+          importArray = obj.users as any[]
+        }
+      }
+
+      if (importArray.length === 0) {
+        toasts.error("No user records found in the JSON file")
+        return
+      }
+
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importData: importArray }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toasts.success(result.message || `Import completed: ${result.successCount} created, ${result.failureCount} failed`)
+        await fetchUsers()
+      } else if (response.status === 401) {
+        toasts.error("Session expired. Please log in again.")
+        router.push('/')
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toasts.error(errorData.message || "Failed to import users")
+      }
+    } catch (error) {
+      console.error("Error importing users:", error)
+      toasts.networkError()
+    } finally {
+      setImportLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -822,10 +928,41 @@ export default function UsersPage() {
             Manage user accounts and permissions
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportUsers}>
-            <Download className="mr-2 h-4 w-4" />
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportJSON}
+          />
+          <Button
+            variant="outline"
+            onClick={handleImportClick}
+            disabled={importLoading}
+          >
+            {importLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportJSON}
+            disabled={users.length === 0}
+          >
+            <FileJson className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadCSV}
+            disabled={users.length === 0}
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Download
           </Button>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />

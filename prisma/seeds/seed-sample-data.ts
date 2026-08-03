@@ -204,7 +204,6 @@ async function main() {
     assessmentQuestionGroup = await prisma.questionGroup.create({
       data: {
         name: 'Assessment AWS Questions',
-        description: 'Question group for assessment testing with AWS-related questions covering various services',
         isActive: true,
         creatorId: creator.id,
       },
@@ -440,10 +439,30 @@ async function main() {
   })
 
   // ========================================
-  // PART 5: Create Assessment with timing and tab switches
+  // PART 5: Create Assessment Group + Assessment with timing and tab switches
   // ========================================
-  console.log('\n📋 Part 5: Creating Assessment with timed settings and tab switches...')
-  
+  console.log('\n📁 Part 5: Creating Assessment Group + Assessment with timed settings and tab switches...')
+
+  let assessmentGroup = await prisma.assessmentGroup.findFirst({
+    where: {
+      name: 'Sample Assessment Group',
+      creatorId: creator.id
+    }
+  })
+
+  if (!assessmentGroup) {
+    assessmentGroup = await prisma.assessmentGroup.create({
+      data: {
+        name: 'Sample Assessment Group',
+        isActive: true,
+        creatorId: creator.id,
+      },
+    })
+    console.log('✅ Created assessment group:', assessmentGroup.name)
+  } else {
+    console.log('✅ Found existing assessment group:', assessmentGroup.name)
+  }
+
   // Calculate start time (10 mins from now) and end time (70 mins from now)
   const now = new Date()
   const startTime = new Date(now.getTime() + 10 * 60 * 1000)
@@ -484,6 +503,7 @@ async function main() {
         endtime: endtime,
         creatorId: creator.id,
         campusId: campus2.id,
+        groupId: assessmentGroup.id,
       },
     })
     console.log(`✅ Created assessment: ${assessment.title}`)
@@ -543,9 +563,29 @@ async function main() {
   console.log(`✅ Added ${createdAssessmentQuestions.length} questions to assessment`)
 
   // ========================================
-  // PART 6: Create Test Quiz with date range
+  // PART 6: Create Quiz Group + Test Quiz with date range
   // ========================================
-  console.log('\n🎯 Part 6: Creating Test Quiz with date range...')
+  console.log('\n📁 Part 6: Creating Quiz Group + Test Quiz with date range...')
+
+  let quizGroup = await prisma.quizGroup.findFirst({
+    where: {
+      name: 'Sample Quiz Group',
+      creatorId: creator.id
+    }
+  })
+
+  if (!quizGroup) {
+    quizGroup = await prisma.quizGroup.create({
+      data: {
+        name: 'Sample Quiz Group',
+        isActive: true,
+        creatorId: creator.id,
+      },
+    })
+    console.log('✅ Created quiz group:', quizGroup.name)
+  } else {
+    console.log('✅ Found existing quiz group:', quizGroup.name)
+  }
 
   // Calculate quiz start date (current date) and end date (1 month from now)
   const quizStartDate = new Date()
@@ -580,6 +620,7 @@ async function main() {
         creatorId: creator.id,
         campusId: campus2.id,
         checkAnswerEnabled: false,
+        groupId: quizGroup.id,
       },
     })
     console.log('✅ Created quiz:', quiz.title)
@@ -677,6 +718,12 @@ async function main() {
   
   console.log('\n📝 Question Group: Assessment AWS Questions')
   console.log(`   Total Questions: ${createdAssessmentQuestions.length}`)
+  
+  console.log('\n📁 Quiz Group: Sample Quiz Group')
+  console.log(`   Contains Quiz: ${quiz.title}`)
+  
+  console.log('\n📁 Assessment Group: Sample Assessment Group')
+  console.log(`   Contains Assessment: ${assessment.title}`)
   
   console.log('\n🔑 User Credentials:')
   console.log('   Assessment Admin (Creator):')

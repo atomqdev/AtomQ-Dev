@@ -29,10 +29,18 @@ export async function GET(request: NextRequest) {
     )
     const skip = (page - 1) * pageSize
 
+    // Optional groupId filter
+    const groupId = searchParams.get('groupId')
+    const where: any = {}
+    if (groupId && groupId !== 'all') {
+      where.groupId = groupId
+    }
+
     // Get total count
-    const total = await db.quiz.count()
+    const total = await db.quiz.count({ where })
 
     const quizzes = await db.quiz.findMany({
+      where,
       include: {
         _count: {
           select: {
@@ -139,18 +147,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Regular quiz creation
-    const { 
-      title, 
-      description, 
-      timeLimit, 
-      difficulty, 
-      negativeMarking, 
-      negativePoints, 
-      randomOrder, 
-      maxAttempts, 
-      startDate, 
+    const {
+      title,
+      description,
+      timeLimit,
+      difficulty,
+      status,
+      negativeMarking,
+      negativePoints,
+      randomOrder,
+      maxAttempts,
+      startDate,
       endDate,
-      checkAnswerEnabled
+      checkAnswerEnabled,
+      groupId
     } = body
 
     const quiz = await db.quiz.create({
@@ -159,7 +169,7 @@ export async function POST(request: NextRequest) {
         description,
         timeLimit,
         difficulty: difficulty || DifficultyLevel.MEDIUM,
-        status: QuizStatus.ACTIVE,
+        status: status || QuizStatus.ACTIVE,
         negativeMarking: negativeMarking || false,
         negativePoints: negativePoints || 0.5,
         randomOrder: randomOrder || false,
@@ -168,6 +178,7 @@ export async function POST(request: NextRequest) {
         endDate: endDate ? new Date(endDate) : null,
         checkAnswerEnabled: checkAnswerEnabled || false,
         creatorId: session.user.id,
+        ...(groupId ? { groupId } : {}),
       },
       include: {
         _count: {

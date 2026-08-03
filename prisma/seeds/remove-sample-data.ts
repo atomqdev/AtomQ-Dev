@@ -417,6 +417,17 @@ async function main() {
     console.log('✅ Deleted quiz\n')
   }
 
+  // Remove Sample Quiz Group (created alongside the quiz)
+  const sampleQuizGroup = await prisma.quizGroup.findFirst({
+    where: { name: 'Sample Quiz Group' }
+  })
+  if (sampleQuizGroup) {
+    await prisma.quizGroup.delete({ where: { id: sampleQuizGroup.id } })
+    console.log('✅ Deleted quiz group: Sample Quiz Group\n')
+  } else {
+    console.log('ℹ️  No Sample Quiz Group found.')
+  }
+
   // ========================================
   // Part 5: Remove Timed Assessment Test
   // ========================================
@@ -453,6 +464,17 @@ async function main() {
       where: { id: timedAssessment.id }
     })
     console.log('✅ Deleted assessment\n')
+  }
+
+  // Remove Sample Assessment Group (created alongside the assessment)
+  const sampleAssessmentGroup = await prisma.assessmentGroup.findFirst({
+    where: { name: 'Sample Assessment Group' }
+  })
+  if (sampleAssessmentGroup) {
+    await prisma.assessmentGroup.delete({ where: { id: sampleAssessmentGroup.id } })
+    console.log('✅ Deleted assessment group: Sample Assessment Group\n')
+  } else {
+    console.log('ℹ️  No Sample Assessment Group found.')
   }
 
   // ========================================

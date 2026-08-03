@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
 import { checkRateLimit, clearLoginAttempts } from "@/lib/rate-limit"
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET
-
-if (!JWT_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required')
-}
+import { generateToken } from "@/lib/mobile-auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,15 +80,11 @@ export async function POST(request: NextRequest) {
     clearLoginAttempts(email)
 
     // Generate JWT token (60 days for mobile apps)
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      JWT_SECRET,
-      { expiresIn: "60d" }
-    )
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    })
 
     // Return user data without password
     const { password: _, ...userData } = user

@@ -30,7 +30,6 @@ import {
   Minimize,
   FileText,
   CreditCard,
-  Gamepad2,
 } from "lucide-react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { flushSync } from "react-dom"
@@ -51,11 +50,6 @@ const userNavItems = [
     title: "Assessments",
     href: "/user/assessment",
     icon: FileText,
-  },
-  {
-    title: "Activity",
-    href: "/user/activity",
-    icon: Gamepad2,
   },
   {
     title: "Subscription",

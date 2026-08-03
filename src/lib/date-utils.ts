@@ -3,9 +3,6 @@
  * All date operations in the application should use these utilities
  */
 
-// IST timezone constant
-export const IST_TIMEZONE = 'Asia/Calcutta'
-
 /**
  * Format date to dd/mm/yyyy format in IST timezone
  * @param date - Date object, string, or null
@@ -41,26 +38,6 @@ export function formatDateDDMMYYYYTime(date: Date | string | null): string | nul
 }
 
 /**
- * Format date to dd/mm/yyyy HH:mm:ss format in IST timezone (12-hour format with AM/PM)
- * @param date - Date object, string, or null
- * @returns Formatted date-time string or null
- */
-export function formatDateDDMMYYYYTimeSeconds(date: Date | string | null): string | null {
-  if (!date) return null
-
-  const d = new Date(date)
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
-  const hours24 = d.getHours()
-  const hours = hours24 % 12 || 12 // Convert to 12-hour format
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-  const seconds = String(d.getSeconds()).padStart(2, '0')
-  const ampm = hours24 >= 12 ? 'PM' : 'AM'
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} ${ampm}`
-}
-
-/**
  * Get current timestamp in IST timezone for comparison
  * @param dateInput - Date object or string
  * @returns Timestamp in milliseconds
@@ -79,34 +56,6 @@ export function getISTTimestamp(dateInput: Date | string): number {
   }
 
   return date.getTime()
-}
-
-/**
- * Get current date in IST timezone
- * @returns Date object representing current IST time
- */
-export function getCurrentISTDate(): Date {
-  return new Date()
-}
-
-/**
- * Get start of day in IST timezone
- * @param date - Date object or string (defaults to current date)
- * @returns Date object at 00:00:00 in IST
- */
-export function getStartOfDayIST(date: Date | string = new Date()): Date {
-  const d = new Date(date)
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
-}
-
-/**
- * Get end of day in IST timezone
- * @param date - Date object or string (defaults to current date)
- * @returns Date object at 23:59:59.999 in IST
- */
-export function getEndOfDayIST(date: Date | string = new Date()): Date {
-  const d = new Date(date)
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
 }
 
 /**
@@ -131,79 +80,6 @@ export function parseDateWithTimezone(date: Date | string | null): Date {
   }
 
   return dateObj
-}
-
-/**
- * Format date using Intl.DateTimeFormat with IST timezone
- * @param date - Date object, string, or null
- * @param options - Intl.DateTimeFormatOptions
- * @returns Formatted date string or null
- */
-export function formatDateIST(
-  date: Date | string | null,
-  options: Intl.DateTimeFormatOptions = {}
-): string | null {
-  if (!date) return null
-
-  const d = new Date(date)
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    timeZone: IST_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    ...options
-  }
-
-  return new Intl.DateTimeFormat('en-IN', defaultOptions).format(d)
-}
-
-/**
- * Format time using Intl.DateTimeFormat with IST timezone
- * @param date - Date object, string, or null
- * @param options - Intl.DateTimeFormatOptions
- * @returns Formatted time string or null
- */
-export function formatTimeIST(
-  date: Date | string | null,
-  options: Intl.DateTimeFormatOptions = {}
-): string | null {
-  if (!date) return null
-
-  const d = new Date(date)
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    timeZone: IST_TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    ...options
-  }
-
-  return new Intl.DateTimeFormat('en-IN', defaultOptions).format(d)
-}
-
-/**
- * Format date and time using Intl.DateTimeFormat with IST timezone
- * @param date - Date object, string, or null
- * @param options - Intl.DateTimeFormatOptions
- * @returns Formatted date-time string or null
- */
-export function formatDateTimeIST(
-  date: Date | string | null,
-  options: Intl.DateTimeFormatOptions = {}
-): string | null {
-  if (!date) return null
-
-  const d = new Date(date)
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    timeZone: IST_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    ...options
-  }
-
-  return new Intl.DateTimeFormat('en-IN', defaultOptions).format(d)
 }
 
 /**
@@ -236,25 +112,6 @@ export function getTimeParts(date: Date | string | null): { hours: string; minut
   return {
     hours,
     minutes: String(d.getMinutes()).padStart(2, '0'),
-    ampm: hours24 >= 12 ? 'PM' : 'AM'
-  }
-}
-
-/**
- * Get time parts with seconds for display in HH:mm:ss format (12-hour format with AM/PM)
- * @param date - Date object, string, or null
- * @returns Object with hours, minutes, seconds, ampm properties or null
- */
-export function getTimePartsWithSeconds(date: Date | string | null): { hours: string; minutes: string; seconds: string; ampm: string } | null {
-  if (!date) return null
-
-  const d = new Date(date)
-  const hours24 = d.getHours()
-  const hours = String(hours24 % 12 || 12).padStart(2, '0') // Convert to 12-hour format
-  return {
-    hours,
-    minutes: String(d.getMinutes()).padStart(2, '0'),
-    seconds: String(d.getSeconds()).padStart(2, '0'),
     ampm: hours24 >= 12 ? 'PM' : 'AM'
   }
 }
