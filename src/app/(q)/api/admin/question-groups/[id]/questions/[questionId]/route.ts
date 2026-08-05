@@ -74,8 +74,8 @@ export async function PUT(
     const { id, questionId } = await params
     const body = await request.json()
     const {
+      reference,
       title,
-      content,
       type,
       options,
       correctAnswer,
@@ -161,8 +161,8 @@ export async function PUT(
 
     // Update the question
     const updateData: any = {}
+    if (reference !== undefined) updateData.reference = reference
     if (title !== undefined) updateData.title = title
-    if (content !== undefined) updateData.content = content
     if (type !== undefined) updateData.type = type
     if (options !== undefined) updateData.options = JSON.stringify(Array.isArray(options) ? options : JSON.parse(options))
     if (correctAnswer !== undefined) updateData.correctAnswer = correctAnswer

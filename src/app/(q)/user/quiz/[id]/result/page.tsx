@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import { formatDateDDMMYYYY } from "@/lib/date-utils"
+import { getMultiSelectCount } from "@/lib/utils"
 
 interface QuizResult {
   id: string
@@ -43,8 +44,8 @@ interface QuizResult {
     isCorrect: boolean
     pointsEarned: number
     question: {
+      reference: string
       title: string
-      content: string
       type: QuestionType
       correctAnswer: string
       explanation?: string
@@ -365,9 +366,6 @@ function QuestionCard({
                 {answer.pointsEarned}/{answer.pointsEarned + (answer.isCorrect ? 0 : 1)} pts
               </Badge>
             </div>
-            <h3 className="font-medium text-sm leading-tight line-clamp-2">
-              {answer.question.title}
-            </h3>
           </div>
           <div className="flex items-center gap-2 ml-2">
             {answer.isCorrect ? (
@@ -382,7 +380,15 @@ function QuestionCard({
       <CardContent className="space-y-3">
         {/* Question Content */}
         <div className="text-sm text-muted-foreground">
-          <RichTextDisplay content={answer.question.content} />
+          <RichTextDisplay content={answer.question.title} />
+          {answer.question.type === 'MULTI_SELECT' && (() => {
+            const selectCount = getMultiSelectCount(answer.question.correctAnswer)
+            return (
+              <span className="inline-flex items-center ml-2 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                Select {selectCount} option{selectCount !== 1 ? 's' : ''}
+              </span>
+            )
+          })()}
         </div>
 
         {/* Answers */}

@@ -90,7 +90,7 @@ export async function GET(
 
       return {
         id: question.id,
-        title: question.title,
+        reference: question.reference,
         type: question.type,
         difficulty: question.difficulty,
         totalAttempts,

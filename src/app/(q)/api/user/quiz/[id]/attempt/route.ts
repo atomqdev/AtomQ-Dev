@@ -42,8 +42,8 @@ export async function GET(
                 question: {
                   select: {
                     id: true,
+                    reference: true,
                     title: true,
-                    content: true,
                     type: true,
                     options: true,
                     correctAnswer: true,
@@ -98,7 +98,7 @@ export async function GET(
       .map((qq, index) => {
         try {
           // Validate question data
-          if (!qq.question.id || !qq.question.content || !qq.question.type) {
+          if (!qq.question.id || !qq.question.title || !qq.question.type) {
             console.error(`Question at index ${index} missing required fields:`, qq.question)
             return null
           }
@@ -125,8 +125,8 @@ export async function GET(
 
           return {
             id: qq.question.id,
+            reference: qq.question.reference,
             title: qq.question.title || `Question ${index + 1}`,
-            content: qq.question.content,
             type: qq.question.type,
             options: options,
             correctAnswer: qq.question.correctAnswer || '0',

@@ -6,12 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Sheet,
   SheetContent,
   SheetFooter,
@@ -32,7 +26,12 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import {
-  MoreHorizontal,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Plus,
   Edit,
   Trash2,
@@ -40,6 +39,9 @@ import {
   ArrowUpDown,
   Loader2,
   BookOpen,
+  FileQuestion,
+  Users,
+  CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
@@ -85,10 +87,28 @@ export default function QuizGroupsPage() {
   const [selectedGroup, setSelectedGroup] = useState<QuizGroup | null>(null)
   const [groupToDelete, setGroupToDelete] = useState<QuizGroup | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
-  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     isActive: true,
+  })
+
+  // Deletion tracking state
+  const [deleteInfo, setDeleteInfo] = useState<{
+    group: { id: string; name: string }
+    counts: { quizzes: number; questions: number; users: number; attempts: number; tabSwitches: number }
+  } | null>(null)
+  const [deletionStatus, setDeletionStatus] = useState<{
+    data: 'pending' | 'deleting' | 'deleted'
+    questions: 'pending' | 'deleting' | 'deleted'
+    users: 'pending' | 'deleting' | 'deleted'
+    quizzes: 'pending' | 'deleting' | 'deleted'
+  }>({
+    data: 'pending',
+    questions: 'pending',
+    users: 'pending',
+    quizzes: 'pending',
   })
 
   const columns: ColumnDef<QuizGroup>[] = [
@@ -158,36 +178,71 @@ export default function QuizGroupsPage() {
       },
     },
     {
-      id: "actions",
+      id: "viewQuizzes",
+      header: "View",
       enableHiding: false,
       cell: ({ row }) => {
         const group = row.original
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push(`/admin/quiz-group/${group.id}/quiz`)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Quizzes
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openEditDialog(group)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => openDeleteDialog(group)}
-                className="text-red-600"
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => router.push(`/admin/quiz-group/${group.id}/quiz`)}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>View Quizzes</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      id: "edit",
+      header: "Edit",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const group = row.original
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => openEditDialog(group)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit Group</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      id: "delete",
+      header: "Delete",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const group = row.original
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                onClick={() => openDeleteDialog(group)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Group</TooltipContent>
+          </Tooltip>
         )
       },
     },
@@ -220,9 +275,23 @@ export default function QuizGroupsPage() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (group: QuizGroup) => {
+  const openDeleteDialog = async (group: QuizGroup) => {
     setGroupToDelete(group)
+    setDeleteConfirmation("")
+    setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending', quizzes: 'pending' })
     setIsDeleteDialogOpen(true)
+
+    // Fetch detailed deletion info
+    try {
+      const response = await fetch(`/api/admin/quiz-groups/${group.id}/delete-info`)
+      if (response.ok) {
+        const data = await response.json()
+        setDeleteInfo(data)
+      }
+    } catch (error) {
+      console.error("Error fetching delete info:", error)
+      toasts.error("Failed to fetch group data")
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -268,11 +337,189 @@ export default function QuizGroupsPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDeleteData = async () => {
     if (!groupToDelete) return
-    setDeleteLoading(true)
 
     try {
+      setDeletionStatus(prev => ({ ...prev, data: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-data`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.attempts || 0} attempt(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Quiz data deletion")
+        setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting quiz data:", error)
+      toasts.actionFailed("Quiz data deletion")
+      setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+    }
+  }
+
+  const handleUnenrollQuestions = async () => {
+    if (!groupToDelete) return
+
+    // Check if data deletion is needed first
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete quiz data first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/unenroll-questions`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.questions || 0} question(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Question unenrollment")
+        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling questions:", error)
+      toasts.actionFailed("Question unenrollment")
+      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+    }
+  }
+
+  const handleUnenrollUsers = async () => {
+    if (!groupToDelete) return
+
+    // Check if questions unenrollment is needed first
+    if ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please unenroll questions first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, users: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/unenroll-users`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.users || 0} user(s) unenrolled successfully`)
+        setDeletionStatus(prev => ({ ...prev, users: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("User unenrollment")
+        setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error unenrolling users:", error)
+      toasts.actionFailed("User unenrollment")
+      setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+    }
+  }
+
+  const handleDeleteQuizzes = async () => {
+    if (!groupToDelete) return
+
+    // Check if users unenrollment is needed first
+    if ((deleteInfo?.counts.users || 0) > 0 && deletionStatus.users !== 'deleted') {
+      toasts.error('Please unenroll users first')
+      return
+    }
+
+    try {
+      setDeletionStatus(prev => ({ ...prev, quizzes: 'deleting' }))
+      const response = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-quizzes`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toasts.success(`${data.count.quizzes || 0} quiz/quizzes deleted successfully`)
+        setDeletionStatus(prev => ({ ...prev, quizzes: 'deleted' }))
+
+        // Refresh delete info to update counts
+        const refreshResponse = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}/delete-info`)
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setDeleteInfo(refreshData)
+        }
+      } else {
+        toasts.actionFailed("Quiz deletion")
+        setDeletionStatus(prev => ({ ...prev, quizzes: 'pending' }))
+      }
+    } catch (error) {
+      console.error("Error deleting quizzes:", error)
+      toasts.actionFailed("Quiz deletion")
+      setDeletionStatus(prev => ({ ...prev, quizzes: 'pending' }))
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!groupToDelete || deleteConfirmation !== "CONFIRM DELETE") {
+      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+      return
+    }
+
+    // Check if all steps are completed in correct order
+    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+    const hasUsers = (deleteInfo?.counts.users || 0) > 0
+    const hasQuizzes = (deleteInfo?.counts.quizzes || 0) > 0
+
+    // Check data step (attempts and tab switches)
+    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+      toasts.error('Please delete quiz data first')
+      return
+    }
+
+    // Check questions step
+    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+      toasts.error('Please unenroll questions first')
+      return
+    }
+
+    // Check users step
+    if (hasUsers && deletionStatus.users !== 'deleted') {
+      toasts.error('Please unenroll users first')
+      return
+    }
+
+    // Check quizzes step
+    if (hasQuizzes && deletionStatus.quizzes !== 'deleted') {
+      toasts.error('Please delete quizzes first')
+      return
+    }
+
+    try {
+      setDeleteLoading(groupToDelete.id)
       const response = await fetch(`/api/admin/quiz-groups/${groupToDelete.id}`, {
         method: "DELETE",
       })
@@ -281,15 +528,19 @@ export default function QuizGroupsPage() {
         toasts.success("Quiz group deleted successfully")
         setIsDeleteDialogOpen(false)
         setGroupToDelete(null)
+        setDeleteInfo(null)
+        setDeleteConfirmation("")
+        setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending', quizzes: 'pending' })
         fetchQuizGroups()
       } else {
         const error = await response.json()
         toasts.error(error.message || "Delete failed")
       }
     } catch (error) {
-      toasts.networkError()
+      console.error("Error deleting quiz group:", error)
+      toasts.actionFailed("Quiz group deletion")
     } finally {
-      setDeleteLoading(false)
+      setDeleteLoading(null)
     }
   }
 
@@ -405,37 +656,257 @@ export default function QuizGroupsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete Confirmation */}
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent>
+      {/* Delete Quiz Group Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Quiz Group</AlertDialogTitle>
+            <AlertDialogTitle>Delete Quiz Group: {groupToDelete?.name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{groupToDelete?.name}</span>?
-              The quizzes in this group will not be deleted but will be
-              unassigned from the group.
+              This action cannot be undone. Please delete all associated data before deleting this group.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <TooltipProvider>
+          <div className="mt-4 space-y-4">
+            {deleteInfo ? (
+              <div className="space-y-3">
+                {/* Step 1: Delete Quiz Data */}
+                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Quiz Data</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.attempts || 0} quiz attempt(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.data === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteData}
+                            disabled={deletionStatus.data === 'deleted' || deletionStatus.data === 'deleting'}
+                            variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.data === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.data === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.data === 'deleted' ? 'Quiz data deleted' : deletionStatus.data === 'deleting' ? 'Deleting...' : 'Delete quiz data'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Unenroll Questions */}
+                {(deleteInfo.counts.questions || 0) > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileQuestion className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Questions</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.questions === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollQuestions}
+                            disabled={
+                              deletionStatus.questions === 'deleted' ||
+                              deletionStatus.questions === 'deleting' ||
+                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.data !== 'deleted')
+                            }
+                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.questions === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.questions === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.questions === 'deleted' ? 'Questions unenrolled' : deletionStatus.questions === 'deleting' ? 'Unenrolling...' : 'Unenroll questions'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Unenroll Users */}
+                {(deleteInfo.counts.users || 0) > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium">Users</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.users} user{deleteInfo.counts.users !== 1 ? 's' : ''} enrolled
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.users === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleUnenrollUsers}
+                            disabled={
+                              deletionStatus.users === 'deleted' ||
+                              deletionStatus.users === 'deleting' ||
+                              ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted')
+                            }
+                            variant={deletionStatus.users === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.users === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.users === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.users === 'deleted' ? 'Users unenrolled' : deletionStatus.users === 'deleting' ? 'Unenrolling...' : 'Unenroll users'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Delete Quizzes */}
+                {(deleteInfo.counts.quizzes || 0) > 0 && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium">Quizzes</p>
+                        <p className="text-sm text-muted-foreground">
+                          {deleteInfo.counts.quizzes} quiz{deleteInfo.counts.quizzes !== 1 ? 'zes' : ''} in group
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deletionStatus.quizzes === 'deleted' && (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleDeleteQuizzes}
+                            disabled={
+                              deletionStatus.quizzes === 'deleted' ||
+                              deletionStatus.quizzes === 'deleting' ||
+                              ((deleteInfo?.counts.users || 0) > 0 && deletionStatus.users !== 'deleted')
+                            }
+                            variant={deletionStatus.quizzes === 'deleted' ? 'outline' : 'destructive'}
+                            size="icon"
+                          >
+                            {deletionStatus.quizzes === 'deleting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : deletionStatus.quizzes === 'deleted' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deletionStatus.quizzes === 'deleted' ? 'Quizzes deleted' : deletionStatus.quizzes === 'deleting' ? 'Deleting...' : 'Delete quizzes'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - Ready to delete */}
+                {deleteInfo.counts.quizzes === 0 &&
+                 deleteInfo.counts.questions === 0 &&
+                 deleteInfo.counts.users === 0 &&
+                 deleteInfo.counts.attempts === 0 &&
+                 deleteInfo.counts.tabSwitches === 0 && (
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <p className="text-green-800 text-sm font-medium">
+                      ✓ All critical data removed. Ready to delete quiz group.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          </TooltipProvider>
+
+          {/* Final Confirmation Input */}
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <Label htmlFor="delete-confirmation">
+              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+            </Label>
+            <Input
+              id="delete-confirmation"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="CONFIRM DELETE"
+              autoComplete="off"
+              className="uppercase"
+            />
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLoading}>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setGroupToDelete(null)
+              setDeleteInfo(null)
+              setDeleteConfirmation("")
+              setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending', quizzes: 'pending' })
+            }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={deleteLoading}
               className="bg-red-600 hover:bg-red-700"
+              disabled={
+                deleteLoading !== null ||
+                deleteConfirmation !== "CONFIRM DELETE"
+              }
             >
-              {deleteLoading ? (
+              {deleteLoading !== null ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...
                 </>
               ) : (
-                "Delete"
+                "Delete Group"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

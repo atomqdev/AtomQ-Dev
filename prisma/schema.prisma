@@ -147,8 +147,8 @@ model AssessmentGroup {
 
 model Question {
   id            String          @id @default(cuid())
-  title         String          @db.VarChar(500)
-  content       String          @db.Text
+  reference     String          @db.VarChar(500)
+  title         String          @db.Text
   type          QuestionType
   options       String          @db.Text
   correctAnswer String          @db.Text

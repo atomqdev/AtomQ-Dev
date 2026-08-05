@@ -55,8 +55,8 @@ export async function GET(
 
     if (search) {
       whereClause.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } }
+        { reference: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } }
       ]
     }
 

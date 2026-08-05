@@ -32,8 +32,8 @@ export async function GET(
 
     const formattedQuestions = questions.map(qq => ({
       id: qq.question.id,
+      reference: qq.question.reference,
       title: qq.question.title,
-      content: qq.question.content,
       type: qq.question.type,
       options: qq.question.options,
       correctAnswer: qq.question.correctAnswer,
@@ -72,11 +72,11 @@ export async function POST(
     const body = await request.json()
 
     // Check if this is a request to create a new question or add existing ones
-    if (body.title && body.content && body.type) {
+    if (body.reference && body.title && body.type) {
       // This is a request to create a new question
       const {
+        reference,
         title,
-        content,
         type,
         options,
         correctAnswer,
@@ -87,7 +87,7 @@ export async function POST(
       } = body
 
       // Validate required fields
-      if (!title || !content || !type || !options || !correctAnswer) {
+      if (!reference || !title || !type || !options || !correctAnswer) {
         return NextResponse.json(
           { message: "Missing required fields" },
           { status: 400 }
@@ -156,8 +156,8 @@ export async function POST(
       // Create the question
       const question = await db.question.create({
         data: {
+          reference,
           title,
-          content,
           type,
           options: JSON.stringify(parsedOptions),
           correctAnswer,

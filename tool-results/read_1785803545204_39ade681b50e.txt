@@ -1,0 +1,757 @@
+     1→"use client"
+     2→
+     3→import { useState, useEffect, useMemo } from "react"
+     4→import { useParams, useRouter } from "next/navigation"
+     5→import { Button } from "@/components/ui/button"
+     6→import { Badge } from "@/components/ui/badge"
+     7→import {
+     8→  Sheet,
+     9→  SheetContent,
+    10→  SheetDescription,
+    11→  SheetFooter,
+    12→  SheetHeader,
+    13→  SheetTitle,
+    14→} from "@/components/ui/sheet"
+    15→import {
+    16→  AlertDialog,
+    17→  AlertDialogAction,
+    18→  AlertDialogCancel,
+    19→  AlertDialogContent,
+    20→  AlertDialogDescription,
+    21→  AlertDialogFooter,
+    22→  AlertDialogHeader,
+    23→  AlertDialogTitle,
+    24→} from "@/components/ui/alert-dialog"
+    25→import {
+    26→  ArrowLeft,
+    27→  Search,
+    28→  UserPlus,
+    29→  UserMinus,
+    30→  Users,
+    31→  ArrowUpDown,
+    32→  ChevronLeft,
+    33→  CheckCircle2,
+    34→  Loader2,
+    35→  UserCheck,
+    36→} from "lucide-react"
+    37→import { toast } from "sonner"
+    38→import { DataTable } from "@/components/ui/data-table"
+    39→import { ColumnDef } from "@tanstack/react-table"
+    40→import HexagonLoader from "@/components/Loader/Loading"
+    41→import { ScrollArea } from "@/components/ui/scroll-area"
+    42→
+    43→interface User {
+    44→  id: string
+    45→  name: string
+    46→  email: string
+    47→  uoid?: string
+    48→  campus?: {
+    49→    id: string
+    50→    name: string
+    51→    shortName: string
+    52→  }
+    53→  department?: {
+    54→    id: string
+    55→    name: string
+    56→  }
+    57→  batch?: {
+    58→    id: string
+    59→    name: string
+    60→  }
+    61→  section: string
+    62→}
+    63→
+    64→interface Quiz {
+    65→  id: string
+    66→  title: string
+    67→  description?: string
+    68→  category?: { name: string }
+    69→  timeLimit?: number
+    70→  difficulty: string
+    71→  status: string
+    72→}
+    73→
+    74→export default function QuizUsersPage() {
+    75→  const params = useParams()
+    76→  const router = useRouter()
+    77→  const quizId = params.id as string
+    78→
+    79→  const [quiz, setQuiz] = useState<Quiz | null>(null)
+    80→  const [users, setUsers] = useState<User[]>([])
+    81→  const [loading, setLoading] = useState(true)
+    82→
+    83→  // Sheet states
+    84→  const [isEnrollSheetOpen, setIsEnrollSheetOpen] = useState(false)
+    85→  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+    86→  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+    87→
+    88→  // Sheet filter states
+    89→  const [enrollSearchTerm, setEnrollSearchTerm] = useState("")
+    90→  const [enrollCampusFilter, setEnrollCampusFilter] = useState<string>("all")
+    91→  const [enrollDepartmentFilter, setEnrollDepartmentFilter] = useState<string>("all")
+    92→  const [enrollBatchFilter, setEnrollBatchFilter] = useState<string>("all")
+    93→  const [enrollSectionFilter, setEnrollSectionFilter] = useState<string>("all")
+    94→  const [isEnrolling, setIsEnrolling] = useState(false)
+    95→
+    96→  // Unenroll states
+    97→  const [isUnenrollDialogOpen, setIsUnenrollDialogOpen] = useState(false)
+    98→  const [userToUnenroll, setUserToUnenroll] = useState<User | null>(null)
+    99→  const [isUnenrolling, setIsUnenrolling] = useState(false)
+   100→
+   101→  useEffect(() => {
+   102→    fetchQuizData()
+   103→    fetchEnrolledUsers()
+   104→  }, [quizId])
+   105→
+   106→  useEffect(() => {
+   107→    fetchAvailableUsers()
+   108→  }, [isEnrollSheetOpen, enrollSearchTerm, enrollCampusFilter, enrollDepartmentFilter, enrollBatchFilter, enrollSectionFilter])
+   109→
+   110→  const fetchQuizData = async () => {
+   111→    try {
+   112→      const response = await fetch(`/api/admin/quiz/${quizId}`)
+   113→      if (response.ok) {
+   114→        const data = await response.json()
+   115→        setQuiz(data)
+   116→      }
+   117→    } catch (error) {
+   118→      console.error("Error fetching quiz:", error)
+   119→    }
+   120→  }
+   121→
+   122→  const fetchEnrolledUsers = async () => {
+   123→    setLoading(true)
+   124→    try {
+   125→      const response = await fetch(`/api/admin/quiz/${quizId}/users`)
+   126→      if (response.ok) {
+   127→        const data = await response.json()
+   128→        setUsers(Array.isArray(data.users) ? data.users : [])
+   129→      }
+   130→    } catch (error) {
+   131→      console.error("Error fetching enrolled users:", error)
+   132→      setUsers([])
+   133→    } finally {
+   134→      setLoading(false)
+   135→    }
+   136→  }
+   137→
+   138→  const fetchAvailableUsers = async () => {
+   139→    try {
+   140→      const params = new URLSearchParams({
+   141→        quizId,
+   142→        ...(enrollSearchTerm && { search: enrollSearchTerm }),
+   143→        ...(enrollCampusFilter && enrollCampusFilter !== "all" && { campus: enrollCampusFilter }),
+   144→        ...(enrollDepartmentFilter && enrollDepartmentFilter !== "all" && { department: enrollDepartmentFilter }),
+   145→        ...(enrollBatchFilter && enrollBatchFilter !== "all" && { batch: enrollBatchFilter }),
+   146→        ...(enrollSectionFilter && enrollSectionFilter !== "all" && { section: enrollSectionFilter }),
+   147→      })
+   148→
+   149→      const response = await fetch(`/api/admin/students/available?${params}`)
+   150→      if (response.ok) {
+   151→        const data = await response.json()
+   152→        setAvailableUsers(Array.isArray(data) ? data : [])
+   153→      }
+   154→    } catch (error) {
+   155→      console.error("Error fetching available users:", error)
+   156→      setAvailableUsers([])
+   157→    }
+   158→  }
+   159→
+   160→  const handleEnrollUsers = async () => {
+   161→    if (selectedUsers.length === 0) return
+   162→
+   163→    setIsEnrolling(true)
+   164→
+   165→    try {
+   166→      const response = await fetch(`/api/admin/quiz/${quizId}/users`, {
+   167→        method: 'POST',
+   168→        headers: {
+   169→          'Content-Type': 'application/json',
+   170→        },
+   171→        body: JSON.stringify({
+   172→          userIds: selectedUsers
+   173→        })
+   174→      })
+   175→
+   176→      if (response.ok) {
+   177→        const result = await response.json()
+   178→        toast.success(result.message || `${selectedUsers.length} user(s) enrolled successfully`)
+   179→        setIsEnrollSheetOpen(false)
+   180→        setSelectedUsers([])
+   181→        // Reset filters
+   182→        setEnrollSearchTerm("")
+   183→        setEnrollCampusFilter("all")
+   184→        setEnrollDepartmentFilter("all")
+   185→        setEnrollBatchFilter("all")
+   186→        setEnrollSectionFilter("all")
+   187→        fetchEnrolledUsers()
+   188→      } else {
+   189→        const error = await response.json()
+   190→        toast.error(error.message || 'Failed to enroll users')
+   191→      }
+   192→    } catch (error) {
+   193→      toast.error('Failed to enroll users')
+   194→    } finally {
+   195→      setIsEnrolling(false)
+   196→    }
+   197→  }
+   198→
+   199→  const handleUnenrollUser = async () => {
+   200→    if (!userToUnenroll) return
+   201→
+   202→    setIsUnenrolling(true)
+   203→
+   204→    try {
+   205→      const response = await fetch(`/api/admin/quiz/${quizId}/users/${userToUnenroll.id}`, {
+   206→        method: 'DELETE'
+   207→      })
+   208→
+   209→      if (response.ok) {
+   210→        toast.success('User unenrolled successfully')
+   211→        setIsUnenrollDialogOpen(false)
+   212→        setUserToUnenroll(null)
+   213→        fetchEnrolledUsers()
+   214→      } else {
+   215→        const error = await response.json()
+   216→        toast.error(error.message || 'Failed to unenroll user')
+   217→      }
+   218→    } catch (error) {
+   219→      toast.error('Failed to unenroll user')
+   220→    } finally {
+   221→      setIsUnenrolling(false)
+   222→    }
+   223→  }
+   224→
+   225→  // Helper functions for user selection
+   226→  const selectAllUsers = () => {
+   227→    const allUserIds = availableUsers.map(u => u.id)
+   228→    setSelectedUsers(allUserIds)
+   229→  }
+   230→
+   231→  const clearUserSelection = () => {
+   232→    setSelectedUsers([])
+   233→  }
+   234→
+   235→  const toggleUserSelection = (userId: string) => {
+   236→    setSelectedUsers(prev =>
+   237→      prev.includes(userId)
+   238→        ? prev.filter(id => id !== userId)
+   239→        : [...prev, userId]
+   240→    )
+   241→  }
+   242→
+   243→  const isUserSelected = (userId: string) => selectedUsers.includes(userId)
+   244→
+   245→  // Get unique campuses for filters
+   246→  const uniqueCampuses = useMemo(() => {
+   247→    if (!Array.isArray(users)) return []
+   248→    const campuses = users
+   249→      .map(user => user.campus?.shortName)
+   250→      .filter(Boolean) as string[]
+   251→    return [...new Set(campuses)]
+   252→  }, [users])
+   253→
+   254→  // Get unique departments for filters
+   255→  const uniqueDepartments = useMemo(() => {
+   256→    if (!Array.isArray(users)) return []
+   257→    const departments = users
+   258→      .map(user => user.department?.name)
+   259→      .filter(Boolean) as string[]
+   260→    return [...new Set(departments)]
+   261→  }, [users])
+   262→
+   263→  // Get unique batches for filters
+   264→  const uniqueBatches = useMemo(() => {
+   265→    if (!Array.isArray(users)) return []
+   266→    const batches = users
+   267→      .map(user => user.batch?.name)
+   268→      .filter(Boolean) as string[]
+   269→    return [...new Set(batches)]
+   270→  }, [users])
+   271→
+   272→  // Get unique sections for filters
+   273→  const uniqueSections = useMemo(() => {
+   274→    if (!Array.isArray(users)) return []
+   275→    const sections = users
+   276→      .map(user => user.section)
+   277→      .filter(Boolean) as string[]
+   278→    return [...new Set(sections)]
+   279→  }, [users])
+   280→
+   281→  // Get unique campuses for enrollment filters
+   282→  const enrollUniqueCampuses = useMemo(() => {
+   283→    if (!Array.isArray(availableUsers)) return []
+   284→    const campuses = availableUsers
+   285→      .map(user => user.campus?.shortName)
+   286→      .filter(Boolean) as string[]
+   287→    return [...new Set(campuses)]
+   288→  }, [availableUsers])
+   289→
+   290→  // Get unique departments for enrollment filters
+   291→  const enrollUniqueDepartments = useMemo(() => {
+   292→    if (!Array.isArray(availableUsers)) return []
+   293→    const departments = availableUsers
+   294→      .map(user => user.department?.name)
+   295→      .filter(Boolean) as string[]
+   296→    return [...new Set(departments)]
+   297→  }, [availableUsers])
+   298→
+   299→  // Get unique batches for enrollment filters
+   300→  const enrollUniqueBatches = useMemo(() => {
+   301→    if (!Array.isArray(availableUsers)) return []
+   302→    const batches = availableUsers
+   303→      .map(user => user.batch?.name)
+   304→      .filter(Boolean) as string[]
+   305→    return [...new Set(batches)]
+   306→  }, [availableUsers])
+   307→
+   308→  // Get unique sections for enrollment filters
+   309→  const enrollUniqueSections = useMemo(() => {
+   310→    if (!Array.isArray(availableUsers)) return []
+   311→    const sections = availableUsers
+   312→      .map(user => user.section)
+   313→      .filter(Boolean) as string[]
+   314→    return [...new Set(sections)]
+   315→  }, [availableUsers])
+   316→
+   317→  const columns: ColumnDef<User>[] = [
+   318→    {
+   319→      id: "searchable",
+   320→      accessorFn: (row) => `${row.name} ${row.email} ${row.uoid || ''}`,
+   321→      enableHiding: true,
+   322→    },
+   323→    {
+   324→      accessorKey: "name",
+   325→      header: ({ column }) => {
+   326→        return (
+   327→          <Button
+   328→            variant="ghost"
+   329→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   330→            className="h-auto p-0 font-medium"
+   331→          >
+   332→            Name
+   333→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   334→          </Button>
+   335→        )
+   336→      },
+   337→    },
+   338→    {
+   339→      accessorKey: "email",
+   340→      header: "Email",
+   341→    },
+   342→    {
+   343→      accessorKey: "uoid",
+   344→      header: "UOID",
+   345→      cell: ({ row }) => {
+   346→        const uoid = row.getValue("uoid") as string
+   347→        return uoid || "-"
+   348→      },
+   349→    },
+   350→    {
+   351→      id: "campus",
+   352→      accessorFn: (row) => row.campus?.shortName || "",
+   353→      header: "Campus",
+   354→      cell: ({ row }) => {
+   355→        const campus = row.original.campus
+   356→        return campus?.shortName || campus?.name || "-"
+   357→      },
+   358→    },
+   359→    {
+   360→      id: "department",
+   361→      accessorFn: (row) => row.department?.name || "",
+   362→      header: "Department",
+   363→      cell: ({ row }) => {
+   364→        const department = row.original.department
+   365→        return department?.name || "-"
+   366→      },
+   367→    },
+   368→    {
+   369→      id: "batch",
+   370→      accessorFn: (row) => row.batch?.name || "",
+   371→      header: "Batch",
+   372→      cell: ({ row }) => {
+   373→        const batch = row.original.batch
+   374→        return batch?.name || "-"
+   375→      },
+   376→    },
+   377→    {
+   378→      accessorKey: "section",
+   379→      header: "Section",
+   380→      cell: ({ row }) => {
+   381→        const section = row.getValue("section") as string
+   382→        return section || "-"
+   383→      },
+   384→    },
+   385→    {
+   386→      id: "actions",
+   387→      header: "Actions",
+   388→      cell: ({ row }) => {
+   389→        const user = row.original
+   390→        return (
+   391→          <Button
+   392→            variant="outline"
+   393→            size="sm"
+   394→            onClick={() => {
+   395→              setUserToUnenroll(user)
+   396→              setIsUnenrollDialogOpen(true)
+   397→            }}
+   398→            className="text-red-600 hover:text-red-700"
+   399→          >
+   400→            <UserMinus className="h-4 w-4 mr-1" />
+   401→            Unenroll
+   402→          </Button>
+   403→        )
+   404→      },
+   405→    },
+   406→  ]
+   407→
+   408→  if (loading) {
+   409→    return (
+   410→      <div className="flex items-center justify-center h-[80vh]">
+   411→        <HexagonLoader size={80} />
+   412→      </div>
+   413→    )
+   414→  }
+   415→
+   416→  return (
+   417→    <div className="space-y-6">
+   418→      {/* Header */}
+   419→      <div className="flex items-center justify-between">
+   420→        <div>
+   421→          <h1 className="text-2xl font-bold">{quiz?.title}</h1>
+   422→          <p className="text-sm text-muted-foreground">{users.length} enrolled users</p>
+   423→        </div>
+   424→        <div className="flex items-center gap-2">
+   425→          <Button
+   426→            onClick={() => {
+   427→              setEnrollSearchTerm("")
+   428→              setEnrollCampusFilter("all")
+   429→              setEnrollDepartmentFilter("all")
+   430→              setEnrollBatchFilter("all")
+   431→              setEnrollSectionFilter("all")
+   432→              setIsEnrollSheetOpen(true)
+   433→            }}
+   434→          >
+   435→            <UserPlus className="h-4 w-4 mr-2" />
+   436→            Enroll Users
+   437→          </Button>
+   438→          <Button
+   439→            variant="outline"
+   440→            size="sm"
+   441→            onClick={() => router.back()}
+   442→          >
+   443→            <ChevronLeft className="h-4 w-4" />
+   444→          </Button>
+   445→        </div>
+   446→      </div>
+   447→
+   448→      {/* Users Table */}
+   449→      <DataTable
+   450→        columns={columns}
+   451→        data={users}
+   452→        searchKey="searchable"
+   453→        searchPlaceholder="Search by name, email, or UOID..."
+   454→        initialColumnVisibility={{ searchable: false }}
+   455→        filters={[
+   456→          {
+   457→            key: "campus",
+   458→            label: "Campus",
+   459→            options: [
+   460→              { value: "all", label: "All Campuses" },
+   461→              ...uniqueCampuses.map(campus => ({
+   462→                value: campus,
+   463→                label: campus
+   464→              }))
+   465→            ],
+   466→          },
+   467→          {
+   468→            key: "department",
+   469→            label: "Department",
+   470→            options: [
+   471→              { value: "all", label: "All Departments" },
+   472→              ...uniqueDepartments.map(dept => ({
+   473→                value: dept,
+   474→                label: dept
+   475→              }))
+   476→            ],
+   477→          },
+   478→          {
+   479→            key: "batch",
+   480→            label: "Batch",
+   481→            options: [
+   482→              { value: "all", label: "All Batches" },
+   483→              ...uniqueBatches.map(batch => ({
+   484→                value: batch,
+   485→                label: batch
+   486→              }))
+   487→            ],
+   488→          },
+   489→          {
+   490→            key: "section",
+   491→            label: "Section",
+   492→            options: [
+   493→              { value: "all", label: "All Sections" },
+   494→              ...uniqueSections.map(section => ({
+   495→                value: section,
+   496→                label: section
+   497→              }))
+   498→            ],
+   499→          },
+   500→        ]}
+   501→      />
+   502→
+   503→      {/* Enroll Users Sheet */}
+   504→      <Sheet open={isEnrollSheetOpen} onOpenChange={setIsEnrollSheetOpen}>
+   505→        <SheetContent className="overflow-y-auto px-0.5" style={{ minWidth: '100vw' }}>
+   506→          <SheetHeader>
+   507→            <SheetTitle>Enroll Users to Quiz</SheetTitle>
+   508→            <SheetDescription>
+   509→              Select users to enroll in "{quiz?.title}"
+   510→            </SheetDescription>
+   511→          </SheetHeader>
+   512→
+   513→          <div className="space-y-2">
+   514→            {/* Filters Section */}
+   515→            <div className="flex flex-col gap-2">
+   516→              <div className="relative w-full">
+   517→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   518→                <input
+   519→                  type="text"
+   520→                  placeholder="Search users by name or email..."
+   521→                  value={enrollSearchTerm}
+   522→                  onChange={(e) => setEnrollSearchTerm(e.target.value)}
+   523→                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+   524→                />
+   525→              </div>
+   526→              <div className="flex flex-wrap gap-2">
+   527→                <div className="relative">
+   528→                  <select
+   529→                    value={enrollCampusFilter}
+   530→                    onChange={(e) => setEnrollCampusFilter(e.target.value)}
+   531→                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+   532→                  >
+   533→                    <option value="all">All Campuses</option>
+   534→                    {enrollUniqueCampuses.map(campus => (
+   535→                      <option key={campus} value={campus}>
+   536→                        {campus}
+   537→                      </option>
+   538→                    ))}
+   539→                  </select>
+   540→                </div>
+   541→                <div className="relative">
+   542→                  <select
+   543→                    value={enrollDepartmentFilter}
+   544→                    onChange={(e) => setEnrollDepartmentFilter(e.target.value)}
+   545→                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+   546→                  >
+   547→                    <option value="all">All Departments</option>
+   548→                    {enrollUniqueDepartments.map(dept => (
+   549→                      <option key={dept} value={dept}>
+   550→                        {dept}
+   551→                      </option>
+   552→                    ))}
+   553→                  </select>
+   554→                </div>
+   555→                <div className="relative">
+   556→                  <select
+   557→                    value={enrollBatchFilter}
+   558→                    onChange={(e) => setEnrollBatchFilter(e.target.value)}
+   559→                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+   560→                  >
+   561→                    <option value="all">All Batches</option>
+   562→                    {enrollUniqueBatches.map(batch => (
+   563→                      <option key={batch} value={batch}>
+   564→                        {batch}
+   565→                      </option>
+   566→                    ))}
+   567→                  </select>
+   568→                </div>
+   569→                <div className="relative">
+   570→                  <select
+   571→                    value={enrollSectionFilter}
+   572→                    onChange={(e) => setEnrollSectionFilter(e.target.value)}
+   573→                    className="flex h-10 w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+   574→                  >
+   575→                    <option value="all">All Sections</option>
+   576→                    {enrollUniqueSections.map(section => (
+   577→                      <option key={section} value={section}>
+   578→                        {section}
+   579→                      </option>
+   580→                    ))}
+   581→                  </select>
+   582→                </div>
+   583→                {(enrollSearchTerm || enrollCampusFilter !== "all" || enrollDepartmentFilter !== "all" || enrollBatchFilter !== "all" || enrollSectionFilter !== "all") && (
+   584→                  <Button
+   585→                    variant="outline"
+   586→                    size="sm"
+   587→                    onClick={() => {
+   588→                      setEnrollSearchTerm("")
+   589→                      setEnrollCampusFilter("all")
+   590→                      setEnrollDepartmentFilter("all")
+   591→                      setEnrollBatchFilter("all")
+   592→                      setEnrollSectionFilter("all")
+   593→                    }}
+   594→                  >
+   595→                    Clear
+   596→                  </Button>
+   597→                )}
+   598→              </div>
+   599→            </div>
+   600→
+   601→            {/* Selection Controls */}
+   602→            <div className="flex items-center justify-between border-b pb-4">
+   603→              <div className="flex items-center gap-2">
+   604→                <Button
+   605→                  variant="outline"
+   606→                  size="sm"
+   607→                  onClick={selectAllUsers}
+   608→                >
+   609→                  Select All ({availableUsers.length})
+   610→                </Button>
+   611→                <Button
+   612→                  variant="ghost"
+   613→                  size="sm"
+   614→                  onClick={clearUserSelection}
+   615→                  disabled={selectedUsers.length === 0}
+   616→                >
+   617→                  Clear Selection ({selectedUsers.length})
+   618→                </Button>
+   619→              </div>
+   620→            </div>
+   621→
+   622→            {/* Users List */}
+   623→            <ScrollArea className="h-[calc(100vh-280px)]">
+   624→              <div className="space-y-2 px-4 pb-4">
+   625→                {availableUsers.length === 0 ? (
+   626→                  <div className="flex items-center justify-center h-32 text-muted-foreground">
+   627→                    No users found
+   628→                  </div>
+   629→                ) : (
+   630→                  availableUsers.map((user) => (
+   631→                    <div
+   632→                      key={user.id}
+   633→                      onClick={() => toggleUserSelection(user.id)}
+   634→                      className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors ${
+   635→                        isUserSelected(user.id)
+   636→                          ? "bg-primary/10 border-primary"
+   637→                          : "hover:bg-muted/50"
+   638→                      }`}
+   639→                    >
+   640→                      <div className="flex-1">
+   641→                        <div className="flex items-center gap-3">
+   642→                          <div className="flex items-center gap-2">
+   643→                            <input
+   644→                              type="checkbox"
+   645→                              checked={isUserSelected(user.id)}
+   646→                              onChange={() => toggleUserSelection(user.id)}
+   647→                              className="h-4 w-4"
+   648→                            />
+   649→                            <span className="font-medium">{user.name}</span>
+   650→                          </div>
+   651→                          {user.email && (
+   652→                            <span className="text-sm text-muted-foreground">{user.email}</span>
+   653→                          )}
+   654→                        </div>
+   655→                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+   656→                          {user.campus?.shortName && (
+   657→                            <Badge variant="outline" className="text-xs">
+   658→                              {user.campus.shortName}
+   659→                            </Badge>
+   660→                          )}
+   661→                          {user.department?.name && (
+   662→                            <Badge variant="outline" className="text-xs">
+   663→                              {user.department.name}
+   664→                            </Badge>
+   665→                          )}
+   666→                          {user.batch?.name && (
+   667→                            <Badge variant="outline" className="text-xs">
+   668→                              {user.batch.name}
+   669→                            </Badge>
+   670→                          )}
+   671→                          {user.section && (
+   672→                            <Badge variant="outline" className="text-xs">
+   673→                              Sec {user.section}
+   674→                            </Badge>
+   675→                          )}
+   676→                        </div>
+   677→                      </div>
+   678→                      {isUserSelected(user.id) && (
+   679→                        <div className="flex items-center gap-1">
+   680→                          <CheckCircle2 className="h-5 w-5 text-primary" />
+   681→                        </div>
+   682→                      )}
+   683→                    </div>
+   684→                  ))
+   685→                )}
+   686→              </div>
+   687→            </ScrollArea>
+   688→          </div>
+   689→
+   690→          <SheetFooter>
+   691→            <Button
+   692→              variant="outline"
+   693→              onClick={() => setIsEnrollSheetOpen(false)}
+   694→              disabled={isEnrolling}
+   695→            >
+   696→              Cancel
+   697→            </Button>
+   698→            <Button
+   699→              onClick={handleEnrollUsers}
+   700→              disabled={selectedUsers.length === 0 || isEnrolling}
+   701→            >
+   702→              {isEnrolling ? (
+   703→                <>
+   704→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   705→                  Enrolling...
+   706→                </>
+   707→              ) : (
+   708→                <>
+   709→                  <UserCheck className="mr-2 h-4 w-4" />
+   710→                  Enroll {selectedUsers.length} User{selectedUsers.length !== 1 ? 's' : ''}
+   711→                </>
+   712→              )}
+   713→            </Button>
+   714→          </SheetFooter>
+   715→        </SheetContent>
+   716→      </Sheet>
+   717→
+   718→      {/* Unenroll Confirmation Dialog */}
+   719→      <AlertDialog open={isUnenrollDialogOpen} onOpenChange={setIsUnenrollDialogOpen}>
+   720→        <AlertDialogContent>
+   721→          <AlertDialogHeader>
+   722→            <AlertDialogTitle>Unenroll User</AlertDialogTitle>
+   723→            <AlertDialogDescription>
+   724→              Are you sure you want to unenroll <strong>{userToUnenroll?.name}</strong> from this quiz?
+   725→              This will also delete all their quiz attempts and data.
+   726→              This action cannot be undone.
+   727→            </AlertDialogDescription>
+   728→          </AlertDialogHeader>
+   729→          <AlertDialogFooter>
+   730→            <AlertDialogCancel disabled={isUnenrolling}>Cancel</AlertDialogCancel>
+   731→            <AlertDialogAction
+   732→              onClick={(e) => {
+   733→                e.preventDefault()
+   734→                handleUnenrollUser()
+   735→              }}
+   736→              disabled={isUnenrolling}
+   737→              className="bg-red-600 hover:bg-red-700"
+   738→            >
+   739→              {isUnenrolling ? (
+   740→                <>
+   741→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   742→                  Unenrolling...
+   743→                </>
+   744→              ) : (
+   745→                <>
+   746→                  <UserMinus className="mr-2 h-4 w-4" />
+   747→                  Unenroll
+   748→                </>
+   749→              )}
+   750→            </AlertDialogAction>
+   751→          </AlertDialogFooter>
+   752→        </AlertDialogContent>
+   753→      </AlertDialog>
+   754→    </div>
+   755→  )
+   756→}
+   757→

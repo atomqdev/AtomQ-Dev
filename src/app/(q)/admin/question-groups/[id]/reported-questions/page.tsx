@@ -22,6 +22,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 import { toast } from "sonner"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 
 interface ReportedQuestion {
   id: string
@@ -30,8 +31,8 @@ interface ReportedQuestion {
   createdAt: string
   question: {
     id: string
+    reference: string
     title: string
-    content: string
     type: QuestionType
     options: string
     correctAnswer: string
@@ -66,8 +67,8 @@ export default function ReportedQuestionsPage() {
   const [editingQuestion, setEditingQuestion] = useState<any>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [formData, setFormData] = useState({
+    reference: "",
     title: "",
-    content: "",
     type: QuestionType.MULTIPLE_CHOICE as QuestionType,
     options: ["", "", ""],
     correctAnswer: "",
@@ -92,11 +93,11 @@ export default function ReportedQuestionsPage() {
         )
       },
       cell: ({ row }) => {
-        const title = row.original.question.title
+        const reference = row.original.question.reference
         const maxLength = 50
         return (
-          <div className="font-medium max-w-xs truncate" title={title}>
-            {title.length > maxLength ? title.slice(0, maxLength) + "..." : title}
+          <div className="font-medium max-w-xs truncate" title={reference}>
+            {reference.length > maxLength ? reference.slice(0, maxLength) + "..." : reference}
           </div>
         )
       },
@@ -291,12 +292,12 @@ export default function ReportedQuestionsPage() {
     setEditingQuestion(report.question)
     const parsedOptions = JSON.parse(report.question.options)
     const correctAnswers = report.question.type === QuestionType.MULTI_SELECT
-      ? report.question.correctAnswer.split('|').map(ans => ans.trim())
+      ? parseMultiSelectAnswers(report.question.correctAnswer)
       : [report.question.correctAnswer]
 
     setFormData({
+      reference: report.question.reference,
       title: report.question.title,
-      content: report.question.content,
       type: report.question.type,
       options: parsedOptions,
       correctAnswer: report.question.correctAnswer,
@@ -311,17 +312,17 @@ export default function ReportedQuestionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.title.trim()) {
-      toast.error("Title is required")
+    if (!formData.reference.trim()) {
+      toast.error("Reference is required")
       return
     }
 
     const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = formData.content
+    tempDiv.innerHTML = formData.title
     const textContent = tempDiv.textContent || tempDiv.innerText || ""
 
     if (!textContent.trim()) {
-      toast.error("Content is required")
+      toast.error("Title is required")
       return
     }
 
@@ -358,8 +359,8 @@ export default function ReportedQuestionsPage() {
 
     try {
       const apiData = {
+        reference: formData.reference,
         title: formData.title,
-        content: formData.content,
         type: formData.type,
         options: formData.options,
         correctAnswer: formData.correctAnswer,
@@ -398,8 +399,8 @@ export default function ReportedQuestionsPage() {
   const resetForm = () => {
     setEditingQuestion(null)
     setFormData({
+      reference: "",
       title: "",
-      content: "",
       type: QuestionType.MULTIPLE_CHOICE as QuestionType,
       options: ["", "", ""],
       correctAnswer: "",
@@ -550,8 +551,8 @@ export default function ReportedQuestionsPage() {
                 <h4 className="font-semibold text-sm text-muted-foreground mb-2">Question</h4>
                 <div className="bg-muted/50 p-4 rounded-lg space-y-3">
                   <div>
-                    <h5 className="font-medium">{selectedReport.question.title}</h5>
-                    <RichTextDisplay content={selectedReport.question.content} />
+                    <h5 className="font-medium">{selectedReport.question.reference}</h5>
+                    <RichTextDisplay content={selectedReport.question.title} />
                   </div>
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
@@ -626,12 +627,12 @@ export default function ReportedQuestionsPage() {
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="reference">Reference (Admin Only)</Label>
                 <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Enter question title"
+                  id="reference"
+                  value={formData.reference}
+                  onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                  placeholder="Enter question reference"
                   required
                 />
               </div>
@@ -770,11 +771,11 @@ export default function ReportedQuestionsPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="content">Content</Label>
+                <Label htmlFor="title">Title</Label>
                 <RichTextEditor
-                  value={formData.content}
-                  onChange={(value) => setFormData({ ...formData, content: value })}
-                  placeholder="Enter question content..."
+                  value={formData.title}
+                  onChange={(value) => setFormData({ ...formData, title: value })}
+                  placeholder="Enter question title..."
                   className="min-h-[150px]"
                 />
               </div>

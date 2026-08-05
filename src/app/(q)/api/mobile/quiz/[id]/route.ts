@@ -216,8 +216,8 @@ export async function GET(
                 question: {
                   select: {
                     id: true,
+                    reference: true,
                     title: true,
-                    content: true,
                     type: true,
                     options: true,
                     correctAnswer: true,
@@ -287,8 +287,8 @@ export async function GET(
 
         const questionData: any = {
           id: qq.question.id,
+          reference: qq.question.reference,
           title: qq.question.title || `Question ${originalIndex + 1}`,
-          content: qq.question.content,
           type: qq.question.type,
           options: Array.isArray(options) ? options : [],
           correctAnswer: correctAnswer,

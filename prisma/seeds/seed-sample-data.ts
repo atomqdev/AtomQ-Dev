@@ -217,8 +217,8 @@ async function main() {
   console.log('\n❓ Creating 20 AWS Questions for Assessment...')
   const awsAssessmentQuestions = [
     {
-      title: 'Amazon EC2 Instance Types',
-      content: 'Which EC2 instance type provides GPU-based acceleration for machine learning workloads?',
+      reference: 'Amazon EC2 Instance Types',
+      title: 'Which EC2 instance type provides GPU-based acceleration for machine learning workloads?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['P2', 'P3', 'P3dn', 'G4dn', 'G5']),
       correctAnswer: 'P3',
@@ -226,8 +226,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'Elastic Load Balancing Features',
-      content: 'ELB supports which of the following traffic routing policies?',
+      reference: 'Elastic Load Balancing Features',
+      title: 'ELB supports which of the following traffic routing policies?',
       type: QuestionType.MULTI_SELECT,
       options: JSON.stringify(['Round Robin', 'Least Connections', 'IP Hash', 'Least Latency']),
       correctAnswer: '["Round Robin","Least Connections"]',
@@ -235,8 +235,8 @@ async function main() {
       difficulty: DifficultyLevel.HARD
     },
     {
-      title: 'S3 Storage Classes',
-      content: 'Which S3 storage class is designed for archiving data with rare access?',
+      reference: 'S3 Storage Classes',
+      title: 'Which S3 storage class is designed for archiving data with rare access?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['Standard', 'Standard-IA', 'Glacier', 'One Zone-IA']),
       correctAnswer: 'Glacier',
@@ -244,8 +244,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'AWS Lambda Triggers',
-      content: 'AWS Lambda can be triggered synchronously by which of the following services?',
+      reference: 'AWS Lambda Triggers',
+      title: 'AWS Lambda can be triggered synchronously by which of the following services?',
       type: QuestionType.MULTI_SELECT,
       options: JSON.stringify(['Amazon S3', 'Amazon DynamoDB', 'Amazon Kinesis', 'Amazon SQS']),
       correctAnswer: '["Amazon S3","Amazon SQS"]',
@@ -253,8 +253,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'RDS Read Replicas',
-      content: 'True or False: Amazon RDS Read Replicas can be used to scale read operations for databases.',
+      reference: 'RDS Read Replicas',
+      title: 'True or False: Amazon RDS Read Replicas can be used to scale read operations for databases.',
       type: QuestionType.TRUE_FALSE,
       options: JSON.stringify(['True', 'False']),
       correctAnswer: 'True',
@@ -262,8 +262,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'VPC Peering',
-      content: 'VPC peering allows you to connect two VPCs to enable _______.',
+      reference: 'VPC Peering',
+      title: 'VPC peering allows you to connect two VPCs to enable _______.',
       type: QuestionType.FILL_IN_BLANK,
       options: JSON.stringify(['private networks', 'public networks', 'different regions', 'same region']),
       correctAnswer: 'private networks',
@@ -271,8 +271,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'CloudWatch Alarms',
-      content: 'Which AWS CloudWatch metric type is used for monitoring CPU utilization?',
+      reference: 'CloudWatch Alarms',
+      title: 'Which AWS CloudWatch metric type is used for monitoring CPU utilization?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['CPUUtilization', 'NetworkIn', 'NetworkOut', 'DiskReadBytes']),
       correctAnswer: 'CPUUtilization',
@@ -280,8 +280,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'IAM Policy Elements',
-      content: 'Which of the following are core elements of an IAM policy? (Select all that apply)',
+      reference: 'IAM Policy Elements',
+      title: 'Which of the following are core elements of an IAM policy? (Select all that apply)',
       type: QuestionType.MULTI_SELECT,
       options: JSON.stringify(['Version', 'Statement', 'Effect', 'Action', 'Resource']),
       correctAnswer: '["Version","Statement","Effect","Action","Resource"]',
@@ -289,8 +289,8 @@ async function main() {
       difficulty: DifficultyLevel.HARD
     },
     {
-      title: 'DynamoDB Read Capacity',
-      content: 'True or False: DynamoDB auto scaling can increase read capacity based on traffic patterns.',
+      reference: 'DynamoDB Read Capacity',
+      title: 'True or False: DynamoDB auto scaling can increase read capacity based on traffic patterns.',
       type: QuestionType.TRUE_FALSE,
       options: JSON.stringify(['True', 'False']),
       correctAnswer: 'True',
@@ -298,8 +298,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'S3 Versioning',
-      content: 'True or False: Amazon S3 versioning keeps multiple versions of an object in the same bucket.',
+      reference: 'S3 Versioning',
+      title: 'True or False: Amazon S3 versioning keeps multiple versions of an object in the same bucket.',
       type: QuestionType.TRUE_FALSE,
       options: JSON.stringify(['True', 'False']),
       correctAnswer: 'True',
@@ -307,8 +307,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'EBS Volume Types',
-      content: 'Which EBS volume type is optimized for boot volumes and provides low latency?',
+      reference: 'EBS Volume Types',
+      title: 'Which EBS volume type is optimized for boot volumes and provides low latency?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['gp2', 'gp3', 'io1', 'io2', 'st1']),
       correctAnswer: 'gp2',
@@ -316,8 +316,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'Route 53 Routing Policies',
-      content: 'Which Route 53 routing policy routes traffic based on the health of your resources?',
+      reference: 'Route 53 Routing Policies',
+      title: 'Which Route 53 routing policy routes traffic based on the health of your resources?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['Simple', 'Weighted', 'Latency', 'Failover', 'Geolocation']),
       correctAnswer: 'Health Check',
@@ -325,8 +325,8 @@ async function main() {
       difficulty: DifficultyLevel.HARD
     },
     {
-      title: 'Direct Connect',
-      content: 'AWS Direct Connect allows you to establish _______ between your VPC and your on-premises network.',
+      reference: 'Direct Connect',
+      title: 'AWS Direct Connect allows you to establish _______ between your VPC and your on-premises network.',
       type: QuestionType.FILL_IN_BLANK,
       options: JSON.stringify(['private connection', 'VPN connection', 'public connection', 'dedicated connection']),
       correctAnswer: 'dedicated connection',
@@ -334,8 +334,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'SNS Message Filtering',
-      content: 'Which SNS feature allows subscribers to receive only messages that match a specific criteria?',
+      reference: 'SNS Message Filtering',
+      title: 'Which SNS feature allows subscribers to receive only messages that match a specific criteria?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['Message Filtering', 'Topic Subscription', 'Platform Application', 'Fanout']),
       correctAnswer: 'Message Filtering',
@@ -343,8 +343,8 @@ async function main() {
       difficulty: DifficultyLevel.HARD
     },
     {
-      title: 'EKS Cluster',
-      content: 'True or False: Amazon EKS automatically manages the Kubernetes control plane for you.',
+      reference: 'EKS Cluster',
+      title: 'True or False: Amazon EKS automatically manages the Kubernetes control plane for you.',
       type: QuestionType.TRUE_FALSE,
       options: JSON.stringify(['True', 'False']),
       correctAnswer: 'True',
@@ -352,8 +352,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'CloudTrail',
-      content: 'AWS CloudTrail enables _______ of API calls made in your account.',
+      reference: 'CloudTrail',
+      title: 'AWS CloudTrail enables _______ of API calls made in your account.',
       type: QuestionType.FILL_IN_BLANK,
       options: JSON.stringify(['monitoring', 'auditing', 'logging', 'encryption']),
       correctAnswer: 'auditing',
@@ -361,8 +361,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'Auto Scaling Groups',
-      content: 'Which of the following are valid Auto Scaling metrics for scale-out policies?',
+      reference: 'Auto Scaling Groups',
+      title: 'Which of the following are valid Auto Scaling metrics for scale-out policies?',
       type: QuestionType.MULTI_SELECT,
       options: JSON.stringify(['CPUUtilization', 'NetworkIn', 'RequestCount', 'ALBRequestCountPerTarget']),
       correctAnswer: '["CPUUtilization","RequestCount"]',
@@ -370,8 +370,8 @@ async function main() {
       difficulty: DifficultyLevel.HARD
     },
     {
-      title: 'ACM Certificate Import',
-      content: 'True or False: AWS Certificate Manager (ACM) supports importing third-party SSL certificates.',
+      reference: 'ACM Certificate Import',
+      title: 'True or False: AWS Certificate Manager (ACM) supports importing third-party SSL certificates.',
       type: QuestionType.TRUE_FALSE,
       options: JSON.stringify(['True', 'False']),
       correctAnswer: 'True',
@@ -379,8 +379,8 @@ async function main() {
       difficulty: DifficultyLevel.EASY
     },
     {
-      title: 'SQS Message Retention',
-      content: 'What is the maximum message retention period for Amazon SQS standard queues?',
+      reference: 'SQS Message Retention',
+      title: 'What is the maximum message retention period for Amazon SQS standard queues?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['7 days', '14 days', '30 days', '365 days']),
       correctAnswer: '14 days',
@@ -388,8 +388,8 @@ async function main() {
       difficulty: DifficultyLevel.MEDIUM
     },
     {
-      title: 'CloudFormation Stack',
-      content: 'Which CloudFormation template section is required and defines AWS resources to create?',
+      reference: 'CloudFormation Stack',
+      title: 'Which CloudFormation template section is required and defines AWS resources to create?',
       type: QuestionType.MULTIPLE_CHOICE,
       options: JSON.stringify(['Parameters', 'Resources', 'Outputs', 'Conditions']),
       correctAnswer: 'Resources',
@@ -403,15 +403,15 @@ async function main() {
     let question = await prisma.question.findFirst({
       where: {
         groupId: assessmentQuestionGroup.id,
-        title: q.title
+        reference: q.reference
       }
     })
 
     if (!question) {
       question = await prisma.question.create({
         data: {
+          reference: q.reference,
           title: q.title,
-          content: q.content,
           type: q.type,
           options: q.options,
           correctAnswer: q.correctAnswer,
@@ -421,10 +421,10 @@ async function main() {
           isActive: true,
         },
       })
-      console.log(`✅ Created question: ${q.title} (${q.type})`)
+      console.log(`✅ Created question: ${q.reference} (${q.type})`)
       createdAssessmentQuestions.push(question)
     } else {
-      console.log(`✅ Found existing question: ${q.title}`)
+      console.log(`✅ Found existing question: ${q.reference}`)
       createdAssessmentQuestions.push(question)
     }
   }

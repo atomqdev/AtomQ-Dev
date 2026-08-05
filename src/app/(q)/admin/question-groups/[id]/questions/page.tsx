@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain, Sparkles, Undo2 } from "lucide-react"
+import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain, Sparkles, Undo2, Upload, FileJson, FileSpreadsheet } from "lucide-react"
 import { format } from "date-fns"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
@@ -24,11 +24,12 @@ import { toast } from "sonner"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
+import { parseMultiSelectAnswers, getMultiSelectCount } from "@/lib/utils"
 
 interface Question {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string
   correctAnswer: string
@@ -73,8 +74,8 @@ export default function QuestionGroupPage() {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [formData, setFormData] = useState({
+    reference: "",
     title: "",
-    content: "",
     type: QuestionType.MULTIPLE_CHOICE as QuestionType,
     options: ["", "", ""],
     correctAnswer: "",
@@ -90,6 +91,10 @@ export default function QuestionGroupPage() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
 
+  // JSON import state
+  const jsonImportRef = useRef<HTMLInputElement>(null)
+  const [jsonImportLoading, setJsonImportLoading] = useState(false)
+
   // AI Enhancement states
   const [aiEnhancing, setAiEnhancing] = useState(false)
   const [explanationHistory, setExplanationHistory] = useState<string[]>([])
@@ -97,24 +102,38 @@ export default function QuestionGroupPage() {
 
   const columns: ColumnDef<Question>[] = [
     {
-      accessorKey: "title",
+      accessorKey: "reference",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Title
+            Reference
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
       cell: ({ row }) => {
-        const title = row.getValue("title") as string
+        const reference = row.getValue("reference") as string
         const maxLength = 50
         return (
-          <div className="font-medium max-w-xs truncate" title={title}>
-            {title.length > maxLength ? title.slice(0, maxLength) + "..." : title}
+          <div className="font-medium max-w-xs truncate" title={reference}>
+            {reference.length > maxLength ? reference.slice(0, maxLength) + "..." : reference}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "title",
+      header: "Title",
+      cell: ({ row }) => {
+        const htmlContent = row.getValue("title") as string
+        const maxLength = 50
+        const textContent = htmlContent.replace(/<[^>]*>/g, '')
+        return (
+          <div className="max-w-xs truncate" title={textContent}>
+            {textContent.length > maxLength ? textContent.slice(0, maxLength) + "..." : textContent}
           </div>
         )
       },
@@ -124,13 +143,23 @@ export default function QuestionGroupPage() {
       header: "Type",
       cell: ({ row }) => {
         const type = row.getValue("type") as QuestionType
+        const question = row.original
         const typeLabels: Record<QuestionType, string> = {
           [QuestionType.MULTIPLE_CHOICE]: "Multiple Choice",
           [QuestionType.TRUE_FALSE]: "True/False",
           [QuestionType.FILL_IN_BLANK]: "Fill in Blank",
           [QuestionType.MULTI_SELECT]: "Multi Select",
         }
-        return <Badge variant="outline">{typeLabels[type]}</Badge>
+        const label = typeLabels[type]
+        const selectCount = type === QuestionType.MULTI_SELECT
+          ? getMultiSelectCount(question.correctAnswer || '')
+          : 0
+        return (
+          <Badge variant="outline">
+            {label}
+            {selectCount > 0 && ` (Select ${selectCount})`}
+          </Badge>
+        )
       },
     },
     {
@@ -259,17 +288,17 @@ export default function QuestionGroupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.title.trim()) {
-      toast.error("Title is required")
+    if (!formData.reference.trim()) {
+      toast.error("Reference is required")
       return
     }
 
     const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = formData.content
+    tempDiv.innerHTML = formData.title
     const textContent = tempDiv.textContent || tempDiv.innerText || ""
 
     if (!textContent.trim()) {
-      toast.error("Content is required")
+      toast.error("Title is required")
       return
     }
 
@@ -306,8 +335,8 @@ export default function QuestionGroupPage() {
 
     try {
       const apiData = {
+        reference: formData.reference,
         title: formData.title,
-        content: formData.content,
         type: formData.type,
         options: formData.options,
         correctAnswer: formData.correctAnswer,
@@ -351,12 +380,12 @@ export default function QuestionGroupPage() {
     setEditingQuestion(question)
     const parsedOptions = JSON.parse(question.options)
     const correctAnswers = question.type === QuestionType.MULTI_SELECT
-      ? question.correctAnswer.split('|').map(ans => ans.trim())
+      ? parseMultiSelectAnswers(question.correctAnswer)
       : [question.correctAnswer]
 
     setFormData({
+      reference: question.reference,
       title: question.title,
-      content: question.content,
       type: question.type,
       options: parsedOptions,
       correctAnswer: question.correctAnswer,
@@ -400,8 +429,8 @@ export default function QuestionGroupPage() {
   const resetForm = () => {
     setEditingQuestion(null)
     setFormData({
+      reference: "",
       title: "",
-      content: "",
       type: QuestionType.MULTIPLE_CHOICE as QuestionType,
       options: ["", "", ""],
       correctAnswer: "",
@@ -488,7 +517,7 @@ export default function QuestionGroupPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          questionContent: formData.content,
+          questionContent: formData.title,
           options: formData.options,
           correctAnswer: formData.correctAnswer,
           currentExplanation: formData.explanation,
@@ -529,7 +558,7 @@ export default function QuestionGroupPage() {
 
   const handleExportQuestions = () => {
     const csvContent = [
-      ["Title", "Content", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Active"],
+      ["Reference", "Title", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Active"],
       ...questions.map(question => {
         let optionsString = ""
         try {
@@ -540,8 +569,8 @@ export default function QuestionGroupPage() {
         }
 
         return [
+          question.reference,
           question.title,
-          question.content,
           question.type,
           optionsString,
           question.correctAnswer,
@@ -628,13 +657,13 @@ export default function QuestionGroupPage() {
       complete: async (results) => {
         try {
           const validQuestions = results.data.filter((row: any) => {
+            const hasReference = row.Reference && row.Reference.trim() !== ""
             const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasContent = row.Content && row.Content.trim() !== ""
             const hasType = row.Type && row.Type.trim() !== ""
             const hasOptions = row.Options && row.Options.trim() !== ""
             const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
 
-            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
           })
 
           if (validQuestions.length === 0) {
@@ -648,8 +677,8 @@ export default function QuestionGroupPage() {
               const options = question.Options.split('|').map((opt: string) => opt.trim()).filter((opt: string) => opt)
 
               const apiData = {
+                reference: question.Reference,
                 title: question.Title,
-                content: question.Content,
                 type: question.Type,
                 options: options,
                 correctAnswer: question["Correct Answer"],
@@ -667,7 +696,7 @@ export default function QuestionGroupPage() {
               })
 
               if (!response.ok) {
-                throw new Error(`Failed to create question "${question.Title}"`)
+                throw new Error(`Failed to create question "${question.Reference}"`)
               }
 
               const result = await response.json()
@@ -710,6 +739,150 @@ export default function QuestionGroupPage() {
     })
   }
 
+  // JSON Import handler
+  const handleJsonImportClick = () => {
+    jsonImportRef.current?.click()
+  }
+
+  const handleJsonImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Reset the input so the same file can be selected again
+    event.target.value = ""
+
+    if (!file.name.endsWith('.json')) {
+      toast.error("Please select a JSON file")
+      return
+    }
+
+    setJsonImportLoading(true)
+    try {
+      const text = await file.text()
+      let parsedData: unknown
+      try {
+        parsedData = JSON.parse(text)
+      } catch {
+        toast.error("Invalid JSON file. Please check the file format.")
+        return
+      }
+
+      // Support both a raw array and an object with an `importData`/`questions` array
+      let importArray: any[] = []
+      if (Array.isArray(parsedData)) {
+        importArray = parsedData
+      } else if (parsedData && typeof parsedData === 'object') {
+        const obj = parsedData as Record<string, unknown>
+        if (Array.isArray(obj.importData)) {
+          importArray = obj.importData as any[]
+        } else if (Array.isArray(obj.questions)) {
+          importArray = obj.questions as any[]
+        }
+      }
+
+      if (importArray.length === 0) {
+        toast.error("No question records found in the JSON file")
+        return
+      }
+
+      const response = await fetch(`/api/admin/question-groups/${groupId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importData: importArray }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(result.message || `Import completed: ${result.successCount} created, ${result.failureCount} failed`)
+        await fetchQuestions()
+      } else if (response.status === 401) {
+        toast.error("Session expired. Please log in again.")
+        router.push('/')
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast.error(errorData.message || "Failed to import questions")
+      }
+    } catch (error) {
+      console.error("Error importing questions:", error)
+      toast.error("Failed to import questions. Please try again.")
+    } finally {
+      setJsonImportLoading(false)
+    }
+  }
+
+  // JSON Export handler
+  const handleExportJSON = () => {
+    const exportData = questions.map(question => {
+      let parsedOptions: string[] = []
+      try {
+        parsedOptions = JSON.parse(question.options || "[]")
+      } catch {
+        parsedOptions = []
+      }
+
+      return {
+        reference: question.reference,
+        title: question.title,
+        type: question.type,
+        options: parsedOptions,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation || "",
+        difficulty: question.difficulty,
+        isActive: question.isActive,
+      }
+    })
+
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: "application/json;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `${questionGroup?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'questions'}_questions.json`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${exportData.length} question${exportData.length !== 1 ? 's' : ''} as JSON`)
+  }
+
+  // CSV Download handler (using PapaParse for clean CSV)
+  const handleDownloadCSV = () => {
+    const csvData = questions.map(question => {
+      let optionsString = ""
+      try {
+        const parsedOptions = JSON.parse(question.options || "[]")
+        optionsString = parsedOptions.join("|")
+      } catch {
+        optionsString = question.options?.toString() || ""
+      }
+
+      return {
+        reference: question.reference,
+        title: question.title,
+        type: question.type,
+        options: optionsString,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation || "",
+        difficulty: question.difficulty,
+        isActive: question.isActive,
+      }
+    })
+
+    const csv = Papa.unparse(csvData)
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `${questionGroup?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'questions'}_questions.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success("Questions downloaded successfully")
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-[80vh]"><HexagonLoader size={80} /></div>
   }
@@ -732,14 +905,45 @@ export default function QuestionGroupPage() {
             Created {format(new Date(questionGroup.createdAt), "MMM d, yyyy")} • {questions.length} questions
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportQuestions}>
-            <FileDown className="mr-2 h-4 w-4" />
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={jsonImportRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleJsonImport}
+          />
+          <Button
+            variant="outline"
+            onClick={handleJsonImportClick}
+            disabled={jsonImportLoading}
+          >
+            {jsonImportLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportJSON}
+            disabled={questions.length === 0}
+          >
+            <FileJson className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadCSV}
+            disabled={questions.length === 0}
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Download
           </Button>
           <Button variant="outline" onClick={handleImportQuestions}>
             <FileUp className="mr-2 h-4 w-4" />
-            Import
+            Import CSV
           </Button>
           <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
             <Plus className="mr-2 h-4 w-4" />
@@ -756,7 +960,7 @@ export default function QuestionGroupPage() {
           <DataTable
             columns={columns}
             data={questions}
-            searchKey="title"
+            searchKey="reference"
             searchPlaceholder="Search questions..."
             filters={[
               {
@@ -810,12 +1014,12 @@ export default function QuestionGroupPage() {
             <form onSubmit={handleSubmit} className="w-[45%]">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="reference">Reference (Admin Only)</Label>
                   <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Enter question title"
+                    id="reference"
+                    value={formData.reference}
+                    onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                    placeholder="Enter question reference"
                     required
                   />
                 </div>
@@ -954,11 +1158,11 @@ export default function QuestionGroupPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="content">Content</Label>
+                  <Label htmlFor="title">Title</Label>
                   <RichTextEditor
-                    value={formData.content}
-                    onChange={(value) => setFormData({ ...formData, content: value })}
-                    placeholder="Enter question content..."
+                    value={formData.title}
+                    onChange={(value) => setFormData({ ...formData, title: value })}
+                    placeholder="Enter question title..."
                     className="min-h-[150px]"
                   />
                 </div>
@@ -977,7 +1181,7 @@ export default function QuestionGroupPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleAIEnhance('enhance')}
-                      disabled={aiEnhancing || !formData.content || formData.options.filter(o => o.trim()).length === 0}
+                      disabled={aiEnhancing || !formData.title || formData.options.filter(o => o.trim()).length === 0}
                       className="flex-1"
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
@@ -1049,13 +1253,13 @@ export default function QuestionGroupPage() {
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground font-medium">
-                      {formData.title || "Question Title"}
+                      {formData.reference || "Question Reference"}
                     </div>
                     <div className="text-xl leading-relaxed">
-                      {formData.content ? (
-                        <RichTextDisplay content={formData.content} />
+                      {formData.title ? (
+                        <RichTextDisplay content={formData.title} />
                       ) : (
-                        <span className="text-muted-foreground italic">Question content will appear here...</span>
+                        <span className="text-muted-foreground italic">Question title will appear here...</span>
                       )}
                     </div>
                   </CardHeader>

@@ -308,3 +308,54 @@ Stage Summary:
 - `description` column dropped from the `question_groups` database table; Prisma client regenerated.
 - Lint clean, tsc clean, page renders 200, API returns 401 (auth guard), SQL queries no longer reference description.
 - Environment note: 4GB sandbox with no swap cannot sustain cold compilation of the NextAuth route under the dev server; runtime authed API test was not possible, but code correctness is verified via tsc (the regenerated Prisma client would flag any lingering description reference as a type error).
+---
+Task ID: 1
+Agent: main
+Task: Implement import/export/download functionality for quiz-group quiz page
+
+Work Log:
+- Explored existing user import/export pattern (users page: Import JSON, Export JSON, Download CSV)
+- Explored existing quiz import in /api/admin/quiz route (CSV import already existed but no groupId support)
+- Read quiz-group/[id]/quiz/page.tsx to understand current structure
+- Updated /api/admin/quiz/route.ts: Added groupId support in import mode, added failureCount tracking, improved success/failure messaging
+- Added papaparse import, Upload/FileJson/FileSpreadsheet icons, useRef to quiz page
+- Added importLoading state and fileInputRef to quiz page component
+- Implemented handleImportJSON: Accepts JSON files, supports raw array or {importData}/{} format, posts to /api/admin/quiz with groupId
+- Implemented handleExportJSON: Maps quizzes to clean export format, downloads as {groupName}_quizzes.json
+- Implemented handleDownloadCSV: Uses Papa.unparse() to generate CSV, downloads as {groupName}_quizzes.csv
+- Added Import/Export/Download buttons alongside Add Quiz in header
+- Extended Quiz interface with negativeMarking, negativePoints, randomOrder, maxAttempts, checkAnswerEnabled fields
+- Verified in browser: All 3 buttons render correctly on quiz group detail page
+- No lint errors, no runtime errors
+
+Stage Summary:
+- Quiz-group quiz page now has Import (JSON), Export (JSON), Download (CSV) functionality
+- API route supports groupId during import so imported quizzes are added to the correct group
+- Pattern matches the users page import/export implementation
+---
+Task ID: 2
+Agent: main
+Task: Implement import/export/download functionality for question-groups questions page
+
+Work Log:
+- Explored existing question-groups questions page (1306 lines) - had CSV import dialog and manual CSV export
+- Explored existing API route - only supported single question creation (POST)
+- Updated API route to support bulk JSON import via `body.importData` array with full type validation
+- Added jsonImportRef, jsonImportLoading state variables to questions page
+- Added Upload, FileJson, FileSpreadsheet icons to imports
+- Implemented handleJsonImport: Accepts JSON files, supports raw array or {importData}/{questions} format, posts to API with importData
+- Implemented handleExportJSON: Maps questions to clean JSON with parsed options array, downloads as {groupName}_questions.json
+- Implemented handleDownloadCSV: Uses Papa.unparse() for clean CSV, options joined with |, downloads as {groupName}_questions.csv
+- Updated header buttons: Import (JSON), Export (JSON), Download (CSV), Import CSV (existing), New Question, Back
+- Hidden file input for JSON import with .json accept filter
+- Export/Download disabled when no questions exist
+- Kept existing CSV import dialog (renamed to "Import CSV")
+- Verified in browser: All buttons render on both Test Question (1 question) and General Knowledge (2 questions) groups
+- Export JSON and Download CSV both trigger file downloads
+- Import CSV dialog still works
+- No lint errors, no runtime errors
+
+Stage Summary:
+- Question-groups questions page now has Import (JSON), Export (JSON), Download (CSV) + existing Import CSV
+- API route supports bulk import with full question type validation per question
+- Pattern matches users page and quiz-group quiz page implementations

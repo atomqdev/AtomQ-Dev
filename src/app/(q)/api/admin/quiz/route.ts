@@ -102,27 +102,32 @@ export async function POST(request: NextRequest) {
 
     // Check if this is an import request
     if (body.importData && Array.isArray(body.importData)) {
-      const { importData } = body
+      const { importData, groupId } = body
       const createdQuizzes = []
+      let failureCount = 0
 
       for (const quizData of importData) {
         // Skip empty rows
-        if (!quizData.title || quizData.title.trim() === "") continue
+        if (!quizData.title || quizData.title.trim() === "") {
+          failureCount++
+          continue
+        }
 
         try {
           const quiz = await db.quiz.create({
             data: {
               title: quizData.title,
               description: quizData.description || null,
-              timeLimit: quizData.timeLimit && quizData.timeLimit.trim() !== "" ? parseInt(quizData.timeLimit) : null,
+              timeLimit: quizData.timeLimit && String(quizData.timeLimit).trim() !== "" ? parseInt(String(quizData.timeLimit)) : null,
               difficulty: quizData.difficulty || DifficultyLevel.MEDIUM,
               status: quizData.status || QuizStatus.ACTIVE,
               negativeMarking: quizData.negativeMarking === true || quizData.negativeMarking === "true",
-              negativePoints: quizData.negativePoints && quizData.negativePoints.trim() !== "" ? parseFloat(quizData.negativePoints) : 0.5,
+              negativePoints: quizData.negativePoints && String(quizData.negativePoints).trim() !== "" ? parseFloat(String(quizData.negativePoints)) : 0.5,
               randomOrder: quizData.randomOrder === true || quizData.randomOrder === "true",
-              maxAttempts: quizData.maxAttempts && quizData.maxAttempts !== "" ? parseInt(quizData.maxAttempts) : null,
+              maxAttempts: quizData.maxAttempts && String(quizData.maxAttempts).trim() !== "" ? parseInt(String(quizData.maxAttempts)) : null,
               checkAnswerEnabled: quizData.checkAnswerEnabled === true || quizData.checkAnswerEnabled === "true",
               creatorId: session.user.id,
+              ...(groupId ? { groupId } : {}),
             },
             include: {
               _count: {
@@ -136,13 +141,16 @@ export async function POST(request: NextRequest) {
           createdQuizzes.push(quiz)
         } catch (error) {
           console.error("Error creating quiz from import:", error)
+          failureCount++
           // Continue with other quizzes even if one fails
         }
       }
 
       return NextResponse.json({ 
-        message: `Successfully imported ${createdQuizzes.length} quizzes`,
-        quizzes: createdQuizzes 
+        message: `Successfully imported ${createdQuizzes.length} quiz${createdQuizzes.length !== 1 ? 'zes' : ''}${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        quizzes: createdQuizzes,
+        successCount: createdQuizzes.length,
+        failureCount,
       }, { status: 201 })
     }
 

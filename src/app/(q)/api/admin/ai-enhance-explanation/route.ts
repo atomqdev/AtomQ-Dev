@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { UserRole } from "@prisma/client"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 import OpenAI from "openai"
 
 export async function POST(request: NextRequest) {
@@ -59,7 +60,7 @@ Output must start with an HTML tag.
     let userPrompt = ""
 
     if (mode === "enhance") {
-      const correctAnswers = correctAnswer.split('|').map((a: string) => a.trim())
+      const correctAnswers = parseMultiSelectAnswers(correctAnswer)
 
       const optionList = options.map((opt: string, idx: number) => {
         const isCorrect = correctAnswers.includes(opt.trim())

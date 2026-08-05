@@ -335,7 +335,7 @@ export async function POST(
 // Helper function to format assessment question
 function formatAssessmentQuestion(aq: any, index: number) {
   try {
-    if (!aq.question?.id || !aq.question?.content || !aq.question?.type) {
+    if (!aq.question?.id || !aq.question?.title || !aq.question?.type) {
       console.error(`Assessment question at index ${index} missing required fields:`, aq.question)
       return null
     }
@@ -361,8 +361,8 @@ function formatAssessmentQuestion(aq: any, index: number) {
 
     return {
       id: aq.question.id,
+      reference: aq.question.reference,
       title: aq.question.title || `Question ${index + 1}`,
-      content: aq.question.content,
       type: aq.question.type,
       options: options,
       correctAnswer: aq.question.correctAnswer || '0',
@@ -383,7 +383,7 @@ function formatAssessmentQuestion(aq: any, index: number) {
 // Helper function to format quiz question
 function formatQuizQuestion(aq: any, index: number) {
   try {
-    if (!aq.question?.id || !aq.question?.content || !aq.question?.type) {
+    if (!aq.question?.id || !aq.question?.title || !aq.question?.type) {
       console.error(`Quiz question at index ${index} missing required fields:`, aq.question)
       return null
     }
@@ -409,8 +409,8 @@ function formatQuizQuestion(aq: any, index: number) {
 
     return {
       id: aq.question.id,
+      reference: aq.question.reference,
       title: aq.question.title || `Question ${index + 1}`,
-      content: aq.question.content,
       type: aq.question.type,
       options: options,
       correctAnswer: aq.question.correctAnswer || '0',

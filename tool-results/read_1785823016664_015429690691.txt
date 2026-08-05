@@ -1,0 +1,1425 @@
+     1→"use client"
+     2→
+     3→import { useState, useEffect, useRef } from "react"
+     4→import { useParams, useRouter } from "next/navigation"
+     5→import { Button } from "@/components/ui/button"
+     6→import { Input } from "@/components/ui/input"
+     7→import { Badge } from "@/components/ui/badge"
+     8→import { LoadingButton } from "@/components/ui/laodaing-button"
+     9→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+    10→import {
+    11→  Table,
+    12→  TableBody,
+    13→  TableCell,
+    14→  TableHead,
+    15→  TableHeader,
+    16→  TableRow,
+    17→} from "@/components/ui/table"
+    18→import {
+    19→  Dialog,
+    20→  DialogContent,
+    21→  DialogDescription,
+    22→  DialogFooter,
+    23→  DialogHeader,
+    24→  DialogTitle,
+    25→  DialogTrigger,
+    26→} from "@/components/ui/dialog"
+    27→import {
+    28→  Sheet,
+    29→  SheetContent,
+    30→  SheetDescription,
+    31→  SheetFooter,
+    32→  SheetHeader,
+    33→  SheetTitle,
+    34→} from "@/components/ui/sheet"
+    35→import {
+    36→  AlertDialog,
+    37→  AlertDialogAction,
+    38→  AlertDialogCancel,
+    39→  AlertDialogContent,
+    40→  AlertDialogDescription,
+    41→  AlertDialogFooter,
+    42→  AlertDialogHeader,
+    43→  AlertDialogTitle,
+    44→  AlertDialogTrigger,
+    45→} from "@/components/ui/alert-dialog"
+    46→import { Label } from "@/components/ui/label"
+    47→import { RichTextEditor } from "@/components/ui/rich-text-editor"
+    48→import { RichTextDisplay } from "@/components/ui/rich-text-display"
+    49→import { Checkbox } from "@/components/ui/checkbox"
+    50→import {
+    51→  Select,
+    52→  SelectContent,
+    53→  SelectItem,
+    54→  SelectTrigger,
+    55→  SelectValue,
+    56→} from "@/components/ui/select"
+    57→import {
+    58→  DndContext,
+    59→  closestCenter,
+    60→  KeyboardSensor,
+    61→  PointerSensor,
+    62→  useSensor,
+    63→  useSensors,
+    64→  DragEndEvent,
+    65→} from "@dnd-kit/core"
+    66→import {
+    67→  arrayMove,
+    68→  SortableContext,
+    69→  sortableKeyboardCoordinates,
+    70→  verticalListSortingStrategy,
+    71→} from "@dnd-kit/sortable"
+    72→import {
+    73→  useSortable,
+    74→} from "@dnd-kit/sortable"
+    75→import { CSS } from "@dnd-kit/utilities"
+    76→import {
+    77→  GripVertical,
+    78→  Search,
+    79→  Plus,
+    80→  ArrowLeft,
+    81→  Edit,
+    82→  Trash2,
+    83→  Eye,
+    84→  X,
+    85→  Download,
+    86→  Upload,
+    87→  ChevronLeft,
+    88→  FileDown,
+    89→  FileUp
+    90→} from "lucide-react"
+    91→import { toast } from "sonner"
+    92→import { QuestionType, DifficultyLevel } from "@prisma/client"
+    93→import Papa from "papaparse"
+    94→import HexagonLoader from "@/components/Loader/Loading"
+    95→
+    96→interface Question {
+    97→  id: string
+    98→  title: string
+    99→  content: string
+   100→  type: QuestionType
+   101→  options: string[] | string
+   102→  correctAnswer: string
+   103→  explanation?: string
+   104→  difficulty: DifficultyLevel
+   105→  isActive: boolean
+   106→  order: number
+   107→  points: number
+   108→}
+   109→
+   110→interface AvailableQuestion {
+   111→  id: string
+   112→  title: string
+   113→  content: string
+   114→  type: QuestionType
+   115→  options: string[] | string
+   116→  correctAnswer: string
+   117→  explanation?: string
+   118→  difficulty: DifficultyLevel
+   119→  isActive: boolean
+   120→  group?: {
+   121→    id: string
+   122→    name: string
+   123→  }
+   124→}
+   125→
+   126→interface QuestionGroup {
+   127→  id: string
+   128→  name: string
+   129→  description: string | null
+   130→  isActive: boolean
+   131→  _count: {
+   132→    questions: number
+   133→  }
+   134→}
+   135→
+   136→function SortableQuestion({
+   137→  question,
+   138→  onEdit,
+   139→  onDelete,
+   140→  onView
+   141→}: {
+   142→  question: Question
+   143→  onEdit: (question: Question) => void
+   144→  onDelete: (questionId: string) => void
+   145→  onView: (question: Question) => void
+   146→}) {
+   147→  const {
+   148→    attributes,
+   149→    listeners,
+   150→    setNodeRef,
+   151→    transform,
+   152→    transition,
+   153→    isDragging,
+   154→  } = useSortable({ id: question.id })
+   155→
+   156→  const style = {
+   157→    transform: CSS.Transform.toString(transform),
+   158→    transition,
+   159→    opacity: isDragging ? 0.5 : 1,
+   160→  }
+   161→
+   162→  return (
+   163→    <TableRow ref={setNodeRef} style={style} {...attributes}>
+   164→      <TableCell>
+   165→        <div {...listeners} className="cursor-grab">
+   166→          <GripVertical className="h-4 w-4" />
+   167→        </div>
+   168→      </TableCell>
+   169→      <TableCell className="font-medium">{question.order}</TableCell>
+   170→      <TableCell>
+   171→        <div>
+   172→          <div className="font-medium">{question.title}</div>
+   173→          {/* <div className="text-sm text-muted-foreground">
+   174→            <RichTextDisplay content={question.content} />
+   175→          </div> */}
+   176→        </div>
+   177→      </TableCell>
+   178→      <TableCell>
+   179→        <Badge variant={
+   180→          question.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+   181→            question.type === QuestionType.MULTI_SELECT ? "secondary" :
+   182→            question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
+   183→        }>
+   184→          {question.type.replace('_', ' ')}
+   185→        </Badge>
+   186→      </TableCell>
+   187→      <TableCell>
+   188→        <Badge variant={
+   189→          question.difficulty === DifficultyLevel.EASY ? "default" :
+   190→            question.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+   191→        }>
+   192→          {question.difficulty}
+   193→        </Badge>
+   194→      </TableCell>
+   195→      <TableCell>{question.points}</TableCell>
+   196→      <TableCell>
+   197→        <div className="flex gap-2">
+   198→          <Button
+   199→            variant="ghost"
+   200→            size="sm"
+   201→            onClick={() => onView(question)}
+   202→          >
+   203→            <Eye className="h-4 w-4" />
+   204→          </Button>
+   205→
+   206→          <AlertDialog>
+   207→            <AlertDialogTrigger asChild>
+   208→              <Button
+   209→                variant="ghost"
+   210→                size="sm"
+   211→                className="text-red-600"
+   212→              >
+   213→                <Trash2 className="h-4 w-4" />
+   214→              </Button>
+   215→            </AlertDialogTrigger>
+   216→            <AlertDialogContent>
+   217→              <AlertDialogHeader>
+   218→                <AlertDialogTitle>Remove Question</AlertDialogTitle>
+   219→                <AlertDialogDescription>
+   220→                  Are you sure you want to remove this question from the quiz? This action cannot be undone.
+   221→                </AlertDialogDescription>
+   222→              </AlertDialogHeader>
+   223→              <AlertDialogFooter>
+   224→                <AlertDialogCancel>Cancel</AlertDialogCancel>
+   225→                <AlertDialogAction onClick={() => onDelete(question.id)}>
+   226→                  Remove
+   227→                </AlertDialogAction>
+   228→              </AlertDialogFooter>
+   229→            </AlertDialogContent>
+   230→          </AlertDialog>
+   231→        </div>
+   232→      </TableCell>
+   233→    </TableRow>
+   234→  )
+   235→}
+   236→
+   237→export default function QuizQuestionsPage() {
+   238→  const params = useParams()
+   239→  const router = useRouter()
+   240→  const quizId = params.id as string
+   241→
+   242→  const [questions, setQuestions] = useState<Question[]>([])
+   243→  const [availableQuestions, setAvailableQuestions] = useState<AvailableQuestion[]>([])
+   244→  const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([])
+   245→  const [loading, setLoading] = useState(true)
+   246→  const [searchTerm, setSearchTerm] = useState("")
+   247→  const [difficultyFilter, setDifficultyFilter] = useState<string>("all")
+   248→  const [groupFilter, setGroupFilter] = useState<string>("all")
+   249→  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+   250→  
+   251→  // Popup-specific filter states
+   252→  const [popupSearchTerm, setPopupSearchTerm] = useState("")
+   253→  const [popupDifficultyFilter, setPopupDifficultyFilter] = useState<string>("all")
+   254→  const [popupGroupFilter, setPopupGroupFilter] = useState<string>("all")
+   255→  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
+   256→  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+   257→  const [quizTitle, setQuizTitle] = useState("")
+   258→  const [selectedQuestionsToAdd, setSelectedQuestionsToAdd] = useState<string[]>([])
+   259→  const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null)
+   260→  const fileInputRef = useRef<HTMLInputElement>(null)
+   261→  
+   262→  // Import sheet states
+   263→  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false)
+   264→  const [selectedQuestionGroup, setSelectedQuestionGroup] = useState<string>("")
+   265→  const [importFile, setImportFile] = useState<File | null>(null)
+   266→  const [isDragOver, setIsDragOver] = useState(false)
+   267→  const [isImporting, setIsImporting] = useState(false)
+   268→
+   269→  const sensors = useSensors(
+   270→    useSensor(PointerSensor),
+   271→    useSensor(KeyboardSensor, {
+   272→      coordinateGetter: sortableKeyboardCoordinates,
+   273→    })
+   274→  )
+   275→
+   276→  useEffect(() => {
+   277→    fetchQuiz()
+   278→    fetchQuestions()
+   279→    fetchAvailableQuestions()
+   280→    fetchQuestionGroups()
+   281→  }, [quizId])
+   282→
+   283→  useEffect(() => {
+   284→    fetchAvailableQuestions()
+   285→  }, [difficultyFilter, searchTerm, groupFilter])
+   286→
+   287→  const fetchQuiz = async () => {
+   288→    try {
+   289→      const response = await fetch(`/api/admin/quiz/${quizId}`)
+   290→      if (response.ok) {
+   291→        const data = await response.json()
+   292→        setQuizTitle(data.title)
+   293→      }
+   294→    } catch (error) {
+   295→      console.error("Failed to fetch quiz title:", error)
+   296→    }
+   297→  }
+   298→
+   299→  const fetchQuestions = async () => {
+   300→    try {
+   301→      const response = await fetch(`/api/admin/quiz/${quizId}/questions`)
+   302→      if (response.ok) {
+   303→        const data = await response.json()
+   304→        setQuestions(data)
+   305→      }
+   306→    } catch (error) {
+   307→      toast.error("Failed to fetch questions")
+   308→    } finally {
+   309→      setLoading(false)
+   310→    }
+   311→  }
+   312→
+   313→  const fetchAvailableQuestions = async () => {
+   314→    try {
+   315→      const params = new URLSearchParams()
+   316→      if (difficultyFilter !== "all") params.append("difficulty", difficultyFilter)
+   317→      if (searchTerm) params.append("search", searchTerm)
+   318→      if (groupFilter !== "all") params.append("groupId", groupFilter)
+   319→      
+   320→      const response = await fetch(`/api/admin/quiz/${quizId}/available-questions?${params}`)
+   321→      if (response.ok) {
+   322→        const data = await response.json()
+   323→        setAvailableQuestions(data)
+   324→      }
+   325→    } catch (error) {
+   326→      toast.error("Failed to fetch available questions")
+   327→    }
+   328→  }
+   329→
+   330→  const fetchQuestionGroups = async () => {
+   331→    try {
+   332→      const response = await fetch("/api/admin/question-groups")
+   333→      if (response.ok) {
+   334→        const data = await response.json()
+   335→        setQuestionGroups(data)
+   336→      }
+   337→    } catch (error) {
+   338→      console.error("Failed to fetch question groups:", error)
+   339→    }
+   340→  }
+   341→
+   342→  const handleDragEnd = async (event: DragEndEvent) => {
+   343→    const { active, over } = event
+   344→
+   345→    if (active.id !== over?.id) {
+   346→      const oldIndex = questions.findIndex(q => q.id === active.id)
+   347→      const newIndex = questions.findIndex(q => q.id === over?.id)
+   348→
+   349→      const newQuestions = arrayMove(questions, oldIndex, newIndex)
+   350→      setQuestions(newQuestions)
+   351→
+   352→      // Update order in backend
+   353→      try {
+   354→        await fetch(`/api/admin/quiz/${quizId}/questions/reorder`, {
+   355→          method: "POST",
+   356→          headers: {
+   357→            "Content-Type": "application/json",
+   358→          },
+   359→          body: JSON.stringify({
+   360→            questionOrders: newQuestions.map((q, index) => ({
+   361→              questionId: q.id,
+   362→              order: index + 1
+   363→            }))
+   364→          }),
+   365→        })
+   366→      } catch (error) {
+   367→        toast.error("Failed to update question order")
+   368→        fetchQuestions() // Revert to original order
+   369→      }
+   370→    }
+   371→  }
+   372→
+   373→  const handleRemoveQuestion = async (questionId: string) => {
+   374→    try {
+   375→      const response = await fetch(`/api/admin/quiz/${quizId}/questions/${questionId}`, {
+   376→        method: "DELETE",
+   377→      })
+   378→
+   379→      if (response.ok) {
+   380→        setQuestions(questions.filter(q => q.id !== questionId))
+   381→        toast.success("Question removed from quiz")
+   382→        setDeleteQuestionId(null)
+   383→      } else {
+   384→        toast.error("Failed to remove question")
+   385→      }
+   386→    } catch (error) {
+   387→      toast.error("Failed to remove question")
+   388→    }
+   389→  }
+   390→
+   391→  const handleAddQuestions = async (questionIds: string[]) => {
+   392→    if (questionIds.length === 0) return
+   393→    
+   394→    try {
+   395→      const response = await fetch(`/api/admin/quiz/${quizId}/questions`, {
+   396→        method: "POST",
+   397→        headers: {
+   398→          "Content-Type": "application/json",
+   399→        },
+   400→        body: JSON.stringify({ questionIds }),
+   401→      })
+   402→
+   403→      if (response.ok) {
+   404→        toast.success("Questions added to quiz")
+   405→        setIsAddDialogOpen(false)
+   406→        setSelectedQuestionsToAdd([])
+   407→        // Reset popup filters when closing
+   408→        setPopupSearchTerm("")
+   409→        setPopupDifficultyFilter("all")
+   410→        setPopupGroupFilter("all")
+   411→        fetchQuestions()
+   412→        fetchAvailableQuestions()
+   413→      } else {
+   414→        toast.error("Failed to enroll questions")
+   415→      }
+   416→    } catch (error) {
+   417→      toast.error("Failed to enroll questions")
+   418→    }
+   419→  }
+   420→
+   421→  const handleExportQuestions = () => {
+   422→    const csvContent = [
+   423→      ["Title", "Content", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Points"],
+   424→      ...questions.map(question => {
+   425→        // Parse options from database (stored as JSON string) and convert to pipe-separated format
+   426→        let optionsString = ""
+   427→        try {
+   428→          const parsedOptions = Array.isArray(question.options)
+   429→            ? question.options
+   430→            : JSON.parse(question.options || "[]")
+   431→          optionsString = parsedOptions.join("|")
+   432→        } catch (e) {
+   433→          console.warn("Failed to parse options for question:", question.title, e)
+   434→          optionsString = question.options?.toString() || ""
+   435→        }
+   436→
+   437→        return [
+   438→          question.title,
+   439→          question.content,
+   440→          question.type,
+   441→          optionsString,
+   442→          question.correctAnswer,
+   443→          question.explanation || "",
+   444→          question.difficulty,
+   445→          question.points.toString()
+   446→        ]
+   447→      })
+   448→    ].map(row =>
+   449→      // Properly escape CSV values that contain commas or quotes
+   450→      row.map(cell => {
+   451→        if (cell === null || cell === undefined) return ""
+   452→        const str = cell.toString()
+   453→        if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+   454→          return `"${str.replace(/"/g, '""')}"`
+   455→        }
+   456→        return str
+   457→      }).join(",")
+   458→    ).join("\n")
+   459→
+   460→    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" })
+   461→    const url = window.URL.createObjectURL(blob)
+   462→    const a = document.createElement("a")
+   463→    a.href = url
+   464→    a.download = `${quizTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_questions.csv`
+   465→    a.click()
+   466→    window.URL.revokeObjectURL(url)
+   467→    toast.success("Questions exported to CSV")
+   468→  }
+   469→
+   470→  const handleImportQuestions = () => {
+   471→    fileInputRef.current?.click()
+   472→  }
+   473→
+   474→  // Drag and drop handlers
+   475→  const handleDragOver = (e: React.DragEvent) => {
+   476→    e.preventDefault()
+   477→    setIsDragOver(true)
+   478→  }
+   479→
+   480→  const handleDragLeave = (e: React.DragEvent) => {
+   481→    e.preventDefault()
+   482→    setIsDragOver(false)
+   483→  }
+   484→
+   485→  const handleDrop = (e: React.DragEvent) => {
+   486→    e.preventDefault()
+   487→    setIsDragOver(false)
+   488→    
+   489→    const files = e.dataTransfer.files
+   490→    if (files.length > 0) {
+   491→      const file = files[0]
+   492→      if (file.type === "text/csv" || file.name.endsWith(".csv")) {
+   493→        setImportFile(file)
+   494→      } else {
+   495→        toast.error("Please upload a CSV file")
+   496→      }
+   497→    }
+   498→  }
+   499→
+   500→  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+   501→    const file = e.target.files?.[0]
+   502→    if (file) {
+   503→      setImportFile(file)
+   504→    }
+   505→  }
+   506→
+   507→  const handleRemoveFile = () => {
+   508→    setImportFile(null)
+   509→    if (fileInputRef.current) {
+   510→      fileInputRef.current.value = ""
+   511→    }
+   512→  }
+   513→
+   514→  const handleImportWithGroup = async () => {
+   515→    if (!importFile) {
+   516→      toast.error("Please select a file to import")
+   517→      return
+   518→    }
+   519→    
+   520→    if (!selectedQuestionGroup) {
+   521→      toast.error("Please select a question group")
+   522→      return
+   523→    }
+   524→
+   525→    setIsImporting(true)
+   526→
+   527→    Papa.parse(importFile, {
+   528→      header: true,
+   529→      skipEmptyLines: true,
+   530→      complete: async (results) => {
+   531→        try {
+   532→
+   533→          // Filter out empty rows and validate required fields
+   534→          const validQuestions = results.data.filter((row: any) => {
+   535→            const hasTitle = row.Title && row.Title.trim() !== ""
+   536→            const hasContent = row.Content && row.Content.trim() !== ""
+   537→            const hasType = row.Type && row.Type.trim() !== ""
+   538→            const hasOptions = row.Options && row.Options.trim() !== ""
+   539→            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
+   540→
+   541→            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+   542→          })
+   543→
+   544→
+   545→          if (validQuestions.length === 0) {
+   546→            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
+   547→            return
+   548→          }
+   549→
+   550→          // Create questions in the selected group
+   551→          const importPromises = validQuestions.map(async (question: any, index: number) => {
+   552→            try {
+   553→
+   554→              // Normalize question type
+   555→              let questionType = question.Type?.toString().toUpperCase().trim()
+   556→              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
+   557→                questionType = QuestionType.MULTIPLE_CHOICE
+   558→                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
+   559→              }
+   560→
+   561→              // Parse options
+   562→              let options = []
+   563→              if (question.Options) {
+   564→                const optionsStr = question.Options.toString().trim()
+   565→                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
+   566→                  try {
+   567→                    const parsed = JSON.parse(optionsStr)
+   568→                    if (Array.isArray(parsed)) {
+   569→                      options = parsed
+   570→                    }
+   571→                  } catch {
+   572→                    options = optionsStr.split('|').map(opt => opt.trim())
+   573→                  }
+   574→                } else {
+   575→                  options = optionsStr.split('|').map(opt => opt.trim())
+   576→                }
+   577→              }
+   578→
+   579→              // Create the question
+   580→              const response = await fetch("/api/admin/question-groups", {
+   581→                method: "POST",
+   582→                headers: {
+   583→                  "Content-Type": "application/json",
+   584→                },
+   585→                body: JSON.stringify({
+   586→                  title: question.Title?.trim(),
+   587→                  content: question.Content?.trim(),
+   588→                  type: questionType,
+   589→                  options: options,
+   590→                  correctAnswer: question["Correct Answer"]?.toString(),
+   591→                  explanation: question.Explanation?.trim() || "",
+   592→                  difficulty: question.Difficulty?.toUpperCase() || "MEDIUM",
+   593→                  groupId: selectedQuestionGroup
+   594→                }),
+   595→              })
+   596→
+   597→              if (!response.ok) {
+   598→                const error = await response.json()
+   599→                throw new Error(error.message || "Failed to create question")
+   600→              }
+   601→
+   602→              return await response.json()
+   603→            } catch (error) {
+   604→              console.error(`Failed to import question ${index + 1}:`, error)
+   605→              throw error
+   606→            }
+   607→          })
+   608→
+   609→          const importedQuestions = await Promise.all(importPromises)
+   610→          
+   611→          // Add imported questions to the quiz
+   612→          const questionIds = importedQuestions.map(q => q.id)
+   613→          const addResponse = await fetch(`/api/admin/quiz/${quizId}/questions`, {
+   614→            method: "POST",
+   615→            headers: {
+   616→              "Content-Type": "application/json",
+   617→            },
+   618→            body: JSON.stringify({ questionIds }),
+   619→          })
+   620→
+   621→          if (addResponse.ok) {
+   622→            toast.success(`Successfully imported ${importedQuestions.length} questions and added to quiz`)
+   623→            setIsImportSheetOpen(false)
+   624→            setImportFile(null)
+   625→            setSelectedQuestionGroup("")
+   626→            fetchQuestions()
+   627→            fetchAvailableQuestions()
+   628→            setIsImporting(false)
+   629→          } else {
+   630→            toast.error("Questions were imported but failed to enroll to quiz")
+   631→            setIsImporting(false)
+   632→          }
+   633→
+   634→        } catch (error) {
+   635→          console.error("Import error:", error)
+   636→          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
+   637→          setIsImporting(false)
+   638→        }
+   639→      },
+   640→      error: (error) => {
+   641→        console.error("CSV parsing error:", error)
+   642→        toast.error("Failed to parse CSV file")
+   643→        setIsImporting(false)
+   644→      }
+   645→    })
+   646→  }
+   647→
+   648→  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+   649→    const file = event.target.files?.[0]
+   650→    if (!file) return
+   651→
+   652→    Papa.parse(file, {
+   653→      header: true,
+   654→      skipEmptyLines: true,
+   655→      complete: async (results) => {
+   656→        try {
+   657→
+   658→          // Filter out empty rows and validate required fields
+   659→          const validQuestions = results.data.filter((row: any) => {
+   660→            const hasTitle = row.Title && row.Title.trim() !== ""
+   661→            const hasContent = row.Content && row.Content.trim() !== ""
+   662→            const hasType = row.Type && row.Type.trim() !== ""
+   663→            const hasOptions = row.Options && row.Options.trim() !== ""
+   664→            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
+   665→
+   666→            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+   667→          })
+   668→
+   669→
+   670→          if (validQuestions.length === 0) {
+   671→            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
+   672→            return
+   673→          }
+   674→
+   675→          const importPromises = validQuestions.map(async (question: any, index: number) => {
+   676→            try {
+   677→
+   678→              // Normalize question type
+   679→              let questionType = question.Type?.toString().toUpperCase().trim()
+   680→              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
+   681→                // Default to MULTIPLE_CHOICE if type is invalid
+   682→                questionType = QuestionType.MULTIPLE_CHOICE
+   683→                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
+   684→              }
+   685→
+   686→              // Parse options with better error handling
+   687→              let options = []
+   688→              if (question.Options) {
+   689→                const optionsStr = question.Options.toString().trim()
+   690→
+   691→                // Try to parse as JSON first (handles ["aa","bb","cc"] format)
+   692→                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
+   693→                  try {
+   694→                    const parsed = JSON.parse(optionsStr)
+   695→                    if (Array.isArray(parsed)) {
+   696→                      options = parsed.map(opt => opt.toString().trim()).filter(opt => opt.length > 0)
+   697→                    }
+   698→                  } catch (e) {
+   699→                    console.warn(`Failed to parse options as JSON for question "${question.Title}":`, e)
+   700→                  }
+   701→                }
+   702→
+   703→                // If JSON parsing failed or not JSON, try different delimiters
+   704→                if (options.length === 0) {
+   705→                  // Try pipe delimiter first
+   706→                  if (optionsStr.includes('|')) {
+   707→                    options = optionsStr.split('|').map(opt => opt.trim()).filter(opt => opt.length > 0)
+   708→                  }
+   709→                  // Try comma delimiter
+   710→                  else if (optionsStr.includes(',')) {
+   711→                    options = optionsStr.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0)
+   712→                  }
+   713→                  // Try semicolon delimiter
+   714→                  else if (optionsStr.includes(';')) {
+   715→                    options = optionsStr.split(';').map(opt => opt.trim()).filter(opt => opt.length > 0)
+   716→                  }
+   717→                  // Single option as string
+   718→                  else if (optionsStr.length > 0) {
+   719→                    options = [optionsStr]
+   720→                  }
+   721→                }
+   722→              }
+   723→
+   724→
+   725→              // Ensure True/False questions have correct options
+   726→              if (questionType === QuestionType.TRUE_FALSE) {
+   727→                if (options.length !== 2 || !options.includes("True") || !options.includes("False")) {
+   728→                  options = ["True", "False"]
+   729→                }
+   730→              }
+   731→
+   732→              // Validate options for multiple choice
+   733→              if (questionType === QuestionType.MULTIPLE_CHOICE && options.length < 2) {
+   734→                throw new Error(`Multiple choice question "${question.Title}" must have at least 2 options`)
+   735→              }
+   736→
+   737→              // Normalize correct answer
+   738→              const correctAnswer = question["Correct Answer"]?.toString().trim()
+   739→              if (!correctAnswer) {
+   740→                throw new Error(`Correct answer is required for question "${question.Title}"`)
+   741→              }
+   742→
+   743→              // Validate that correct answer is in options
+   744→              if (!options.includes(correctAnswer)) {
+   745→                throw new Error(`Correct answer "${correctAnswer}" not found in options for question "${question.Title}"`)
+   746→              }
+   747→
+   748→              // Normalize difficulty
+   749→              let difficulty = question.Difficulty?.toString().toUpperCase().trim() || DifficultyLevel.MEDIUM
+   750→              if (!Object.values(DifficultyLevel).includes(difficulty as DifficultyLevel)) {
+   751→                difficulty = DifficultyLevel.MEDIUM
+   752→                console.warn(`Invalid difficulty "${question.Difficulty}", defaulting to MEDIUM`)
+   753→              }
+   754→
+   755→              // Parse points
+   756→              const points = parseFloat(question.Points) || 1.0
+   757→              if (isNaN(points) || points <= 0) {
+   758→                throw new Error(`Invalid points value for question "${question.Title}"`)
+   759→              }
+   760→
+   761→              const questionData = {
+   762→                title: question.Title?.toString().trim() || "",
+   763→                content: question.Content?.toString().trim() || "",
+   764→                type: questionType,
+   765→                options: options,
+   766→                correctAnswer: correctAnswer,
+   767→                explanation: question.Explanation?.toString().trim() || "",
+   768→                difficulty: difficulty,
+   769→                points: points
+   770→              }
+   771→
+   772→
+   773→              const response = await fetch(`/api/admin/quiz/${quizId}/questions`, {
+   774→                method: "POST",
+   775→                headers: {
+   776→                  "Content-Type": "application/json",
+   777→                },
+   778→                body: JSON.stringify(questionData),
+   779→              })
+   780→
+   781→              if (!response.ok) {
+   782→                const errorData = await response.json()
+   783→                console.error(`API error for question "${questionData.title}":`, errorData)
+   784→                throw new Error(errorData.message || `Failed to create question "${questionData.title}"`)
+   785→              }
+   786→
+   787→              const result = await response.json()
+   788→              return result
+   789→            } catch (error) {
+   790→              console.error(`Failed to import question "${question.Title}":`, error)
+   791→              return {
+   792→                error: true,
+   793→                title: question.Title,
+   794→                message: error instanceof Error ? error.message : "Unknown error"
+   795→              }
+   796→            }
+   797→          })
+   798→
+   799→          const importResults = await Promise.all(importPromises)
+   800→          const successfulImports = importResults.filter(result => !result.error)
+   801→          const failedImports = importResults.filter(result => result.error)
+   802→
+   803→
+   804→          if (successfulImports.length > 0) {
+   805→            toast.success(`Successfully imported ${successfulImports.length} question(s)`)
+   806→            fetchQuestions()
+   807→            fetchAvailableQuestions()
+   808→          }
+   809→
+   810→          if (failedImports.length > 0) {
+   811→            const errorMessages = failedImports.map(failure =>
+   812→              `"${failure.title}": ${failure.message}`
+   813→            ).join('\n')
+   814→            console.error("Failed imports:", errorMessages)
+   815→            toast.error(`Failed to import ${failedImports.length} question(s):\n${errorMessages}`)
+   816→          }
+   817→        } catch (error) {
+   818→          console.error("Import error:", error)
+   819→          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
+   820→        }
+   821→      },
+   822→      error: (error) => {
+   823→        console.error("CSV parsing error:", error)
+   824→        toast.error(`Failed to parse CSV file: ${error.message}`)
+   825→      }
+   826→    })
+   827→
+   828→    // Reset file input
+   829→    if (fileInputRef.current) {
+   830→      fileInputRef.current.value = ""
+   831→    }
+   832→  }
+   833→
+   834→  const filteredQuestions = questions.filter(question => {
+   835→    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+   836→      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+   837→    const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
+   838→    return matchesSearch && matchesDifficulty
+   839→  })
+   840→
+   841→  const filteredAvailableQuestions = availableQuestions.filter(question => {
+   842→    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+   843→      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+   844→    const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
+   845→    const matchesGroup = groupFilter === "all" || question.group?.id === groupFilter
+   846→    return matchesSearch && matchesDifficulty && matchesGroup
+   847→  })
+   848→
+   849→  // Popup-specific filtered questions
+   850→  const popupFilteredQuestions = availableQuestions.filter(question => {
+   851→    const matchesSearch = question.title.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
+   852→      question.content.toLowerCase().includes(popupSearchTerm.toLowerCase())
+   853→    const matchesDifficulty = popupDifficultyFilter === "all" || question.difficulty === popupDifficultyFilter
+   854→    const matchesGroup = popupGroupFilter === "all" || question.group?.id === popupGroupFilter
+   855→    return matchesSearch && matchesDifficulty && matchesGroup
+   856→  })
+   857→
+   858→  // Helper functions for selection
+   859→  const hasActiveFilters = () => {
+   860→    return popupSearchTerm !== "" || popupDifficultyFilter !== "all" || popupGroupFilter !== "all"
+   861→  }
+   862→
+   863→  const selectAllQuestions = () => {
+   864→    const allQuestionIds = availableQuestions.map(q => q.id)
+   865→    setSelectedQuestionsToAdd(allQuestionIds)
+   866→  }
+   867→
+   868→  const selectFilteredQuestions = () => {
+   869→    const filteredQuestionIds = popupFilteredQuestions.map(q => q.id)
+   870→    setSelectedQuestionsToAdd(filteredQuestionIds)
+   871→  }
+   872→
+   873→  const clearSelection = () => {
+   874→    setSelectedQuestionsToAdd([])
+   875→  }
+   876→
+   877→  // Effect to update selection when filters change
+   878→  // This ensures selected items are only those visible in current filter
+   879→  useEffect(() => {
+   880→    if (selectedQuestionsToAdd.length > 0) {
+   881→      const visibleQuestionIds = popupFilteredQuestions.map(q => q.id)
+   882→      const updatedSelection = selectedQuestionsToAdd.filter(id => 
+   883→        visibleQuestionIds.includes(id)
+   884→      )
+   885→      if (updatedSelection.length !== selectedQuestionsToAdd.length) {
+   886→        setSelectedQuestionsToAdd(updatedSelection)
+   887→      }
+   888→    }
+   889→  }, [popupSearchTerm, popupDifficultyFilter, popupGroupFilter])
+   890→
+   891→  if (loading) {
+   892→    return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
+   893→  }
+   894→
+   895→  return (
+   896→    <div className="space-y-6">
+   897→      <div className="flex items-center justify-between">
+   898→        <div className="flex items-center space-x-2">
+   899→          <div className="relative">
+   900→            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+   901→            <Input
+   902→              placeholder="Search questions..."
+   903→              value={searchTerm}
+   904→              onChange={(e) => setSearchTerm(e.target.value)}
+   905→              className="pl-8 w-[300px]"
+   906→            />
+   907→          </div>
+   908→          <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+   909→            <SelectTrigger className="w-[180px]">
+   910→              <SelectValue placeholder="Filter by difficulty" />
+   911→            </SelectTrigger>
+   912→            <SelectContent>
+   913→              <SelectItem value="all">All Difficulties</SelectItem>
+   914→              <SelectItem value="EASY">Easy</SelectItem>
+   915→              <SelectItem value="MEDIUM">Medium</SelectItem>
+   916→              <SelectItem value="HARD">Hard</SelectItem>
+   917→            </SelectContent>
+   918→          </Select>
+   919→          <Select value={groupFilter} onValueChange={setGroupFilter}>
+   920→            <SelectTrigger className="w-[180px]">
+   921→              <SelectValue placeholder="Filter by group" />
+   922→            </SelectTrigger>
+   923→            <SelectContent>
+   924→              <SelectItem value="all">All Groups</SelectItem>
+   925→              {questionGroups.map((group) => (
+   926→                <SelectItem key={group.id} value={group.id}>
+   927→                  {group.name} ({group._count.questions})
+   928→                </SelectItem>
+   929→              ))}
+   930→            </SelectContent>
+   931→          </Select>
+   932→        </div>
+   933→        <div className="flex items-center space-x-2">
+   934→          <Button onClick={() => setIsAddDialogOpen(true)}>
+   935→            <Plus className="h-4 w-4 mr-2" />
+   936→            Enroll Questions
+   937→          </Button>
+   938→          <Button
+   939→            variant="outline"
+   940→            size="sm"
+   941→            onClick={() => router.back()}
+   942→            className="h-9"
+   943→          >
+   944→            <ChevronLeft className="h-5 w-5" />
+   945→          </Button>
+   946→        </div>
+   947→      </div>
+   948→
+   949→      <Card>
+   950→        <CardHeader>
+   951→          <div className="flex items-center justify-between">
+   952→            <div>
+   953→              <CardTitle>Quiz Questions ({filteredQuestions.length})</CardTitle>
+   954→              <CardDescription>
+   955→                Questions currently assigned to this quiz. Drag to reorder.
+   956→              </CardDescription>
+   957→            </div>
+   958→            <div className="flex items-center space-x-2">
+   959→              <Button variant="outline" size="sm" onClick={handleExportQuestions}>
+   960→                <FileDown className="h-4 w-4 mr-2" />
+   961→                Export
+   962→              </Button>
+   963→              <Button variant="outline" size="sm" onClick={() => setIsImportSheetOpen(true)}>
+   964→                <FileUp className="h-4 w-4 mr-2" />
+   965→                Import
+   966→              </Button>
+   967→              <input
+   968→                ref={fileInputRef}
+   969→                type="file"
+   970→                accept=".csv"
+   971→                onChange={handleFileChange}
+   972→                className="hidden"
+   973→              />
+   974→            </div>
+   975→          </div>
+   976→        </CardHeader>
+   977→        <CardContent>
+   978→          <DndContext
+   979→            sensors={sensors}
+   980→            collisionDetection={closestCenter}
+   981→            onDragEnd={handleDragEnd}
+   982→          >
+   983→            <Table>
+   984→              <TableHeader>
+   985→                <TableRow>
+   986→                  <TableHead className="w-[50px]"></TableHead>
+   987→                  <TableHead className="w-[80px]">Order</TableHead>
+   988→                  <TableHead>Question</TableHead>
+   989→                  <TableHead>Type</TableHead>
+   990→                  <TableHead>Difficulty</TableHead>
+   991→                  <TableHead className="w-[80px]">Points</TableHead>
+   992→                  <TableHead className="w-[120px]">Actions</TableHead>
+   993→                </TableRow>
+   994→              </TableHeader>
+   995→              <TableBody>
+   996→                <SortableContext
+   997→                  items={filteredQuestions.map(q => q.id)}
+   998→                  strategy={verticalListSortingStrategy}
+   999→                >
+  1000→                  {filteredQuestions.map((question) => (
+  1001→                    <SortableQuestion
+  1002→                      key={question.id}
+  1003→                      question={question}
+  1004→                      onEdit={(question) => {
+  1005→                        setSelectedQuestion(question)
+  1006→                        setIsViewDialogOpen(true)
+  1007→                      }}
+  1008→                      onDelete={handleRemoveQuestion}
+  1009→                      onView={(question) => {
+  1010→                        setSelectedQuestion(question)
+  1011→                        setIsViewDialogOpen(true)
+  1012→                      }}
+  1013→                    />
+  1014→                  ))}
+  1015→                </SortableContext>
+  1016→              </TableBody>
+  1017→            </Table>
+  1018→          </DndContext>
+  1019→        </CardContent>
+  1020→      </Card>
+  1021→
+  1022→      {/* Enroll Questions Dialog */}
+  1023→      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+  1024→        <DialogContent className="sm:max-w-[600px] min-w-[70vw] max-h-[80vh] overflow-y-auto">
+  1025→          <DialogHeader>
+  1026→            <div className="flex items-center justify-between">
+  1027→              <div>
+  1028→                <DialogTitle>Enroll Questions</DialogTitle>
+  1029→                <DialogDescription>
+  1030→                  Select questions from the available pool to enroll to this quiz
+  1031→                </DialogDescription>
+  1032→              </div>
+  1033→        </div>
+  1034→          </DialogHeader>
+  1035→          <div className="grid flex-1 auto-rows-min gap-6 px-4">
+  1036→            {/* Search and Filter Controls */}
+  1037→            <div className="flex flex-col gap-4">
+  1038→              <div className="flex flex-col sm:flex-row gap-3">
+  1039→                <div className="relative flex-1">
+  1040→                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+  1041→                  <Input
+  1042→                    placeholder="Search questions..."
+  1043→                    value={popupSearchTerm}
+  1044→                    onChange={(e) => setPopupSearchTerm(e.target.value)}
+  1045→                    className="pl-8"
+  1046→                  />
+  1047→                </div>
+  1048→                <Select value={popupDifficultyFilter} onValueChange={setPopupDifficultyFilter}>
+  1049→                  <SelectTrigger className="w-full sm:w-[180px]">
+  1050→                    <SelectValue placeholder="Filter by difficulty" />
+  1051→                  </SelectTrigger>
+  1052→                  <SelectContent>
+  1053→                    <SelectItem value="all">All Difficulties</SelectItem>
+  1054→                    <SelectItem value="EASY">Easy</SelectItem>
+  1055→                    <SelectItem value="MEDIUM">Medium</SelectItem>
+  1056→                    <SelectItem value="HARD">Hard</SelectItem>
+  1057→                  </SelectContent>
+  1058→                </Select>
+  1059→                <Select value={popupGroupFilter} onValueChange={setPopupGroupFilter}>
+  1060→                  <SelectTrigger className="w-full sm:w-[180px]">
+  1061→                    <SelectValue placeholder="Filter by group" />
+  1062→                  </SelectTrigger>
+  1063→                  <SelectContent>
+  1064→                    <SelectItem value="all">All Groups</SelectItem>
+  1065→                    {questionGroups.map((group) => (
+  1066→                      <SelectItem key={group.id} value={group.id}>
+  1067→                        {group.name} ({group._count.questions})
+  1068→                      </SelectItem>
+  1069→                    ))}
+  1070→                  </SelectContent>
+  1071→                </Select>
+  1072→              </div>
+  1073→              {/* Active Filters Display */}
+  1074→              {(popupSearchTerm || popupDifficultyFilter !== "all" || popupGroupFilter !== "all") && (
+  1075→                <div className="flex flex-wrap gap-2">
+  1076→                  {popupSearchTerm && (
+  1077→                    <Badge variant="secondary" className="gap-1">
+  1078→                      Search: "{popupSearchTerm}"
+  1079→                      <X 
+  1080→                        className="h-3 w-3 cursor-pointer" 
+  1081→                        onClick={() => setPopupSearchTerm("")}
+  1082→                      />
+  1083→                    </Badge>
+  1084→                  )}
+  1085→                  {popupDifficultyFilter !== "all" && (
+  1086→                    <Badge variant="secondary" className="gap-1">
+  1087→                      Difficulty: {popupDifficultyFilter}
+  1088→                      <X 
+  1089→                        className="h-3 w-3 cursor-pointer" 
+  1090→                        onClick={() => setPopupDifficultyFilter("all")}
+  1091→                      />
+  1092→                    </Badge>
+  1093→                  )}
+  1094→                  {popupGroupFilter !== "all" && (
+  1095→                    <Badge variant="secondary" className="gap-1">
+  1096→                      Group: {questionGroups.find(g => g.id === popupGroupFilter)?.name || "Unknown"}
+  1097→                      <X 
+  1098→                        className="h-3 w-3 cursor-pointer" 
+  1099→                        onClick={() => setPopupGroupFilter("all")}
+  1100→                      />
+  1101→                    </Badge>
+  1102→                  )}
+  1103→                </div>
+  1104→              )}
+  1105→            </div>
+  1106→            
+  1107→            {/* Selection Controls */}
+  1108→            <div className="flex flex-wrap gap-2 items-center justify-between">
+  1109→              <div className="flex flex-wrap gap-2">
+  1110→                <Button
+  1111→                  variant="outline"
+  1112→                  size="sm"
+  1113→                  onClick={hasActiveFilters() ? selectFilteredQuestions : selectAllQuestions}
+  1114→                  disabled={popupFilteredQuestions.length === 0}
+  1115→                >
+  1116→                  {hasActiveFilters() ? `Select Filtered (${popupFilteredQuestions.length})` : `Select All (${availableQuestions.length})`}
+  1117→                </Button>
+  1118→                <Button
+  1119→                  variant="outline"
+  1120→                  size="sm"
+  1121→                  onClick={clearSelection}
+  1122→                  disabled={selectedQuestionsToAdd.length === 0}
+  1123→                >
+  1124→                  Clear Selection ({selectedQuestionsToAdd.length})
+  1125→                </Button>
+  1126→              </div>
+  1127→              <div className="text-sm text-muted-foreground">
+  1128→                {selectedQuestionsToAdd.length} of {popupFilteredQuestions.length} selected
+  1129→              </div>
+  1130→            </div>
+  1131→            
+  1132→            <div className="grid gap-3">
+  1133→              <div className="max-h-96 overflow-y-auto border rounded-md">
+  1134→                {popupFilteredQuestions.length > 0 ? (
+  1135→                  popupFilteredQuestions.map((question) => (
+  1136→                    <div key={question.id} className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0">
+  1137→                      <input
+  1138→                        type="checkbox"
+  1139→                        id={`question-${question.id}`}
+  1140→                        checked={selectedQuestionsToAdd.includes(question.id)}
+  1141→                        onChange={(e) => {
+  1142→                          if (e.target.checked) {
+  1143→                            setSelectedQuestionsToAdd([...selectedQuestionsToAdd, question.id])
+  1144→                          } else {
+  1145→                            setSelectedQuestionsToAdd(selectedQuestionsToAdd.filter(id => id !== question.id))
+  1146→                          }
+  1147→                        }}
+  1148→                        className="h-4 w-4"
+  1149→                      />
+  1150→                      <label htmlFor={`question-${question.id}`} className="flex-1 cursor-pointer">
+  1151→                        <div className="font-medium">{question.title}</div>
+  1152→                        {/* <div className="text-sm text-muted-foreground">{question.content}</div> */}
+  1153→                        <div className="flex gap-2 mt-1">
+  1154→                          <Badge variant={
+  1155→                            question.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+  1156→                              question.type === QuestionType.MULTI_SELECT ? "secondary" :
+  1157→                              question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
+  1158→                          }>
+  1159→                            {question.type.replace('_', ' ')}
+  1160→                          </Badge>
+  1161→                          <Badge variant={
+  1162→                            question.difficulty === DifficultyLevel.EASY ? "default" :
+  1163→                              question.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+  1164→                          }>
+  1165→                            {question.difficulty}
+  1166→                          </Badge>
+  1167→                          {question.group && (
+  1168→                            <Badge variant="outline">
+  1169→                              {question.group.name}
+  1170→                            </Badge>
+  1171→                          )}
+  1172→                        </div>
+  1173→                      </label>
+  1174→                    </div>
+  1175→                  ))
+  1176→                ) : (
+  1177→                  <div className="text-center py-8 text-muted-foreground">
+  1178→                    No available questions found
+  1179→                  </div>
+  1180→                )}
+  1181→              </div>
+  1182→            </div>
+  1183→          </div>
+  1184→          <DialogFooter className="mt-6">
+  1185→            <Button 
+  1186→              variant="outline" 
+  1187→              onClick={() => {
+  1188→                setIsAddDialogOpen(false)
+  1189→                // Reset popup filters when cancelling
+  1190→                setPopupSearchTerm("")
+  1191→                setPopupDifficultyFilter("all")
+  1192→                setPopupGroupFilter("all")
+  1193→                setSelectedQuestionsToAdd([])
+  1194→              }}
+  1195→            >
+  1196→              Cancel
+  1197→            </Button>
+  1198→            <Button 
+  1199→              onClick={() => {
+  1200→                handleAddQuestions(selectedQuestionsToAdd)
+  1201→                setSelectedQuestionsToAdd([])
+  1202→              }}
+  1203→              disabled={selectedQuestionsToAdd.length === 0}
+  1204→            >
+  1205→              Enroll Selected ({selectedQuestionsToAdd.length})
+  1206→            </Button>
+  1207→          </DialogFooter>
+  1208→        </DialogContent>
+  1209→      </Dialog>
+  1210→
+  1211→      {/* View Question Dialog */}
+  1212→      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  1213→        <DialogContent className="sm:max-w-[600px] min-w-[70vw] max-h-[80vh] overflow-y-auto">
+  1214→          <DialogHeader>
+  1215→            <DialogTitle>Question Details</DialogTitle>
+  1216→            <DialogDescription>
+  1217→              View question details
+  1218→            </DialogDescription>
+  1219→          </DialogHeader>
+  1220→          <div className="grid flex-1 auto-rows-min gap-6 px-4">
+  1221→            {selectedQuestion && (
+  1222→              <div className="space-y-4">
+  1223→                <div>
+  1224→                  <Label className="text-sm font-medium text-muted-foreground">Title</Label>
+  1225→                  <p className="text-lg font-medium">{selectedQuestion.title}</p>
+  1226→                </div>
+  1227→                <div>
+  1228→                  <Label className="text-sm font-medium text-muted-foreground">Content</Label>
+  1229→                  <div className="text-sm">
+  1230→                    <RichTextDisplay content={selectedQuestion.content} />
+  1231→                  </div>
+  1232→                </div>
+  1233→                <div>
+  1234→                  <Label className="text-sm font-medium text-muted-foreground">Type</Label>
+  1235→                  <Badge variant={
+  1236→                    selectedQuestion.type === QuestionType.MULTIPLE_CHOICE ? "default" :
+  1237→                      selectedQuestion.type === QuestionType.TRUE_FALSE ? "secondary" : "outline"
+  1238→                  }>
+  1239→                    {selectedQuestion.type.replace('_', ' ')}
+  1240→                  </Badge>
+  1241→                </div>
+  1242→                <div>
+  1243→                  <Label className="text-sm font-medium text-muted-foreground">Options</Label>
+  1244→                  <div className="space-y-1">
+  1245→                    {Array.isArray(selectedQuestion.options) ? (
+  1246→                      selectedQuestion.options.map((option, index) => (
+  1247→                        <div key={index} className="text-sm p-2 bg-muted rounded flex items-center gap-2">
+  1248→                          {selectedQuestion.type === QuestionType.MULTI_SELECT && (
+  1249→                            <Checkbox
+  1250→                              checked={selectedQuestion.correctAnswer.split('|').includes(option)}
+  1251→                              disabled
+  1252→                            />
+  1253→                          )}
+  1254→                          {selectedQuestion.type === QuestionType.TRUE_FALSE && (
+  1255→                            <Checkbox
+  1256→                              checked={selectedQuestion.correctAnswer === option}
+  1257→                              disabled
+  1258→                            />
+  1259→                          )}
+  1260→                          {selectedQuestion.type === QuestionType.MULTIPLE_CHOICE && (
+  1261→                            <Checkbox
+  1262→                              checked={selectedQuestion.correctAnswer === option}
+  1263→                              disabled
+  1264→                            />
+  1265→                          )}
+  1266→                          {option}
+  1267→                        </div>
+  1268→                      ))
+  1269→                    ) : (
+  1270→                      <div className="text-sm p-2 bg-muted rounded">
+  1271→                        {selectedQuestion.options}
+  1272→                      </div>
+  1273→                    )}
+  1274→                  </div>
+  1275→                </div>
+  1276→                <div>
+  1277→                  <Label className="text-sm font-medium text-muted-foreground">Correct Answer</Label>
+  1278→                  <p className="text-sm font-medium text-green-600">{selectedQuestion.correctAnswer}</p>
+  1279→                </div>
+  1280→                {selectedQuestion.explanation && (
+  1281→                  <div>
+  1282→                    <Label className="text-sm font-medium text-muted-foreground">Explanation</Label>
+  1283→                    <div className="text-sm">
+  1284→                      <RichTextDisplay content={selectedQuestion.explanation} />
+  1285→                    </div>
+  1286→                  </div>
+  1287→                )}
+  1288→                <div>
+  1289→                  <Label className="text-sm font-medium text-muted-foreground">Difficulty</Label>
+  1290→                  <Badge variant={
+  1291→                    selectedQuestion.difficulty === DifficultyLevel.EASY ? "default" :
+  1292→                      selectedQuestion.difficulty === DifficultyLevel.MEDIUM ? "secondary" : "destructive"
+  1293→                  }>
+  1294→                    {selectedQuestion.difficulty}
+  1295→                  </Badge>
+  1296→                </div>
+  1297→                <div>
+  1298→                  <Label className="text-sm font-medium text-muted-foreground">Points</Label>
+  1299→                  <p className="text-sm">{selectedQuestion.points}</p>
+  1300→                </div>
+  1301→              </div>
+  1302→            )}
+  1303→          </div>
+  1304→          <DialogFooter className="mt-6">
+  1305→            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+  1306→              Close
+  1307→            </Button>
+  1308→          </DialogFooter>
+  1309→        </DialogContent>
+  1310→      </Dialog>
+  1311→
+  1312→      {/* Import Questions Sheet */}
+  1313→      <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
+  1314→        <SheetContent className=" sm:w-[90vw] min-h-[100vh]">
+  1315→          <SheetHeader>
+  1316→            <SheetTitle>Import Questions</SheetTitle>
+  1317→            <SheetDescription>
+  1318→              Import questions from a CSV file and add & eroll them to a question group
+  1319→            </SheetDescription>
+  1320→          </SheetHeader>
+  1321→          
+  1322→          <div className="mt-6 space-y-6 px-4">
+  1323→            {/* Question Group Selection */}
+  1324→            <div className="space-y-2 w-full">
+  1325→              <Label htmlFor="questionGroup">Question Group *</Label>
+  1326→              <Select value={selectedQuestionGroup} onValueChange={setSelectedQuestionGroup}>
+  1327→                <SelectTrigger className="w-full">
+  1328→                  <SelectValue placeholder="Select a question group" />
+  1329→                </SelectTrigger>
+  1330→                <SelectContent>
+  1331→                  {questionGroups.filter(group => group.isActive).map(group => (
+  1332→                    <SelectItem key={group.id} value={group.id}>
+  1333→                      {group.name} ({group._count.questions} questions)
+  1334→                    </SelectItem>
+  1335→                  ))}
+  1336→                </SelectContent>
+  1337→              </Select>
+  1338→            </div>
+  1339→
+  1340→            {/* File Upload Area */}
+  1341→            <div className="space-y-2">
+  1342→              <Label>CSV File *</Label>
+  1343→              <div
+  1344→                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+  1345→                  isDragOver
+  1346→                    ? "border-primary bg-primary/5"
+  1347→                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
+  1348→                }`}
+  1349→                onDragOver={handleDragOver}
+  1350→                onDragLeave={handleDragLeave}
+  1351→                onDrop={handleDrop}
+  1352→              >
+  1353→                {importFile ? (
+  1354→                  <div className="space-y-4">
+  1355→                    <div className="flex items-center justify-center space-x-2">
+  1356→                      <FileUp className="h-8 w-8 text-primary" />
+  1357→                      <div className="text-left">
+  1358→                        <p className="font-medium">{importFile.name}</p>
+  1359→                        <p className="text-sm text-muted-foreground">
+  1360→                          {(importFile.size / 1024).toFixed(1)} KB
+  1361→                        </p>
+  1362→                      </div>
+  1363→                      <Button
+  1364→                        variant="ghost"
+  1365→                        size="sm"
+  1366→                        onClick={handleRemoveFile}
+  1367→                        className="text-red-600 hover:text-red-700"
+  1368→                      >
+  1369→                        <X className="h-4 w-4" />
+  1370→                      </Button>
+  1371→                    </div>
+  1372→                    <p className="text-sm text-muted-foreground">
+  1373→                      Drag and drop another file or click to select
+  1374→                    </p>
+  1375→                  </div>
+  1376→                ) : (
+  1377→                  <div className="space-y-4">
+  1378→                    <div className="flex justify-center">
+  1379→                      <FileUp className="h-12 w-12 text-muted-foreground" />
+  1380→                    </div>
+  1381→                    <div className="space-y-2">
+  1382→                      <p className="text-lg font-medium">Drop your CSV file here</p>
+  1383→                      <p className="text-sm text-muted-foreground">
+  1384→                        or click to browse files
+  1385→                      </p>
+  1386→                    </div>
+  1387→                    <Button
+  1388→                      variant="outline"
+  1389→                      onClick={() => fileInputRef.current?.click()}
+  1390→                      className="mx-auto"
+  1391→                    >
+  1392→                      Select File
+  1393→                    </Button>
+  1394→                  </div>
+  1395→                )}
+  1396→              </div>
+  1397→              
+  1398→              <input
+  1399→                ref={fileInputRef}
+  1400→                type="file"
+  1401→                accept=".csv"
+  1402→                onChange={handleFileSelect}
+  1403→                className="hidden"
+  1404→              />
+  1405→            </div>
+  1406→          </div>
+  1407→
+  1408→          <SheetFooter className="mt-8">
+  1409→            <Button variant="outline" onClick={() => setIsImportSheetOpen(false)}>
+  1410→              Cancel
+  1411→            </Button>
+  1412→            <LoadingButton
+  1413→              onClick={handleImportWithGroup}
+  1414→              disabled={!selectedQuestionGroup || !importFile}
+  1415→              isLoading={isImporting}
+  1416→              loadingText="Importing..."
+  1417→            >
+  1418→              Import Questions
+  1419→            </LoadingButton>
+  1420→          </SheetFooter>
+  1421→        </SheetContent>
+  1422→      </Sheet>
+  1423→    </div>
+  1424→  )
+  1425→}

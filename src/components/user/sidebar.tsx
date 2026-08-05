@@ -40,6 +40,7 @@ const userNavItems = [
     title: "Dashboard",
     href: "/user",
     icon: LayoutDashboard,
+    exact: true,
   },
   {
     title: "Quiz",
@@ -182,7 +183,9 @@ export function AppSidebar({
       <ScrollArea className="flex-1 px-2 py-4">
         <nav className="space-y-1">
           {userNavItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/")
             return (
               <Link
                 key={item.href}

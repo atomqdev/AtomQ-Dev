@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 import { UserRole } from "@prisma/client"
 
 export async function GET(
@@ -66,7 +67,7 @@ export async function GET(
       
       if (quizQuestion.question.type === "MULTI_SELECT") {
         // For multi-select questions, check if all selected answers are correct
-        const correctAnswers = quizQuestion.question.correctAnswer.split('|').map(ans => ans.trim()).sort()
+        const correctAnswers = parseMultiSelectAnswers(quizQuestion.question.correctAnswer).sort()
         const userAnswers = userAnswer?.userAnswer ? userAnswer.userAnswer.split('|').map(ans => ans.trim()).sort() : []
         isCorrect = JSON.stringify(correctAnswers) === JSON.stringify(userAnswers)
       } else {
@@ -105,8 +106,8 @@ export async function GET(
         isCorrect: r.isCorrect,
         pointsEarned: r.pointsEarned,
         question: {
+          reference: r.question.reference,
           title: r.question.title,
-          content: r.question.content,
           type: r.question.type,
           correctAnswer: r.question.correctAnswer,
           explanation: r.question.explanation,

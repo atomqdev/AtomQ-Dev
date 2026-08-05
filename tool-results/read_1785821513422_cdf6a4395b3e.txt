@@ -1,0 +1,1089 @@
+     1→"use client"
+     2→
+     3→import { useState, useEffect, use } from "react"
+     4→import { useRouter } from "next/navigation"
+     5→import { Button } from "@/components/ui/button"
+     6→import { Badge } from "@/components/ui/badge"
+     7→import { Card, CardContent } from "@/components/ui/card"
+     8→import {
+     9→  AlertDialog,
+    10→  AlertDialogAction,
+    11→  AlertDialogCancel,
+    12→  AlertDialogContent,
+    13→  AlertDialogDescription,
+    14→  AlertDialogFooter,
+    15→  AlertDialogHeader,
+    16→  AlertDialogTitle,
+    17→} from "@/components/ui/alert-dialog"
+    18→import {
+    19→  Sheet,
+    20→  SheetContent,
+    21→  SheetDescription,
+    22→  SheetFooter,
+    23→  SheetHeader,
+    24→  SheetTitle,
+    25→} from "@/components/ui/sheet"
+    26→import { Label } from "@/components/ui/label"
+    27→import { Input } from "@/components/ui/input"
+    28→import { Textarea } from "@/components/ui/textarea"
+    29→import { Switch } from "@/components/ui/switch"
+    30→import {
+    31→  Select,
+    32→  SelectContent,
+    33→  SelectItem,
+    34→  SelectTrigger,
+    35→  SelectValue,
+    36→} from "@/components/ui/select"
+    37→import {
+    38→  Tooltip,
+    39→  TooltipContent,
+    40→  TooltipProvider,
+    41→  TooltipTrigger,
+    42→} from "@/components/ui/tooltip"
+    43→import {
+    44→  ArrowLeft,
+    45→  Plus,
+    46→  Eye,
+    47→  Edit,
+    48→  Trash2,
+    49→  Users,
+    50→  FileQuestion,
+    51→  ArrowUpDown,
+    52→  Loader2,
+    53→  BookOpen,
+    54→  CheckCircle2 as CheckCircle,
+    55→} from "lucide-react"
+    56→import { toasts } from "@/lib/toasts"
+    57→import { DataTable } from "@/components/ui/data-table"
+    58→import { ColumnDef } from "@tanstack/react-table"
+    59→import HexagonLoader from "@/components/Loader/Loading"
+    60→import { LoadingButton } from "@/components/ui/laodaing-button"
+    61→import { DifficultyLevel, QuizStatus } from "@prisma/client"
+    62→import { formatDateDDMMYYYY } from "@/lib/date-utils"
+    63→
+    64→const formatDateToUTC = (dateString: string | null | undefined) => {
+    65→  if (!dateString) return null
+    66→  const date = new Date(dateString)
+    67→  return new Date(
+    68→    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+    69→  ).toISOString()
+    70→}
+    71→
+    72→interface Quiz {
+    73→  id: string
+    74→  title: string
+    75→  description?: string
+    76→  timeLimit?: number | null
+    77→  difficulty: DifficultyLevel
+    78→  status: QuizStatus
+    79→  createdAt: string
+    80→  _count: {
+    81→    quizQuestions: number
+    82→    quizAttempts: number
+    83→  }
+    84→}
+    85→
+    86→interface QuizGroup {
+    87→  id: string
+    88→  name: string
+    89→  isActive: boolean
+    90→  createdAt: string
+    91→  creator: {
+    92→    id: string
+    93→    name: string | null
+    94→    email: string
+    95→  }
+    96→  _count: {
+    97→    quizzes: number
+    98→  }
+    99→}
+   100→
+   101→interface CreateFormData {
+   102→  title: string
+   103→  description: string
+   104→  timeLimit: string
+   105→  difficulty: DifficultyLevel
+   106→  status: QuizStatus
+   107→  negativeMarking: boolean
+   108→  negativePoints: string
+   109→  randomOrder: boolean
+   110→  maxAttempts: string
+   111→  startDate: string
+   112→  endDate: string
+   113→  checkAnswerEnabled: boolean
+   114→}
+   115→
+   116→export default function QuizGroupDetailPage({
+   117→  params,
+   118→}: {
+   119→  params: Promise<{ id: string }>
+   120→}) {
+   121→  const router = useRouter()
+   122→  const { id } = use(params)
+   123→  const [group, setGroup] = useState<QuizGroup | null>(null)
+   124→  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+   125→  const [loading, setLoading] = useState(true)
+   126→  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+   127→  const [submitLoading, setSubmitLoading] = useState(false)
+   128→
+   129→  // Delete dialog state
+   130→  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+   131→  const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null)
+   132→  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+   133→  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+   134→  const [deleteInfo, setDeleteInfo] = useState<{
+   135→    quiz: { id: string; title: string }
+   136→    counts: {
+   137→      questions: number
+   138→      users: number
+   139→      attempts: number
+   140→      tabSwitches: number
+   141→    }
+   142→  } | null>(null)
+   143→  const [deletionStatus, setDeletionStatus] = useState<{
+   144→    data: 'pending' | 'deleting' | 'deleted'
+   145→    questions: 'pending' | 'deleting' | 'deleted'
+   146→    users: 'pending' | 'deleting' | 'deleted'
+   147→  }>({
+   148→    data: 'pending',
+   149→    questions: 'pending',
+   150→    users: 'pending'
+   151→  })
+   152→
+   153→  const [formData, setFormData] = useState<CreateFormData>({
+   154→    title: "",
+   155→    description: "",
+   156→    timeLimit: "",
+   157→    difficulty: DifficultyLevel.EASY,
+   158→    status: QuizStatus.DRAFT,
+   159→    negativeMarking: false,
+   160→    negativePoints: "",
+   161→    randomOrder: false,
+   162→    maxAttempts: "",
+   163→    startDate: "",
+   164→    endDate: "",
+   165→    checkAnswerEnabled: false,
+   166→  })
+   167→
+   168→  const openDeleteDialog = async (quiz: Quiz) => {
+   169→    setQuizToDelete(quiz)
+   170→    setDeleteConfirmation("")
+   171→    setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
+   172→    setIsDeleteDialogOpen(true)
+   173→
+   174→    try {
+   175→      const response = await fetch(`/api/admin/quiz/${quiz.id}/delete-info`)
+   176→      if (response.ok) {
+   177→        const data = await response.json()
+   178→        setDeleteInfo(data)
+   179→      }
+   180→    } catch (error) {
+   181→      console.error("Error fetching delete info:", error)
+   182→      toasts.error("Failed to fetch quiz data")
+   183→    }
+   184→  }
+   185→
+   186→  const handleDeleteQuizData = async () => {
+   187→    if (!quizToDelete) return
+   188→
+   189→    try {
+   190→      setDeletionStatus(prev => ({ ...prev, data: 'deleting' }))
+   191→      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-data`, {
+   192→        method: 'DELETE'
+   193→      })
+   194→
+   195→      if (response.ok) {
+   196→        const data = await response.json()
+   197→        toasts.success(`${data.count.attempts || 0} attempt(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+   198→        setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
+   199→
+   200→        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+   201→        if (refreshResponse.ok) {
+   202→          const refreshData = await refreshResponse.json()
+   203→          setDeleteInfo(refreshData)
+   204→        }
+   205→      } else {
+   206→        toasts.actionFailed("Quiz data deletion")
+   207→        setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+   208→      }
+   209→    } catch (error) {
+   210→      console.error("Error deleting quiz data:", error)
+   211→      toasts.actionFailed("Quiz data deletion")
+   212→      setDeletionStatus(prev => ({ ...prev, data: 'pending' }))
+   213→    }
+   214→  }
+   215→
+   216→  const handleUnenrollQuestions = async () => {
+   217→    if (!quizToDelete) return
+   218→
+   219→    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+   220→    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+   221→    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+   222→      toasts.error('Please delete quiz data first')
+   223→      return
+   224→    }
+   225→
+   226→    try {
+   227→      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+   228→      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/unenroll-questions`, {
+   229→        method: 'DELETE'
+   230→      })
+   231→
+   232→      if (response.ok) {
+   233→        const data = await response.json()
+   234→        toasts.success(`${data.count.questions || 0} question(s) unenrolled successfully`)
+   235→        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+   236→
+   237→        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+   238→        if (refreshResponse.ok) {
+   239→          const refreshData = await refreshResponse.json()
+   240→          setDeleteInfo(refreshData)
+   241→        }
+   242→      } else {
+   243→        toasts.actionFailed("Question unenrollment")
+   244→        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+   245→      }
+   246→    } catch (error) {
+   247→      console.error("Error unenrolling questions:", error)
+   248→      toasts.actionFailed("Question unenrollment")
+   249→      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+   250→    }
+   251→  }
+   252→
+   253→  const handleUnenrollUsers = async () => {
+   254→    if (!quizToDelete) return
+   255→
+   256→    if ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted') {
+   257→      toasts.error('Please unenroll questions first')
+   258→      return
+   259→    }
+   260→
+   261→    try {
+   262→      setDeletionStatus(prev => ({ ...prev, users: 'deleting' }))
+   263→      const response = await fetch(`/api/admin/quiz/${quizToDelete.id}/unenroll-users`, {
+   264→        method: 'DELETE'
+   265→      })
+   266→
+   267→      if (response.ok) {
+   268→        const data = await response.json()
+   269→        toasts.success(`${data.count.users || 0} user(s) unenrolled successfully`)
+   270→        setDeletionStatus(prev => ({ ...prev, users: 'deleted' }))
+   271→
+   272→        const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
+   273→        if (refreshResponse.ok) {
+   274→          const refreshData = await refreshResponse.json()
+   275→          setDeleteInfo(refreshData)
+   276→        }
+   277→      } else {
+   278→        toasts.actionFailed("User unenrollment")
+   279→        setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+   280→      }
+   281→    } catch (error) {
+   282→      console.error("Error unenrolling users:", error)
+   283→      toasts.actionFailed("User unenrollment")
+   284→      setDeletionStatus(prev => ({ ...prev, users: 'pending' }))
+   285→    }
+   286→  }
+   287→
+   288→  const handleDeleteQuiz = async (quizId: string) => {
+   289→    if (!quizToDelete || deleteConfirmation !== "CONFIRM DELETE") {
+   290→      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+   291→      return
+   292→    }
+   293→
+   294→    const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
+   295→    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
+   296→    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+   297→    const hasUsers = (deleteInfo?.counts.users || 0) > 0
+   298→
+   299→    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+   300→      toasts.error('Please delete quiz data first')
+   301→      return
+   302→    }
+   303→
+   304→    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+   305→      toasts.error('Please unenroll questions first')
+   306→      return
+   307→    }
+   308→
+   309→    if (hasUsers && deletionStatus.users !== 'deleted') {
+   310→      toasts.error('Please unenroll users first')
+   311→      return
+   312→    }
+   313→
+   314→    try {
+   315→      setDeleteLoading(quizId)
+   316→      const response = await fetch(`/api/admin/quiz/${quizId}`, {
+   317→        method: "DELETE",
+   318→      })
+   319→
+   320→      if (response.ok) {
+   321→        toasts.success(`${quizToDelete?.title || "Quiz"} deleted successfully`)
+   322→        setQuizzes(quizzes.filter(q => q.id !== quizId))
+   323→        setIsDeleteDialogOpen(false)
+   324→        setQuizToDelete(null)
+   325→        setDeleteInfo(null)
+   326→        setDeleteConfirmation("")
+   327→        setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
+   328→        fetchGroup()
+   329→      } else {
+   330→        const error = await response.json()
+   331→        toasts.error(error.message || "Quiz deletion failed")
+   332→      }
+   333→    } catch (error) {
+   334→      console.error("Error deleting quiz:", error)
+   335→      toasts.actionFailed("Quiz deletion")
+   336→    } finally {
+   337→      setDeleteLoading(null)
+   338→    }
+   339→  }
+   340→
+   341→  const columns: ColumnDef<Quiz>[] = [
+   342→    {
+   343→      accessorKey: "title",
+   344→      header: ({ column }) => {
+   345→        return (
+   346→          <Button
+   347→            variant="ghost"
+   348→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   349→          >
+   350→            Title
+   351→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   352→          </Button>
+   353→        )
+   354→      },
+   355→      cell: ({ row }) => (
+   356→        <div className="font-medium">{row.getValue("title")}</div>
+   357→      ),
+   358→    },
+   359→    {
+   360→      accessorKey: "difficulty",
+   361→      header: "Difficulty",
+   362→      cell: ({ row }) => {
+   363→        const difficulty = row.getValue("difficulty") as DifficultyLevel
+   364→        const variant =
+   365→          difficulty === "HARD"
+   366→            ? "destructive"
+   367→            : difficulty === "EASY"
+   368→            ? "secondary"
+   369→            : "default"
+   370→        return <Badge variant={variant}>{difficulty}</Badge>
+   371→      },
+   372→    },
+   373→    {
+   374→      accessorKey: "status",
+   375→      header: "Status",
+   376→      cell: ({ row }) => {
+   377→        const status = row.getValue("status") as QuizStatus
+   378→        return (
+   379→          <Badge variant={status === "ACTIVE" ? "default" : "secondary"}>
+   380→            {status}
+   381→          </Badge>
+   382→        )
+   383→      },
+   384→    },
+   385→    {
+   386→      accessorKey: "timeLimit",
+   387→      header: "Time Limit",
+   388→      cell: ({ row }) => {
+   389→        const timeLimit = row.getValue("timeLimit") as number | null
+   390→        return timeLimit ? `${timeLimit} min` : "-"
+   391→      },
+   392→    },
+   393→    {
+   394→      accessorKey: "_count.quizQuestions",
+   395→      header: "Questions",
+   396→      cell: ({ row }) => {
+   397→        const quiz = row.original
+   398→        return quiz._count?.quizQuestions || 0
+   399→      },
+   400→    },
+   401→    {
+   402→      accessorKey: "_count.quizAttempts",
+   403→      header: "Attempts",
+   404→      cell: ({ row }) => {
+   405→        const quiz = row.original
+   406→        return quiz._count?.quizAttempts || 0
+   407→      },
+   408→    },
+   409→    {
+   410→      accessorKey: "createdAt",
+   411→      header: ({ column }) => {
+   412→        return (
+   413→          <Button
+   414→            variant="ghost"
+   415→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   416→          >
+   417→            Created At
+   418→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   419→          </Button>
+   420→        )
+   421→      },
+   422→      cell: ({ row }) => {
+   423→        const date = new Date(row.getValue("createdAt"))
+   424→        return formatDateDDMMYYYY(date.toISOString())
+   425→      },
+   426→    },
+   427→    {
+   428→      id: "manageQuestions",
+   429→      header: "Questions",
+   430→      enableHiding: false,
+   431→      cell: ({ row }) => {
+   432→        const quiz = row.original
+   433→        return (
+   434→          <Tooltip>
+   435→            <TooltipTrigger asChild>
+   436→              <Button
+   437→                variant="ghost"
+   438→                size="icon"
+   439→                className="h-8 w-8"
+   440→                onClick={() => router.push(`/admin/quiz/${quiz.id}/questions`)}
+   441→              >
+   442→                <FileQuestion className="h-4 w-4" />
+   443→              </Button>
+   444→            </TooltipTrigger>
+   445→            <TooltipContent>Manage Questions</TooltipContent>
+   446→          </Tooltip>
+   447→        )
+   448→      },
+   449→    },
+   450→    {
+   451→      id: "manageUsers",
+   452→      header: "Users",
+   453→      enableHiding: false,
+   454→      cell: ({ row }) => {
+   455→        const quiz = row.original
+   456→        return (
+   457→          <Tooltip>
+   458→            <TooltipTrigger asChild>
+   459→              <Button
+   460→                variant="ghost"
+   461→                size="icon"
+   462→                className="h-8 w-8"
+   463→                onClick={() => router.push(`/admin/quiz/${quiz.id}/users`)}
+   464→              >
+   465→                <Users className="h-4 w-4" />
+   466→              </Button>
+   467→            </TooltipTrigger>
+   468→            <TooltipContent>Manage Users</TooltipContent>
+   469→          </Tooltip>
+   470→        )
+   471→      },
+   472→    },
+   473→    {
+   474→      id: "edit",
+   475→      header: "Edit",
+   476→      enableHiding: false,
+   477→      cell: ({ row }) => {
+   478→        const quiz = row.original
+   479→        return (
+   480→          <Tooltip>
+   481→            <TooltipTrigger asChild>
+   482→              <Button
+   483→                variant="ghost"
+   484→                size="icon"
+   485→                className="h-8 w-8"
+   486→                onClick={() => router.push(`/admin/quiz/${quiz.id}/edit`)}
+   487→              >
+   488→                <Edit className="h-4 w-4" />
+   489→              </Button>
+   490→            </TooltipTrigger>
+   491→            <TooltipContent>Edit Quiz</TooltipContent>
+   492→          </Tooltip>
+   493→        )
+   494→      },
+   495→    },
+   496→    {
+   497→      id: "delete",
+   498→      header: "Delete",
+   499→      enableHiding: false,
+   500→      cell: ({ row }) => {
+   501→        const quiz = row.original
+   502→        return (
+   503→          <Tooltip>
+   504→            <TooltipTrigger asChild>
+   505→              <Button
+   506→                variant="ghost"
+   507→                size="icon"
+   508→                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+   509→                onClick={() => openDeleteDialog(quiz)}
+   510→              >
+   511→                <Trash2 className="h-4 w-4" />
+   512→              </Button>
+   513→            </TooltipTrigger>
+   514→            <TooltipContent>Delete Quiz</TooltipContent>
+   515→          </Tooltip>
+   516→        )
+   517→      },
+   518→    },
+   519→  ]
+   520→
+   521→  useEffect(() => {
+   522→    fetchGroup()
+   523→    fetchQuizzes()
+   524→  }, [id])
+   525→
+   526→  const fetchGroup = async () => {
+   527→    try {
+   528→      const response = await fetch(`/api/admin/quiz-groups/${id}`)
+   529→      if (response.ok) {
+   530→        const data = await response.json()
+   531→        setGroup(data)
+   532→      } else if (response.status === 404) {
+   533→        toasts.error("Quiz group not found")
+   534→        router.push("/admin/quiz-group")
+   535→      }
+   536→    } catch (error) {
+   537→      toasts.networkError()
+   538→    }
+   539→  }
+   540→
+   541→  const fetchQuizzes = async () => {
+   542→    try {
+   543→      const response = await fetch(
+   544→        `/api/admin/quiz?groupId=${id}&page=1&pageSize=100`
+   545→      )
+   546→      if (response.ok) {
+   547→        const data = await response.json()
+   548→        setQuizzes(data.quizzes || [])
+   549→      }
+   550→    } catch (error) {
+   551→      toasts.networkError()
+   552→    } finally {
+   553→      setLoading(false)
+   554→    }
+   555→  }
+   556→
+   557→  const handleCreateQuiz = async (e: React.FormEvent) => {
+   558→    e.preventDefault()
+   559→    if (!formData.title.trim()) {
+   560→      toasts.error("Title is required")
+   561→      return
+   562→    }
+   563→    if (
+   564→      formData.startDate &&
+   565→      formData.endDate &&
+   566→      new Date(formData.endDate) <= new Date(formData.startDate)
+   567→    ) {
+   568→      toasts.error("End date must be after start date")
+   569→      return
+   570→    }
+   571→    setSubmitLoading(true)
+   572→
+   573→    try {
+   574→      const response = await fetch("/api/admin/quiz", {
+   575→        method: "POST",
+   576→        headers: {
+   577→          "Content-Type": "application/json",
+   578→        },
+   579→        body: JSON.stringify({
+   580→          ...formData,
+   581→          timeLimit: formData.timeLimit ? parseInt(formData.timeLimit) : null,
+   582→          negativePoints: formData.negativePoints
+   583→            ? parseFloat(formData.negativePoints)
+   584→            : null,
+   585→          maxAttempts:
+   586→            formData.maxAttempts === "" ? null : parseInt(formData.maxAttempts),
+   587→          startDate: formatDateToUTC(formData.startDate),
+   588→          endDate: formatDateToUTC(formData.endDate),
+   589→          groupId: id,
+   590→        }),
+   591→      })
+   592→
+   593→      if (response.ok) {
+   594→        toasts.success("Quiz created successfully in this group")
+   595→        setIsAddDialogOpen(false)
+   596→        setFormData({
+   597→          title: "",
+   598→          description: "",
+   599→          timeLimit: "",
+   600→          difficulty: DifficultyLevel.EASY,
+   601→          status: QuizStatus.DRAFT,
+   602→          negativeMarking: false,
+   603→          negativePoints: "",
+   604→          randomOrder: false,
+   605→          maxAttempts: "",
+   606→          startDate: "",
+   607→          endDate: "",
+   608→          checkAnswerEnabled: false,
+   609→        })
+   610→        fetchQuizzes()
+   611→        fetchGroup()
+   612→      } else {
+   613→        const error = await response.json()
+   614→        toasts.error(error.message || "Failed to create quiz")
+   615→      }
+   616→    } catch (error) {
+   617→      toasts.networkError()
+   618→    } finally {
+   619→      setSubmitLoading(false)
+   620→    }
+   621→  }
+   622→
+   623→  if (loading) {
+   624→    return (
+   625→      <div className="flex items-center justify-center h-[80vh]">
+   626→        <HexagonLoader size={80} />
+   627→      </div>
+   628→    )
+   629→  }
+   630→
+   631→  return (
+   632→    <div className="space-y-6">
+   633→      <div className="flex items-center gap-4">
+   634→        <Button
+   635→          variant="ghost"
+   636→          size="icon"
+   637→          onClick={() => router.push("/admin/quiz-group")}
+   638→        >
+   639→          <ArrowLeft className="h-5 w-5" />
+   640→        </Button>
+   641→        <div className="flex-1">
+   642→          <div className="flex items-center gap-3">
+   643→            <BookOpen className="h-6 w-6 text-muted-foreground" />
+   644→            <h1 className="text-3xl font-bold tracking-tight">
+   645→              {group?.name || "Quiz Group"}
+   646→            </h1>
+   647→            {group && (
+   648→              <Badge variant={group.isActive ? "default" : "secondary"}>
+   649→                {group.isActive ? "Active" : "Inactive"}
+   650→              </Badge>
+   651→            )}
+   652→          </div>
+   653→          <p className="text-muted-foreground mt-1">
+   654→            {quizzes.length} quiz{quizzes.length !== 1 ? "zes" : ""} in this group
+   655→          </p>
+   656→        </div>
+   657→        <Button onClick={() => setIsAddDialogOpen(true)}>
+   658→          <Plus className="mr-2 h-4 w-4" />
+   659→          Add Quiz
+   660→        </Button>
+   661→      </div>
+   662→
+   663→      <Card>
+   664→        <CardContent>
+   665→          <DataTable
+   666→            columns={columns}
+   667→            data={quizzes}
+   668→            searchKey="title"
+   669→            searchPlaceholder="Search quizzes..."
+   670→          />
+   671→        </CardContent>
+   672→      </Card>
+   673→
+   674→      {/* Add Quiz Sheet */}
+   675→      <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+   676→        <SheetContent className="overflow-y-auto sm:max-w-md">
+   677→          <SheetHeader>
+   678→            <SheetTitle>Create New Quiz</SheetTitle>
+   679→            <SheetDescription>
+   680→              Create a new quiz with the specified settings.
+   681→            </SheetDescription>
+   682→          </SheetHeader>
+   683→          <form onSubmit={handleCreateQuiz} className="space-y-4 px-4">
+   684→            <div className="space-y-2">
+   685→              <Label htmlFor="create-title">
+   686→                Title <span className="text-red-500">*</span>
+   687→              </Label>
+   688→              <Input
+   689→                id="create-title"
+   690→                value={formData.title}
+   691→                onChange={(e) =>
+   692→                  setFormData({ ...formData, title: e.target.value })
+   693→                }
+   694→                placeholder="Enter quiz title"
+   695→                required
+   696→              />
+   697→            </div>
+   698→            <div className="space-y-2">
+   699→              <Label htmlFor="create-description">Description</Label>
+   700→              <Textarea
+   701→                id="create-description"
+   702→                value={formData.description}
+   703→                onChange={(e) =>
+   704→                  setFormData({ ...formData, description: e.target.value })
+   705→                }
+   706→                placeholder="Enter quiz description"
+   707→                rows={3}
+   708→              />
+   709→            </div>
+   710→            <div className="space-y-2">
+   711→              <Label>Difficulty</Label>
+   712→              <Select
+   713→                value={formData.difficulty}
+   714→                onValueChange={(value) =>
+   715→                  setFormData({
+   716→                    ...formData,
+   717→                    difficulty: value as DifficultyLevel,
+   718→                  })
+   719→                }
+   720→              >
+   721→                <SelectTrigger>
+   722→                  <SelectValue placeholder="Select difficulty" />
+   723→                </SelectTrigger>
+   724→                <SelectContent>
+   725→                  <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+   726→                  <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+   727→                  <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+   728→                </SelectContent>
+   729→              </Select>
+   730→            </div>
+   731→            <div className="space-y-2">
+   732→              <Label htmlFor="create-time-limit">Time Limit (minutes)</Label>
+   733→              <Input
+   734→                id="create-time-limit"
+   735→                type="number"
+   736→                value={formData.timeLimit}
+   737→                onChange={(e) =>
+   738→                  setFormData({ ...formData, timeLimit: e.target.value })
+   739→                }
+   740→                placeholder="e.g. 30"
+   741→                min="1"
+   742→              />
+   743→            </div>
+   744→            <div className="space-y-2">
+   745→              <Label>Status</Label>
+   746→              <Select
+   747→                value={formData.status}
+   748→                onValueChange={(value) =>
+   749→                  setFormData({ ...formData, status: value as QuizStatus })
+   750→                }
+   751→              >
+   752→                <SelectTrigger>
+   753→                  <SelectValue placeholder="Select status" />
+   754→                </SelectTrigger>
+   755→                <SelectContent>
+   756→                  <SelectItem value={QuizStatus.DRAFT}>Draft</SelectItem>
+   757→                  <SelectItem value={QuizStatus.ACTIVE}>Active</SelectItem>
+   758→                </SelectContent>
+   759→              </Select>
+   760→            </div>
+   761→            <div className="flex items-center justify-between">
+   762→              <Label htmlFor="create-negative-marking">Negative Marking</Label>
+   763→              <Switch
+   764→                id="create-negative-marking"
+   765→                checked={formData.negativeMarking}
+   766→                onCheckedChange={(checked) =>
+   767→                  setFormData({ ...formData, negativeMarking: checked })
+   768→                }
+   769→              />
+   770→            </div>
+   771→            {formData.negativeMarking && (
+   772→              <div className="space-y-2">
+   773→                <Label htmlFor="create-negative-points">Negative Points</Label>
+   774→                <Input
+   775→                  id="create-negative-points"
+   776→                  type="number"
+   777→                  step="0.1"
+   778→                  value={formData.negativePoints}
+   779→                  onChange={(e) =>
+   780→                    setFormData({ ...formData, negativePoints: e.target.value })
+   781→                  }
+   782→                  placeholder="e.g. 0.25"
+   783→                />
+   784→              </div>
+   785→            )}
+   786→            <div className="flex items-center justify-between">
+   787→              <div>
+   788→                <Label htmlFor="create-infinite-attempts">Infinite Attempts</Label>
+   789→                <p className="text-xs text-muted-foreground">
+   790→                  Toggle on for unlimited attempts
+   791→                </p>
+   792→              </div>
+   793→              <Switch
+   794→                id="create-infinite-attempts"
+   795→                checked={formData.maxAttempts === ""}
+   796→                onCheckedChange={(checked) =>
+   797→                  setFormData({
+   798→                    ...formData,
+   799→                    maxAttempts: checked ? "" : "1",
+   800→                  })
+   801→                }
+   802→              />
+   803→            </div>
+   804→            {formData.maxAttempts !== "" && (
+   805→              <div className="space-y-2">
+   806→                <Label htmlFor="create-max-attempts">Max Attempts</Label>
+   807→                <Input
+   808→                  id="create-max-attempts"
+   809→                  type="number"
+   810→                  min="1"
+   811→                  value={formData.maxAttempts}
+   812→                  onChange={(e) =>
+   813→                    setFormData({ ...formData, maxAttempts: e.target.value })
+   814→                  }
+   815→                  placeholder="e.g. 3"
+   816→                />
+   817→              </div>
+   818→            )}
+   819→            <div className="space-y-2">
+   820→              <Label htmlFor="create-start-date">Start Date (Optional)</Label>
+   821→              <Input
+   822→                id="create-start-date"
+   823→                type="date"
+   824→                value={formData.startDate}
+   825→                onChange={(e) =>
+   826→                  setFormData({ ...formData, startDate: e.target.value })
+   827→                }
+   828→              />
+   829→            </div>
+   830→            <div className="space-y-2">
+   831→              <Label htmlFor="create-end-date">End Date (Optional)</Label>
+   832→              <Input
+   833→                id="create-end-date"
+   834→                type="date"
+   835→                value={formData.endDate}
+   836→                onChange={(e) =>
+   837→                  setFormData({ ...formData, endDate: e.target.value })
+   838→                }
+   839→              />
+   840→            </div>
+   841→            <div className="flex items-center justify-between">
+   842→              <Label htmlFor="create-random-order">Random Question Order</Label>
+   843→              <Switch
+   844→                id="create-random-order"
+   845→                checked={formData.randomOrder}
+   846→                onCheckedChange={(checked) =>
+   847→                  setFormData({ ...formData, randomOrder: checked })
+   848→                }
+   849→              />
+   850→            </div>
+   851→            <div className="flex items-center justify-between">
+   852→              <Label htmlFor="create-check-answer-enabled">
+   853→                Allow Check Answers
+   854→              </Label>
+   855→              <Switch
+   856→                id="create-check-answer-enabled"
+   857→                checked={formData.checkAnswerEnabled}
+   858→                onCheckedChange={(checked) =>
+   859→                  setFormData({ ...formData, checkAnswerEnabled: checked })
+   860→                }
+   861→              />
+   862→            </div>
+   863→            <SheetFooter>
+   864→              <LoadingButton
+   865→                type="submit"
+   866→                isLoading={submitLoading}
+   867→                className="w-full"
+   868→              >
+   869→                Create Quiz
+   870→              </LoadingButton>
+   871→            </SheetFooter>
+   872→          </form>
+   873→        </SheetContent>
+   874→      </Sheet>
+   875→
+   876→      {/* Delete Quiz Dialog - Multi-step cascade */}
+   877→      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+   878→        <AlertDialogContent className="max-w-2xl">
+   879→          <AlertDialogHeader>
+   880→            <AlertDialogTitle>Delete Quiz: {quizToDelete?.title}</AlertDialogTitle>
+   881→            <AlertDialogDescription>
+   882→              This action cannot be undone. Please delete all associated data before deleting quiz.
+   883→            </AlertDialogDescription>
+   884→          </AlertDialogHeader>
+   885→
+   886→          <TooltipProvider>
+   887→          <div className="mt-4 space-y-4">
+   888→            {deleteInfo ? (
+   889→              <div className="space-y-3">
+   890→                {/* Step 1: Delete Quiz Data */}
+   891→                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+   892→                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+   893→                    <div className="flex items-center gap-3">
+   894→                      <FileQuestion className="w-5 h-5 text-orange-600" />
+   895→                      <div>
+   896→                        <p className="font-medium">Quiz Data</p>
+   897→                        <p className="text-sm text-muted-foreground">
+   898→                          {deleteInfo.counts.attempts || 0} quiz attempt(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+   899→                        </p>
+   900→                      </div>
+   901→                    </div>
+   902→                    <div className="flex items-center gap-2">
+   903→                      {deletionStatus.data === 'deleted' && (
+   904→                        <CheckCircle className="w-5 h-5 text-green-600" />
+   905→                      )}
+   906→                      <Tooltip>
+   907→                        <TooltipTrigger asChild>
+   908→                          <Button
+   909→                            onClick={handleDeleteQuizData}
+   910→                            disabled={deletionStatus.data === 'deleted' || deletionStatus.data === 'deleting'}
+   911→                            variant={deletionStatus.data === 'deleted' ? 'outline' : 'destructive'}
+   912→                            size="icon"
+   913→                          >
+   914→                            {deletionStatus.data === 'deleting' ? (
+   915→                              <Loader2 className="h-4 w-4 animate-spin" />
+   916→                            ) : deletionStatus.data === 'deleted' ? (
+   917→                              <CheckCircle className="h-4 w-4" />
+   918→                            ) : (
+   919→                              <Trash2 className="h-4 w-4" />
+   920→                            )}
+   921→                          </Button>
+   922→                        </TooltipTrigger>
+   923→                        <TooltipContent>
+   924→                          {deletionStatus.data === 'deleted' ? 'Quiz data deleted' : deletionStatus.data === 'deleting' ? 'Deleting...' : 'Delete quiz data'}
+   925→                        </TooltipContent>
+   926→                      </Tooltip>
+   927→                    </div>
+   928→                  </div>
+   929→                )}
+   930→
+   931→                {/* Step 2: Unenroll Questions */}
+   932→                {deleteInfo.counts.questions > 0 && (
+   933→                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+   934→                    <div className="flex items-center gap-3">
+   935→                      <FileQuestion className="w-5 h-5 text-blue-600" />
+   936→                      <div>
+   937→                        <p className="font-medium">Questions</p>
+   938→                        <p className="text-sm text-muted-foreground">
+   939→                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} enrolled
+   940→                        </p>
+   941→                      </div>
+   942→                    </div>
+   943→                    <div className="flex items-center gap-2">
+   944→                      {deletionStatus.questions === 'deleted' && (
+   945→                        <CheckCircle className="w-5 h-5 text-green-600" />
+   946→                      )}
+   947→                      <Tooltip>
+   948→                        <TooltipTrigger asChild>
+   949→                          <Button
+   950→                            onClick={handleUnenrollQuestions}
+   951→                            disabled={
+   952→                              deletionStatus.questions === 'deleted' ||
+   953→                              deletionStatus.questions === 'deleting' ||
+   954→                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.data !== 'deleted')
+   955→                            }
+   956→                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+   957→                            size="icon"
+   958→                          >
+   959→                            {deletionStatus.questions === 'deleting' ? (
+   960→                              <Loader2 className="h-4 w-4 animate-spin" />
+   961→                            ) : deletionStatus.questions === 'deleted' ? (
+   962→                              <CheckCircle className="h-4 w-4" />
+   963→                            ) : (
+   964→                              <Trash2 className="h-4 w-4" />
+   965→                            )}
+   966→                          </Button>
+   967→                        </TooltipTrigger>
+   968→                        <TooltipContent>
+   969→                          {deletionStatus.questions === 'deleted' ? 'Questions unenrolled' : deletionStatus.questions === 'deleting' ? 'Unenrolling...' : 'Unenroll questions'}
+   970→                        </TooltipContent>
+   971→                      </Tooltip>
+   972→                    </div>
+   973→                  </div>
+   974→                )}
+   975→
+   976→                {/* Step 3: Unenroll Users */}
+   977→                {deleteInfo.counts.users > 0 && (
+   978→                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+   979→                    <div className="flex items-center gap-3">
+   980→                      <Users className="w-5 h-5 text-purple-600" />
+   981→                      <div>
+   982→                        <p className="font-medium">Users</p>
+   983→                        <p className="text-sm text-muted-foreground">
+   984→                          {deleteInfo.counts.users} user{deleteInfo.counts.users !== 1 ? 's' : ''} enrolled
+   985→                        </p>
+   986→                      </div>
+   987→                    </div>
+   988→                    <div className="flex items-center gap-2">
+   989→                      {deletionStatus.users === 'deleted' && (
+   990→                        <CheckCircle className="w-5 h-5 text-green-600" />
+   991→                      )}
+   992→                      <Tooltip>
+   993→                        <TooltipTrigger asChild>
+   994→                          <Button
+   995→                            onClick={handleUnenrollUsers}
+   996→                            disabled={
+   997→                              deletionStatus.users === 'deleted' ||
+   998→                              deletionStatus.users === 'deleting' ||
+   999→                              ((deleteInfo?.counts.questions || 0) > 0 && deletionStatus.questions !== 'deleted')
+  1000→                            }
+  1001→                            variant={deletionStatus.users === 'deleted' ? 'outline' : 'destructive'}
+  1002→                            size="icon"
+  1003→                          >
+  1004→                            {deletionStatus.users === 'deleting' ? (
+  1005→                              <Loader2 className="h-4 w-4 animate-spin" />
+  1006→                            ) : deletionStatus.users === 'deleted' ? (
+  1007→                              <CheckCircle className="h-4 w-4" />
+  1008→                            ) : (
+  1009→                              <Trash2 className="h-4 w-4" />
+  1010→                            )}
+  1011→                          </Button>
+  1012→                        </TooltipTrigger>
+  1013→                        <TooltipContent>
+  1014→                          {deletionStatus.users === 'deleted' ? 'Users unenrolled' : deletionStatus.users === 'deleting' ? 'Unenrolling...' : 'Unenroll users'}
+  1015→                        </TooltipContent>
+  1016→                      </Tooltip>
+  1017→                    </div>
+  1018→                  </div>
+  1019→                )}
+  1020→
+  1021→                {/* Empty State - Ready to delete */}
+  1022→                {deleteInfo.counts.questions === 0 &&
+  1023→                 deleteInfo.counts.users === 0 &&
+  1024→                 deleteInfo.counts.attempts === 0 &&
+  1025→                 deleteInfo.counts.tabSwitches === 0 && (
+  1026→                  <div className="p-4 border rounded-lg bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+  1027→                    <p className="text-green-800 dark:text-green-200 text-sm font-medium">
+  1028→                      ✓ All critical data removed. Ready to delete quiz.
+  1029→                    </p>
+  1030→                  </div>
+  1031→                )}
+  1032→              </div>
+  1033→            ) : (
+  1034→              <div className="flex items-center justify-center p-8">
+  1035→                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+  1036→              </div>
+  1037→            )}
+  1038→          </div>
+  1039→          </TooltipProvider>
+  1040→
+  1041→          {/* Final Confirmation Input */}
+  1042→          <div className="mt-4 pt-4 border-t space-y-2">
+  1043→            <Label htmlFor="delete-confirmation">
+  1044→              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+  1045→            </Label>
+  1046→            <Input
+  1047→              id="delete-confirmation"
+  1048→              value={deleteConfirmation}
+  1049→              onChange={(e) => setDeleteConfirmation(e.target.value)}
+  1050→              placeholder="CONFIRM DELETE"
+  1051→              autoComplete="off"
+  1052→              className="uppercase"
+  1053→            />
+  1054→          </div>
+  1055→
+  1056→          <AlertDialogFooter>
+  1057→            <AlertDialogCancel onClick={() => {
+  1058→              setIsDeleteDialogOpen(false)
+  1059→              setQuizToDelete(null)
+  1060→              setDeleteInfo(null)
+  1061→              setDeleteConfirmation("")
+  1062→              setDeletionStatus({ data: 'pending', questions: 'pending', users: 'pending' })
+  1063→            }}>
+  1064→              Cancel
+  1065→            </AlertDialogCancel>
+  1066→            <AlertDialogAction
+  1067→              onClick={() => quizToDelete && handleDeleteQuiz(quizToDelete.id)}
+  1068→              className="bg-red-600 hover:bg-red-700"
+  1069→              disabled={
+  1070→                deleteLoading !== null ||
+  1071→                deleteConfirmation !== "CONFIRM DELETE"
+  1072→              }
+  1073→            >
+  1074→              {deleteLoading === quizToDelete?.id ? (
+  1075→                <>
+  1076→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+  1077→                  Deleting...
+  1078→                </>
+  1079→              ) : (
+  1080→                "Delete Quiz"
+  1081→              )}
+  1082→            </AlertDialogAction>
+  1083→          </AlertDialogFooter>
+  1084→        </AlertDialogContent>
+  1085→      </AlertDialog>
+  1086→    </div>
+  1087→  )
+  1088→}
+  1089→

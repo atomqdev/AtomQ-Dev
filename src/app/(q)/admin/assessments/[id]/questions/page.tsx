@@ -92,11 +92,12 @@ import { toast } from "sonner"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
 import HexagonLoader from "@/components/Loader/Loading"
+import { parseMultiSelectAnswers, getMultiSelectCount } from "@/lib/utils"
 
 interface Question {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string[] | string
   correctAnswer: string
@@ -109,8 +110,8 @@ interface Question {
 
 interface AvailableQuestion {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string[] | string
   correctAnswer: string
@@ -169,9 +170,9 @@ function SortableQuestion({
       <TableCell className="font-medium">{question.order}</TableCell>
       <TableCell>
         <div>
-          <div className="font-medium">{question.title}</div>
+          <div className="font-medium">{question.reference}</div>
           {/* <div className="text-sm text-muted-foreground">
-            <RichTextDisplay content={question.content} />
+            <RichTextDisplay content={question.title} />
           </div> */}
         </div>
       </TableCell>
@@ -182,6 +183,10 @@ function SortableQuestion({
             question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
         }>
           {question.type.replace('_', ' ')}
+          {question.type === QuestionType.MULTI_SELECT && (() => {
+            const sc = getMultiSelectCount(question.correctAnswer || '')
+            return sc > 0 ? ` (Select ${sc})` : ''
+          })()}
         </Badge>
       </TableCell>
       <TableCell>
@@ -304,8 +309,8 @@ export default function AssessmentQuestionsPage() {
         // Map assessment question data to question format expected by the table
         const questionsData = data.map((aq: any) => ({
           id: aq.question.id,
+          reference: aq.question.reference,
           title: aq.question.title,
-          content: aq.question.content,
           type: aq.question.type,
           options: aq.question.options,
           correctAnswer: aq.question.correctAnswer,
@@ -434,7 +439,7 @@ export default function AssessmentQuestionsPage() {
 
   const handleExportQuestions = () => {
     const csvContent = [
-      ["Title", "Content", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Points"],
+      ["Reference", "Title", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Points"],
       ...questions.map(question => {
         // Parse options from database (stored as JSON string) and convert to pipe-separated format
         let optionsString = ""
@@ -444,13 +449,13 @@ export default function AssessmentQuestionsPage() {
             : JSON.parse(question.options || "[]")
           optionsString = parsedOptions.join("|")
         } catch (e) {
-          console.warn("Failed to parse options for question:", question.title, e)
+          console.warn("Failed to parse options for question:", question.reference, e)
           optionsString = question.options?.toString() || ""
         }
 
         return [
+          question.reference,
           question.title,
-          question.content,
           question.type,
           optionsString,
           question.correctAnswer,
@@ -546,13 +551,13 @@ export default function AssessmentQuestionsPage() {
 
           // Filter out empty rows and validate required fields
           const validQuestions = results.data.filter((row: any) => {
+            const hasReference = row.Reference && row.Reference.trim() !== ""
             const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasContent = row.Content && row.Content.trim() !== ""
             const hasType = row.Type && row.Type.trim() !== ""
             const hasOptions = row.Options && row.Options.trim() !== ""
             const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
 
-            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
           })
 
 
@@ -597,8 +602,8 @@ export default function AssessmentQuestionsPage() {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
+                  reference: question.Reference?.trim(),
                   title: question.Title?.trim(),
-                  content: question.Content?.trim(),
                   type: questionType,
                   options: options,
                   correctAnswer: question["Correct Answer"]?.toString(),
@@ -671,13 +676,13 @@ export default function AssessmentQuestionsPage() {
 
           // Filter out empty rows and validate required fields
           const validQuestions = results.data.filter((row: any) => {
+            const hasReference = row.Reference && row.Reference.trim() !== ""
             const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasContent = row.Content && row.Content.trim() !== ""
             const hasType = row.Type && row.Type.trim() !== ""
             const hasOptions = row.Options && row.Options.trim() !== ""
             const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
 
-            return hasTitle && hasContent && hasType && hasOptions && hasCorrectAnswer
+            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
           })
 
 
@@ -710,7 +715,7 @@ export default function AssessmentQuestionsPage() {
                       options = parsed.map(opt => opt.toString().trim()).filter(opt => opt.length > 0)
                     }
                   } catch (e) {
-                    console.warn(`Failed to parse options as JSON for question "${question.Title}":`, e)
+                    console.warn(`Failed to parse options as JSON for question "${question.Reference}":`, e)
                   }
                 }
 
@@ -745,18 +750,18 @@ export default function AssessmentQuestionsPage() {
 
               // Validate options for multiple choice
               if (questionType === QuestionType.MULTIPLE_CHOICE && options.length < 2) {
-                throw new Error(`Multiple choice question "${question.Title}" must have at least 2 options`)
+                throw new Error(`Multiple choice question "${question.Reference}" must have at least 2 options`)
               }
 
               // Normalize correct answer
               const correctAnswer = question["Correct Answer"]?.toString().trim()
               if (!correctAnswer) {
-                throw new Error(`Correct answer is required for question "${question.Title}"`)
+                throw new Error(`Correct answer is required for question "${question.Reference}"`)
               }
 
               // Validate that correct answer is in options
               if (!options.includes(correctAnswer)) {
-                throw new Error(`Correct answer "${correctAnswer}" not found in options for question "${question.Title}"`)
+                throw new Error(`Correct answer "${correctAnswer}" not found in options for question "${question.Reference}"`)
               }
 
               // Normalize difficulty
@@ -769,12 +774,12 @@ export default function AssessmentQuestionsPage() {
               // Parse points
               const points = parseFloat(question.Points) || 1.0
               if (isNaN(points) || points <= 0) {
-                throw new Error(`Invalid points value for question "${question.Title}"`)
+                throw new Error(`Invalid points value for question "${question.Reference}"`)
               }
 
               const questionData = {
+                reference: question.Reference?.toString().trim() || "",
                 title: question.Title?.toString().trim() || "",
-                content: question.Content?.toString().trim() || "",
                 type: questionType,
                 options: options,
                 correctAnswer: correctAnswer,
@@ -794,17 +799,17 @@ export default function AssessmentQuestionsPage() {
 
               if (!response.ok) {
                 const errorData = await response.json()
-                console.error(`API error for question "${questionData.title}":`, errorData)
-                throw new Error(errorData.message || `Failed to create question "${questionData.title}"`)
+                console.error(`API error for question "${questionData.reference}":`, errorData)
+                throw new Error(errorData.message || `Failed to create question "${questionData.reference}"`)
               }
 
               const result = await response.json()
               return result
             } catch (error) {
-              console.error(`Failed to import question "${question.Title}":`, error)
+              console.error(`Failed to import question "${question.Reference}":`, error)
               return {
                 error: true,
-                title: question.Title,
+                reference: question.Reference,
                 message: error instanceof Error ? error.message : "Unknown error"
               }
             }
@@ -823,7 +828,7 @@ export default function AssessmentQuestionsPage() {
 
           if (failedImports.length > 0) {
             const errorMessages = failedImports.map(failure =>
-              `"${failure.title}": ${failure.message}`
+              `"${failure.reference}": ${failure.message}`
             ).join('\n')
             console.error("Failed imports:", errorMessages)
             toast.error(`Failed to import ${failedImports.length} question(s):\n${errorMessages}`)
@@ -846,15 +851,15 @@ export default function AssessmentQuestionsPage() {
   }
 
   const filteredQuestions = questions.filter(question => {
-    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = question.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      question.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
     return matchesSearch && matchesDifficulty
   })
 
   const filteredAvailableQuestions = availableQuestions.filter(question => {
-    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      question.content.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = question.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      question.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesDifficulty = difficultyFilter === "all" || question.difficulty === difficultyFilter
     const matchesGroup = groupFilter === "all" || question.group?.id === groupFilter
     return matchesSearch && matchesDifficulty && matchesGroup
@@ -862,8 +867,8 @@ export default function AssessmentQuestionsPage() {
 
   // Popup-specific filtered questions
   const popupFilteredQuestions = availableQuestions.filter(question => {
-    const matchesSearch = question.title.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
-      question.content.toLowerCase().includes(popupSearchTerm.toLowerCase())
+    const matchesSearch = question.reference.toLowerCase().includes(popupSearchTerm.toLowerCase()) ||
+      question.title.toLowerCase().includes(popupSearchTerm.toLowerCase())
     const matchesDifficulty = popupDifficultyFilter === "all" || question.difficulty === popupDifficultyFilter
     const matchesGroup = popupGroupFilter === "all" || question.group?.id === popupGroupFilter
     return matchesSearch && matchesDifficulty && matchesGroup
@@ -1162,8 +1167,8 @@ export default function AssessmentQuestionsPage() {
                         className="h-4 w-4"
                       />
                       <label htmlFor={`question-${question.id}`} className="flex-1 cursor-pointer">
-                        <div className="font-medium">{question.title}</div>
-                        {/* <div className="text-sm text-muted-foreground">{question.content}</div> */}
+                        <div className="font-medium">{question.reference}</div>
+                        {/* <div className="text-sm text-muted-foreground">{question.title}</div> */}
                         <div className="flex gap-2 mt-1">
                           <Badge variant={
                             question.type === QuestionType.MULTIPLE_CHOICE ? "default" :
@@ -1171,6 +1176,10 @@ export default function AssessmentQuestionsPage() {
                               question.type === QuestionType.TRUE_FALSE ? "outline" : "destructive"
                           }>
                             {question.type.replace('_', ' ')}
+                            {question.type === QuestionType.MULTI_SELECT && (() => {
+                              const sc = getMultiSelectCount(question.correctAnswer || '')
+                              return sc > 0 ? ` (Select ${sc})` : ''
+                            })()}
                           </Badge>
                           <Badge variant={
                             question.difficulty === DifficultyLevel.EASY ? "default" :
@@ -1235,13 +1244,13 @@ export default function AssessmentQuestionsPage() {
             {selectedQuestion && (
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Title</Label>
-                  <p className="text-lg font-medium">{selectedQuestion.title}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Reference</Label>
+                  <p className="text-lg font-medium">{selectedQuestion.reference}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Content</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Title</Label>
                   <div className="text-sm">
-                    <RichTextDisplay content={selectedQuestion.content} />
+                    <RichTextDisplay content={selectedQuestion.title} />
                   </div>
                 </div>
                 <div>
@@ -1261,7 +1270,7 @@ export default function AssessmentQuestionsPage() {
                         <div key={index} className="text-sm p-2 bg-muted rounded flex items-center gap-2">
                           {selectedQuestion.type === QuestionType.MULTI_SELECT && (
                             <Checkbox
-                              checked={selectedQuestion.correctAnswer.split('|').includes(option)}
+                              checked={parseMultiSelectAnswers(selectedQuestion.correctAnswer).includes(option)}
                               disabled
                             />
                           )}

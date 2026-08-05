@@ -150,8 +150,8 @@ async function main() {
   const sampleQuestions = await Promise.all([
     prisma.question.create({
       data: {
-        title: 'Capital of France',
-        content: 'What is the capital city of France?',
+        reference: 'Capital of France',
+        title: 'What is the capital city of France?',
         type: QuestionType.MULTIPLE_CHOICE,
         options: JSON.stringify(['Berlin', 'Paris', 'Madrid', 'Rome']),
         correctAnswer: 'Paris',
@@ -162,8 +162,8 @@ async function main() {
     }),
     prisma.question.create({
       data: {
-        title: 'Primary Colors',
-        content: 'Which of the following are primary colors?',
+        reference: 'Primary Colors',
+        title: 'Which of the following are primary colors?',
         type: QuestionType.MULTI_SELECT,
         options: JSON.stringify(['Red', 'Green', 'Blue', 'Yellow']),
         correctAnswer: '["Red","Blue","Yellow"]',

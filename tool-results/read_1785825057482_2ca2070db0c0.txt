@@ -1,0 +1,1305 @@
+     1→"use client"
+     2→
+     3→import { useState, useEffect, useRef } from "react"
+     4→import { useParams, useRouter } from "next/navigation"
+     5→import { Button } from "@/components/ui/button"
+     6→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+     7→import { Badge } from "@/components/ui/badge"
+     8→import { Input } from "@/components/ui/input"
+     9→import { Label } from "@/components/ui/label"
+    10→import { RichTextEditor } from "@/components/ui/rich-text-editor"
+    11→import { RichTextDisplay } from "@/components/ui/rich-text-display"
+    12→import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+    13→import { Switch } from "@/components/ui/switch"
+    14→import { Checkbox } from "@/components/ui/checkbox"
+    15→import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+    16→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+    17→import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain, Sparkles, Undo2 } from "lucide-react"
+    18→import { format } from "date-fns"
+    19→import { QuestionType, DifficultyLevel } from "@prisma/client"
+    20→import Papa from "papaparse"
+    21→import HexagonLoader from "@/components/Loader/Loading"
+    22→import { LoadingButton } from "@/components/ui/laodaing-button"
+    23→import { toast } from "sonner"
+    24→import { DataTable } from "@/components/ui/data-table"
+    25→import { ColumnDef } from "@tanstack/react-table"
+    26→import { ArrowUpDown } from "lucide-react"
+    27→
+    28→interface Question {
+    29→  id: string
+    30→  reference: string
+    31→  title: string
+    32→  type: QuestionType
+    33→  options: string
+    34→  correctAnswer: string
+    35→  explanation: string | null
+    36→  difficulty: DifficultyLevel
+    37→  isActive: boolean
+    38→  createdAt: string
+    39→}
+    40→
+    41→interface QuestionGroup {
+    42→  id: string
+    43→  name: string
+    44→  description: string | null
+    45→  isActive: boolean
+    46→  createdAt: string
+    47→  creator: {
+    48→    id: string
+    49→    name: string | null
+    50→    email: string
+    51→  }
+    52→  questions: Question[]
+    53→}
+    54→
+    55→const formatDateDDMMYYYY = (dateString: string) => {
+    56→  const date = new Date(dateString)
+    57→  const day = String(date.getDate()).padStart(2, '0')
+    58→  const month = String(date.getMonth() + 1).padStart(2, '0')
+    59→  const year = date.getFullYear()
+    60→  return `${day}/${month}/${year}`
+    61→}
+    62→
+    63→export default function QuestionGroupPage() {
+    64→  const params = useParams()
+    65→  const router = useRouter()
+    66→  const groupId = params.id as string
+    67→
+    68→  const [questionGroup, setQuestionGroup] = useState<QuestionGroup | null>(null)
+    69→  const [questions, setQuestions] = useState<Question[]>([])
+    70→  const [loading, setLoading] = useState(true)
+    71→  const [isDialogOpen, setIsDialogOpen] = useState(false)
+    72→  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
+    73→  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+    74→  const [submitLoading, setSubmitLoading] = useState(false)
+    75→  const [formData, setFormData] = useState({
+    76→    reference: "",
+    77→    title: "",
+    78→    type: QuestionType.MULTIPLE_CHOICE as QuestionType,
+    79→    options: ["", "", ""],
+    80→    correctAnswer: "",
+    81→    correctAnswers: [] as string[],
+    82→    explanation: "",
+    83→    difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
+    84→    isActive: true
+    85→  })
+    86→
+    87→  const fileInputRef = useRef<HTMLInputElement>(null)
+    88→  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false)
+    89→  const [importFile, setImportFile] = useState<File | null>(null)
+    90→  const [isDragOver, setIsDragOver] = useState(false)
+    91→  const [isImporting, setIsImporting] = useState(false)
+    92→
+    93→  // AI Enhancement states
+    94→  const [aiEnhancing, setAiEnhancing] = useState(false)
+    95→  const [explanationHistory, setExplanationHistory] = useState<string[]>([])
+    96→  const [historyIndex, setHistoryIndex] = useState(-1)
+    97→
+    98→  const columns: ColumnDef<Question>[] = [
+    99→    {
+   100→      accessorKey: "reference",
+   101→      header: ({ column }) => {
+   102→        return (
+   103→          <Button
+   104→            variant="ghost"
+   105→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   106→          >
+   107→            Reference
+   108→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   109→          </Button>
+   110→        )
+   111→      },
+   112→      cell: ({ row }) => {
+   113→        const reference = row.getValue("reference") as string
+   114→        const maxLength = 50
+   115→        return (
+   116→          <div className="font-medium max-w-xs truncate" title={reference}>
+   117→            {reference.length > maxLength ? reference.slice(0, maxLength) + "..." : reference}
+   118→          </div>
+   119→        )
+   120→      },
+   121→    },
+   122→    {
+   123→      accessorKey: "title",
+   124→      header: "Title",
+   125→      cell: ({ row }) => {
+   126→        const htmlContent = row.getValue("title") as string
+   127→        const maxLength = 50
+   128→        const textContent = htmlContent.replace(/<[^>]*>/g, '')
+   129→        return (
+   130→          <div className="max-w-xs truncate" title={textContent}>
+   131→            {textContent.length > maxLength ? textContent.slice(0, maxLength) + "..." : textContent}
+   132→          </div>
+   133→        )
+   134→      },
+   135→    },
+   136→    {
+   137→      accessorKey: "type",
+   138→      header: "Type",
+   139→      cell: ({ row }) => {
+   140→        const type = row.getValue("type") as QuestionType
+   141→        const question = row.original
+   142→        const typeLabels: Record<QuestionType, string> = {
+   143→          [QuestionType.MULTIPLE_CHOICE]: "Multiple Choice",
+   144→          [QuestionType.TRUE_FALSE]: "True/False",
+   145→          [QuestionType.FILL_IN_BLANK]: "Fill in Blank",
+   146→          [QuestionType.MULTI_SELECT]: "Multi Select",
+   147→        }
+   148→        const label = typeLabels[type]
+   149→        const selectCount = type === QuestionType.MULTI_SELECT
+   150→          ? question.correctAnswer?.split('|').length || 0
+   151→          : 0
+   152→        return (
+   153→          <Badge variant="outline">
+   154→            {label}
+   155→            {selectCount > 0 && ` (Select ${selectCount})`}
+   156→          </Badge>
+   157→        )
+   158→      },
+   159→    },
+   160→    {
+   161→      accessorKey: "difficulty",
+   162→      header: "Difficulty",
+   163→      cell: ({ row }) => {
+   164→        const difficulty = row.getValue("difficulty") as DifficultyLevel
+   165→        const difficultyColors: Record<DifficultyLevel, string> = {
+   166→          [DifficultyLevel.EASY]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+   167→          [DifficultyLevel.MEDIUM]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+   168→          [DifficultyLevel.HARD]: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+   169→        }
+   170→        return (
+   171→          <Badge className={difficultyColors[difficulty]}>
+   172→            {difficulty.toLowerCase()}
+   173→          </Badge>
+   174→        )
+   175→      },
+   176→    },
+   177→    {
+   178→      accessorKey: "correctAnswer",
+   179→      header: "Correct Answer",
+   180→      cell: ({ row }) => {
+   181→        const correctAnswer = row.getValue("correctAnswer") as string
+   182→        const maxLength = 50
+   183→        return (
+   184→          <div className="max-w-xs truncate" title={correctAnswer}>
+   185→            {correctAnswer.length > maxLength ? correctAnswer.slice(0, maxLength) + "..." : correctAnswer}
+   186→          </div>
+   187→        )
+   188→      },
+   189→    },
+   190→    {
+   191→      accessorKey: "isActive",
+   192→      header: "Status",
+   193→      cell: ({ row }) => {
+   194→        const isActive = row.getValue("isActive") as boolean
+   195→        return (
+   196→          <Badge variant={isActive ? "default" : "secondary"}>
+   197→            {isActive ? "Active" : "Inactive"}
+   198→          </Badge>
+   199→        )
+   200→      },
+   201→    },
+   202→    {
+   203→      accessorKey: "createdAt",
+   204→      header: ({ column }) => {
+   205→        return (
+   206→          <Button
+   207→            variant="ghost"
+   208→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   209→          >
+   210→            Created At
+   211→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   212→          </Button>
+   213→        )
+   214→      },
+   215→      cell: ({ row }) => {
+   216→        const date = new Date(row.getValue("createdAt"))
+   217→        return formatDateDDMMYYYY(date.toISOString())
+   218→      },
+   219→    },
+   220→    {
+   221→      id: "actions",
+   222→      enableHiding: false,
+   223→      cell: ({ row }) => {
+   224→        const question = row.original
+   225→        return (
+   226→          <div className="flex items-center space-x-2">
+   227→            <Button
+   228→              variant="outline"
+   229→              size="sm"
+   230→              onClick={() => handleEdit(question)}
+   231→            >
+   232→              Edit
+   233→            </Button>
+   234→            <Button
+   235→              variant="outline"
+   236→              size="sm"
+   237→              onClick={() => handleDelete(question.id)}
+   238→              disabled={deleteLoading === question.id}
+   239→            >
+   240→              {deleteLoading === question.id ? (
+   241→                <Loader2 className="h-4 w-4 animate-spin" />
+   242→              ) : (
+   243→                <Trash2 className="h-4 w-4" />
+   244→              )}
+   245→            </Button>
+   246→          </div>
+   247→        )
+   248→      },
+   249→    },
+   250→  ]
+   251→
+   252→  useEffect(() => {
+   253→    fetchQuestionGroup()
+   254→    fetchQuestions()
+   255→  }, [groupId])
+   256→
+   257→  const fetchQuestionGroup = async () => {
+   258→    try {
+   259→      const response = await fetch(`/api/admin/question-groups/${groupId}`)
+   260→      if (response.ok) {
+   261→        const data = await response.json()
+   262→        setQuestionGroup(data)
+   263→      }
+   264→    } catch (error) {
+   265→      console.error("Error fetching question group:", error)
+   266→    }
+   267→  }
+   268→
+   269→  const fetchQuestions = async () => {
+   270→    try {
+   271→      const response = await fetch(`/api/admin/question-groups/${groupId}/questions`)
+   272→      if (response.ok) {
+   273→        const data = await response.json()
+   274→        setQuestions(data)
+   275→      }
+   276→    } catch (error) {
+   277→      console.error("Error fetching questions:", error)
+   278→    } finally {
+   279→      setLoading(false)
+   280→    }
+   281→  }
+   282→
+   283→  const handleSubmit = async (e: React.FormEvent) => {
+   284→    e.preventDefault()
+   285→
+   286→    if (!formData.reference.trim()) {
+   287→      toast.error("Reference is required")
+   288→      return
+   289→    }
+   290→
+   291→    const tempDiv = document.createElement('div')
+   292→    tempDiv.innerHTML = formData.title
+   293→    const textContent = tempDiv.textContent || tempDiv.innerText || ""
+   294→
+   295→    if (!textContent.trim()) {
+   296→      toast.error("Title is required")
+   297→      return
+   298→    }
+   299→
+   300→    if (formData.type !== QuestionType.FILL_IN_BLANK) {
+   301→      if (formData.options.length === 0) {
+   302→        toast.error("At least one option is required")
+   303→        return
+   304→      }
+   305→
+   306→      if (formData.options.some(option => !option.trim())) {
+   307→        toast.error("All options must have values")
+   308→        return
+   309→      }
+   310→
+   311→      if (formData.type === QuestionType.MULTI_SELECT) {
+   312→        if (formData.correctAnswers.length === 0) {
+   313→          toast.error("At least one correct answer must be selected for multi-select questions")
+   314→          return
+   315→        }
+   316→      } else {
+   317→        if (!formData.correctAnswer.trim()) {
+   318→          toast.error("A correct answer must be selected")
+   319→          return
+   320→        }
+   321→      }
+   322→    } else {
+   323→      if (!formData.correctAnswer.trim()) {
+   324→        toast.error("Correct answer is required for fill-in-the-blank questions")
+   325→        return
+   326→      }
+   327→    }
+   328→
+   329→    setSubmitLoading(true)
+   330→
+   331→    try {
+   332→      const apiData = {
+   333→        reference: formData.reference,
+   334→        title: formData.title,
+   335→        type: formData.type,
+   336→        options: formData.options,
+   337→        correctAnswer: formData.correctAnswer,
+   338→        explanation: formData.explanation,
+   339→        difficulty: formData.difficulty,
+   340→        isActive: formData.isActive
+   341→      }
+   342→
+   343→      const url = editingQuestion
+   344→        ? `/api/admin/question-groups/${groupId}/questions/${editingQuestion.id}`
+   345→        : `/api/admin/question-groups/${groupId}/questions`
+   346→
+   347→      const method = editingQuestion ? "PUT" : "POST"
+   348→
+   349→      const response = await fetch(url, {
+   350→        method,
+   351→        headers: {
+   352→          "Content-Type": "application/json"
+   353→        },
+   354→        body: JSON.stringify(apiData)
+   355→      })
+   356→
+   357→      if (response.ok) {
+   358→        await fetchQuestions()
+   359→        setIsDialogOpen(false)
+   360→        resetForm()
+   361→        toast.success(editingQuestion ? "Question updated successfully" : "Question created successfully")
+   362→      } else {
+   363→        const errorData = await response.json()
+   364→        toast.error(`Error: ${errorData.message}`)
+   365→      }
+   366→    } catch (error) {
+   367→      console.error("Error saving question:", error)
+   368→      toast.error("Error saving question. Please try again.")
+   369→    } finally {
+   370→      setSubmitLoading(false)
+   371→    }
+   372→  }
+   373→
+   374→  const handleEdit = (question: Question) => {
+   375→    setEditingQuestion(question)
+   376→    const parsedOptions = JSON.parse(question.options)
+   377→    const correctAnswers = question.type === QuestionType.MULTI_SELECT
+   378→      ? question.correctAnswer.split('|').map(ans => ans.trim())
+   379→      : [question.correctAnswer]
+   380→
+   381→    setFormData({
+   382→      reference: question.reference,
+   383→      title: question.title,
+   384→      type: question.type,
+   385→      options: parsedOptions,
+   386→      correctAnswer: question.correctAnswer,
+   387→      correctAnswers,
+   388→      explanation: question.explanation || "",
+   389→      difficulty: question.difficulty,
+   390→      isActive: question.isActive
+   391→    })
+   392→    // Reset history when editing a new question
+   393→    setExplanationHistory([])
+   394→    setHistoryIndex(-1)
+   395→    setIsDialogOpen(true)
+   396→  }
+   397→
+   398→  const handleDelete = async (id: string) => {
+   399→    if (!confirm("Are you sure you want to delete this question?")) {
+   400→      return
+   401→    }
+   402→
+   403→    try {
+   404→      setDeleteLoading(id)
+   405→      const response = await fetch(`/api/admin/question-groups/${groupId}/questions/${id}`, {
+   406→        method: "DELETE"
+   407→      })
+   408→
+   409→      if (response.ok) {
+   410→        await fetchQuestions()
+   411→        toast.success("Question deleted successfully")
+   412→      } else {
+   413→        const errorData = await response.json()
+   414→        toast.error(`Error: ${errorData.message}`)
+   415→      }
+   416→    } catch (error) {
+   417→      console.error("Error deleting question:", error)
+   418→      toast.error("Error deleting question. Please try again.")
+   419→    } finally {
+   420→      setDeleteLoading(null)
+   421→    }
+   422→  }
+   423→
+   424→  const resetForm = () => {
+   425→    setEditingQuestion(null)
+   426→    setFormData({
+   427→      reference: "",
+   428→      title: "",
+   429→      type: QuestionType.MULTIPLE_CHOICE as QuestionType,
+   430→      options: ["", "", ""],
+   431→      correctAnswer: "",
+   432→      correctAnswers: [],
+   433→      explanation: "",
+   434→      difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
+   435→      isActive: true
+   436→    })
+   437→    setExplanationHistory([])
+   438→    setHistoryIndex(-1)
+   439→  }
+   440→
+   441→  const addOption = () => {
+   442→    setFormData({
+   443→      ...formData,
+   444→      options: [...formData.options, ""]
+   445→    })
+   446→  }
+   447→
+   448→  const updateOption = (index: number, value: string) => {
+   449→    const newOptions = [...formData.options]
+   450→    newOptions[index] = value
+   451→    setFormData({
+   452→      ...formData,
+   453→      options: newOptions
+   454→    })
+   455→  }
+   456→
+   457→  const removeOption = (index: number) => {
+   458→    const newOptions = formData.options.filter((_, i) => i !== index)
+   459→    const newCorrectAnswers = formData.correctAnswers.filter(ans => newOptions.includes(ans))
+   460→    setFormData({
+   461→      ...formData,
+   462→      options: newOptions,
+   463→      correctAnswers: newCorrectAnswers,
+   464→      correctAnswer: formData.type === QuestionType.MULTI_SELECT
+   465→        ? newCorrectAnswers.join('|')
+   466→        : formData.correctAnswer
+   467→    })
+   468→  }
+   469→
+   470→  const handleCorrectAnswerChange = (option: string, isChecked: boolean) => {
+   471→    if (formData.type === QuestionType.MULTI_SELECT) {
+   472→      const newCorrectAnswers = isChecked
+   473→        ? [...formData.correctAnswers, option]
+   474→        : formData.correctAnswers.filter(ans => ans !== option)
+   475→
+   476→      setFormData({
+   477→        ...formData,
+   478→        correctAnswers: newCorrectAnswers,
+   479→        correctAnswer: newCorrectAnswers.join('|')
+   480→      })
+   481→    } else {
+   482→      setFormData({
+   483→        ...formData,
+   484→        correctAnswer: isChecked ? option : "",
+   485→        correctAnswers: isChecked ? [option] : []
+   486→      })
+   487→    }
+   488→  }
+   489→
+   490→  // Save current explanation to history before making changes
+   491→  const saveToHistory = (explanation: string) => {
+   492→    if (explanation && explanation !== explanationHistory[historyIndex]) {
+   493→      const newHistory = explanationHistory.slice(0, historyIndex + 1)
+   494→      newHistory.push(explanation)
+   495→      setExplanationHistory(newHistory)
+   496→      setHistoryIndex(newHistory.length - 1)
+   497→    }
+   498→  }
+   499→
+   500→  // Handle AI Enhancement
+   501→  const handleAIEnhance = async (mode: 'enhance' | 'beautify') => {
+   502→    // Save current explanation to history before enhancing
+   503→    if (formData.explanation) {
+   504→      saveToHistory(formData.explanation)
+   505→    }
+   506→
+   507→    setAiEnhancing(true)
+   508→    try {
+   509→      const response = await fetch('/api/admin/ai-enhance-explanation', {
+   510→        method: 'POST',
+   511→        headers: {
+   512→          'Content-Type': 'application/json'
+   513→        },
+   514→        body: JSON.stringify({
+   515→          questionContent: formData.title,
+   516→          options: formData.options,
+   517→          correctAnswer: formData.correctAnswer,
+   518→          currentExplanation: formData.explanation,
+   519→          mode
+   520→        })
+   521→      })
+   522→
+   523→      if (response.ok) {
+   524→        const data = await response.json()
+   525→        setFormData({ ...formData, explanation: data.explanation })
+   526→        toast.success(mode === 'enhance' ? 'Explanation enhanced and beautified!' : 'Explanation beautified!')
+   527→      } else {
+   528→        const errorData = await response.json()
+   529→        toast.error(`Error: ${errorData.message}`)
+   530→      }
+   531→    } catch (error) {
+   532→      console.error("Error enhancing explanation:", error)
+   533→      toast.error("Failed to enhance explanation. Please try again.")
+   534→    } finally {
+   535→      setAiEnhancing(false)
+   536→    }
+   537→  }
+   538→
+   539→  // Handle Undo
+   540→  const handleUndo = () => {
+   541→    if (historyIndex > 0) {
+   542→      const newIndex = historyIndex - 1
+   543→      setHistoryIndex(newIndex)
+   544→      setFormData({ ...formData, explanation: explanationHistory[newIndex] })
+   545→      toast.success("Undone to previous version")
+   546→    } else if (historyIndex === 0) {
+   547→      // If we're at the first history item, clear the explanation
+   548→      setHistoryIndex(-1)
+   549→      setFormData({ ...formData, explanation: "" })
+   550→      toast.success("Undone to original")
+   551→    }
+   552→  }
+   553→
+   554→  const handleExportQuestions = () => {
+   555→    const csvContent = [
+   556→      ["Reference", "Title", "Type", "Options", "Correct Answer", "Explanation", "Difficulty", "Active"],
+   557→      ...questions.map(question => {
+   558→        let optionsString = ""
+   559→        try {
+   560→          const parsedOptions = JSON.parse(question.options || "[]")
+   561→          optionsString = parsedOptions.join("|")
+   562→        } catch (e) {
+   563→          optionsString = question.options?.toString() || ""
+   564→        }
+   565→
+   566→        return [
+   567→          question.reference,
+   568→          question.title,
+   569→          question.type,
+   570→          optionsString,
+   571→          question.correctAnswer,
+   572→          question.explanation || "",
+   573→          question.difficulty,
+   574→          question.isActive.toString()
+   575→        ]
+   576→      })
+   577→    ].map(row =>
+   578→      row.map(cell => {
+   579→        if (cell === null || cell === undefined) return ""
+   580→        const str = cell.toString()
+   581→        if (str.includes(",") || str.includes("\"") || str.includes("\n")) {
+   582→          return `"${str.replace(/"/g, '""')}"`
+   583→        }
+   584→        return str
+   585→      }).join(",")
+   586→    ).join("\n")
+   587→
+   588→    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" })
+   589→    const url = window.URL.createObjectURL(blob)
+   590→    const a = document.createElement("a")
+   591→    a.href = url
+   592→    a.download = `${questionGroup?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_questions.csv`
+   593→    a.click()
+   594→    window.URL.revokeObjectURL(url)
+   595→    toast.success("Questions exported to CSV")
+   596→  }
+   597→
+   598→  const handleImportQuestions = () => {
+   599→    setIsImportSheetOpen(true)
+   600→  }
+   601→
+   602→  const handleDragOver = (e: React.DragEvent) => {
+   603→    e.preventDefault()
+   604→    setIsDragOver(true)
+   605→  }
+   606→
+   607→  const handleDragLeave = (e: React.DragEvent) => {
+   608→    e.preventDefault()
+   609→    setIsDragOver(false)
+   610→  }
+   611→
+   612→  const handleDrop = (e: React.DragEvent) => {
+   613→    e.preventDefault()
+   614→    setIsDragOver(false)
+   615→
+   616→    const files = e.dataTransfer.files
+   617→    if (files.length > 0) {
+   618→      const file = files[0]
+   619→      if (file.type === "text/csv" || file.name.endsWith(".csv")) {
+   620→        setImportFile(file)
+   621→      } else {
+   622→        toast.error("Please upload a CSV file")
+   623→      }
+   624→    }
+   625→  }
+   626→
+   627→  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+   628→    const file = e.target.files?.[0]
+   629→    if (file) {
+   630→      setImportFile(file)
+   631→    }
+   632→  }
+   633→
+   634→  const handleRemoveFile = () => {
+   635→    setImportFile(null)
+   636→    if (fileInputRef.current) {
+   637→      fileInputRef.current.value = ""
+   638→    }
+   639→  }
+   640→
+   641→  const handleImportWithGroup = async () => {
+   642→    if (!importFile) {
+   643→      toast.error("Please select a file to import")
+   644→      return
+   645→    }
+   646→
+   647→    setIsImporting(true)
+   648→
+   649→    Papa.parse(importFile, {
+   650→      header: true,
+   651→      skipEmptyLines: true,
+   652→      complete: async (results) => {
+   653→        try {
+   654→          const validQuestions = results.data.filter((row: any) => {
+   655→            const hasReference = row.Reference && row.Reference.trim() !== ""
+   656→            const hasTitle = row.Title && row.Title.trim() !== ""
+   657→            const hasType = row.Type && row.Type.trim() !== ""
+   658→            const hasOptions = row.Options && row.Options.trim() !== ""
+   659→            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
+   660→
+   661→            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
+   662→          })
+   663→
+   664→          if (validQuestions.length === 0) {
+   665→            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
+   666→            setIsImporting(false)
+   667→            return
+   668→          }
+   669→
+   670→          const importPromises = validQuestions.map(async (question: any, index: number) => {
+   671→            try {
+   672→              const options = question.Options.split('|').map((opt: string) => opt.trim()).filter((opt: string) => opt)
+   673→
+   674→              const apiData = {
+   675→                reference: question.Reference,
+   676→                title: question.Title,
+   677→                type: question.Type,
+   678→                options: options,
+   679→                correctAnswer: question["Correct Answer"],
+   680→                explanation: question.Explanation || "",
+   681→                difficulty: question.Difficulty || DifficultyLevel.MEDIUM,
+   682→                isActive: question.Active !== "false" && question.Active !== false
+   683→              }
+   684→
+   685→              const response = await fetch(`/api/admin/question-groups/${groupId}/questions`, {
+   686→                method: "POST",
+   687→                headers: {
+   688→                  "Content-Type": "application/json"
+   689→                },
+   690→                body: JSON.stringify(apiData)
+   691→              })
+   692→
+   693→              if (!response.ok) {
+   694→                throw new Error(`Failed to create question "${question.Reference}"`)
+   695→              }
+   696→
+   697→              const result = await response.json()
+   698→              return result
+   699→            } catch (error) {
+   700→              console.error(`Failed to import question ${index + 1}:`, error)
+   701→              return { error: error instanceof Error ? error.message : "Unknown error" }
+   702→            }
+   703→          })
+   704→
+   705→          const importedQuestions = await Promise.all(importPromises)
+   706→          const successfulImports = importedQuestions.filter(result => !result.error)
+   707→          const failedImports = importedQuestions.filter(result => result.error)
+   708→
+   709→          if (successfulImports.length > 0) {
+   710→            toast.success(`Successfully imported ${successfulImports.length} question(s)`)
+   711→            await fetchQuestions()
+   712→          }
+   713→
+   714→          if (failedImports.length > 0) {
+   715→            const errorMessages = failedImports.map(f => f.error).join(", ")
+   716→            console.error("Failed imports:", errorMessages)
+   717→            toast.error(`Failed to import ${failedImports.length} question(s). Check console for details.`)
+   718→          }
+   719→
+   720→          setIsImportSheetOpen(false)
+   721→          setImportFile(null)
+   722→        } catch (error) {
+   723→          console.error("Import error:", error)
+   724→          toast.error("Failed to import questions. Please try again.")
+   725→        } finally {
+   726→          setIsImporting(false)
+   727→        }
+   728→      },
+   729→      error: (error) => {
+   730→        console.error("CSV parsing error:", error)
+   731→        toast.error(`Failed to parse CSV file: ${error.message}`)
+   732→        setIsImporting(false)
+   733→      }
+   734→    })
+   735→  }
+   736→
+   737→  if (loading) {
+   738→    return <div className="flex items-center justify-center h-[80vh]"><HexagonLoader size={80} /></div>
+   739→  }
+   740→
+   741→  if (!questionGroup) {
+   742→    return <div className="flex items-center justify-center h-64">Question group not found</div>
+   743→  }
+   744→
+   745→  return (
+   746→    <div className="space-y-6">
+   747→      <div className="flex justify-between items-center">
+   748→        <div>
+   749→          <div className="flex items-center space-x-3">
+   750→            <h1 className="text-3xl font-bold tracking-tight">{questionGroup.name}</h1>
+   751→            <Badge variant={questionGroup.isActive ? "default" : "secondary"}>
+   752→              {questionGroup.isActive ? "Active" : "Inactive"}
+   753→            </Badge>
+   754→          </div>
+   755→          <p className="text-muted-foreground mt-1">
+   756→            Created {format(new Date(questionGroup.createdAt), "MMM d, yyyy")} • {questions.length} questions
+   757→          </p>
+   758→        </div>
+   759→        <div className="flex gap-2">
+   760→          <Button variant="outline" onClick={handleExportQuestions}>
+   761→            <FileDown className="mr-2 h-4 w-4" />
+   762→            Export
+   763→          </Button>
+   764→          <Button variant="outline" onClick={handleImportQuestions}>
+   765→            <FileUp className="mr-2 h-4 w-4" />
+   766→            Import
+   767→          </Button>
+   768→          <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
+   769→            <Plus className="mr-2 h-4 w-4" />
+   770→            New Question
+   771→          </Button>
+   772→          <Button variant="outline" onClick={() => router.back()}>
+   773→            <ChevronLeft className="h-4 w-4" />
+   774→          </Button>
+   775→        </div>
+   776→      </div>
+   777→
+   778→      <Card>
+   779→        <CardContent>
+   780→          <DataTable
+   781→            columns={columns}
+   782→            data={questions}
+   783→            searchKey="reference"
+   784→            searchPlaceholder="Search questions..."
+   785→            filters={[
+   786→              {
+   787→                key: "type",
+   788→                label: "Type",
+   789→                options: [
+   790→                  { value: "all", label: "All Types" },
+   791→                  { value: "MULTIPLE_CHOICE", label: "Multiple Choice" },
+   792→                  { value: "TRUE_FALSE", label: "True/False" },
+   793→                  { value: "FILL_IN_BLANK", label: "Fill in Blank" },
+   794→                  { value: "MULTI_SELECT", label: "Multi Select" },
+   795→                ],
+   796→              },
+   797→              {
+   798→                key: "difficulty",
+   799→                label: "Difficulty",
+   800→                options: [
+   801→                  { value: "all", label: "All Levels" },
+   802→                  { value: "EASY", label: "Easy" },
+   803→                  { value: "MEDIUM", label: "Medium" },
+   804→                  { value: "HARD", label: "Hard" },
+   805→                ],
+   806→              },
+   807→              {
+   808→                key: "isActive",
+   809→                label: "Status",
+   810→                options: [
+   811→                  { value: "all", label: "All Status" },
+   812→                  { value: "true", label: "Active" },
+   813→                  { value: "false", label: "Inactive" },
+   814→                ],
+   815→              },
+   816→            ]}
+   817→          />
+   818→        </CardContent>
+   819→      </Card>
+   820→
+   821→      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+   822→        <DialogContent className="min-w-[98vw] max-h-[95vh] overflow-y-auto">
+   823→          <DialogHeader>
+   824→            <DialogTitle>
+   825→              {editingQuestion ? "Edit Question" : "Create Question"}
+   826→            </DialogTitle>
+   827→            <DialogDescription>
+   828→              {editingQuestion ? "Update the question details below" : "Create a new question for this group"}
+   829→            </DialogDescription>
+   830→          </DialogHeader>
+   831→          <div className="flex flex-row w-full h-full justify-center items-center gap-[10%]">
+   832→
+   833→
+   834→            <form onSubmit={handleSubmit} className="w-[45%]">
+   835→              <div className="space-y-6">
+   836→                <div className="space-y-2">
+   837→                  <Label htmlFor="reference">Reference (Admin Only)</Label>
+   838→                  <Input
+   839→                    id="reference"
+   840→                    value={formData.reference}
+   841→                    onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+   842→                    placeholder="Enter question reference"
+   843→                    required
+   844→                  />
+   845→                </div>
+   846→
+   847→                <div className="grid grid-cols-2 gap-4">
+   848→                  <div className="space-y-2">
+   849→                    <Label htmlFor="type">Type</Label>
+   850→                    <Select
+   851→                      value={formData.type}
+   852→                      onValueChange={(value) => {
+   853→                        const newType = value as QuestionType
+   854→                        let newOptions = [...formData.options]
+   855→                        if (newType === QuestionType.MULTI_SELECT && newOptions.length < 3) {
+   856→                          while (newOptions.length < 3) {
+   857→                            newOptions.push("")
+   858→                          }
+   859→                        } else if (newType === QuestionType.TRUE_FALSE) {
+   860→                          newOptions = ["True", "False"]
+   861→                        } else if (newType === QuestionType.MULTIPLE_CHOICE && newOptions.length < 2) {
+   862→                          while (newOptions.length < 2) {
+   863→                            newOptions.push("")
+   864→                          }
+   865→                        }
+   866→
+   867→                        setFormData({
+   868→                          ...formData,
+   869→                          type: newType,
+   870→                          options: newOptions,
+   871→                          correctAnswer: "",
+   872→                          correctAnswers: []
+   873→                        })
+   874→                      }}
+   875→                    >
+   876→                      <SelectTrigger>
+   877→                        <SelectValue placeholder="Select question type" />
+   878→                      </SelectTrigger>
+   879→                      <SelectContent>
+   880→                        <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
+   881→                        <SelectItem value={QuestionType.MULTI_SELECT}>Multi-Select</SelectItem>
+   882→                        <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+   883→                        <SelectItem value={QuestionType.FILL_IN_BLANK}>Fill in Blank</SelectItem>
+   884→                      </SelectContent>
+   885→                    </Select>
+   886→                  </div>
+   887→
+   888→                  <div className="space-y-2">
+   889→                    <Label htmlFor="difficulty">Difficulty</Label>
+   890→                    <Select
+   891→                      value={formData.difficulty}
+   892→                      onValueChange={(value) => setFormData({ ...formData, difficulty: value as DifficultyLevel })}
+   893→                    >
+   894→                      <SelectTrigger>
+   895→                        <SelectValue placeholder="Select difficulty" />
+   896→                      </SelectTrigger>
+   897→                      <SelectContent>
+   898→                        <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+   899→                        <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+   900→                        <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+   901→                      </SelectContent>
+   902→                    </Select>
+   903→                  </div>
+   904→                </div>
+   905→
+   906→                {formData.type !== QuestionType.FILL_IN_BLANK && (
+   907→                  <div className="space-y-4">
+   908→                    <div className="flex justify-between items-center">
+   909→                      <Label>Options</Label>
+   910→                      <Button type="button" variant="outline" size="sm" onClick={addOption}>
+   911→                        <Plus className="h-4 w-4 mr-1" />
+   912→                        Add Option
+   913→                      </Button>
+   914→                    </div>
+   915→                    {formData.type === QuestionType.MULTI_SELECT && (
+   916→                      <p className="text-sm text-muted-foreground">
+   917→                        Multi-select questions require at least 3 options.
+   918→                      </p>
+   919→                    )}
+   920→                    <div className="space-y-2">
+   921→                      {formData.options.map((option, index) => (
+   922→                        <div key={index} className="flex items-center space-x-2">
+   923→                          <Input
+   924→                            value={option}
+   925→                            onChange={(e) => updateOption(index, e.target.value)}
+   926→                            placeholder={`Option ${index + 1}`}
+   927→                            required
+   928→                          />
+   929→                          <Button
+   930→                            type="button"
+   931→                            variant="outline"
+   932→                            size="sm"
+   933→                            onClick={() => removeOption(index)}
+   934→                            disabled={formData.options.length <= (formData.type === QuestionType.MULTI_SELECT ? 3 :
+   935→                              formData.type === QuestionType.TRUE_FALSE ? 2 : 1)}
+   936→                          >
+   937→                            <Trash2 className="h-4 w-4" />
+   938→                          </Button>
+   939→                        </div>
+   940→                      ))}
+   941→                    </div>
+   942→                  </div>
+   943→                )}
+   944→
+   945→                {formData.type !== QuestionType.FILL_IN_BLANK && (
+   946→                  <div className="space-y-2">
+   947→                    <Label>
+   948→                      {formData.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
+   949→                    </Label>
+   950→                    <div className="space-y-2">
+   951→                      {formData.options.map((option, index) => (
+   952→                        <div key={index} className="flex items-center space-x-2">
+   953→                          <Checkbox
+   954→                            id={`correct-${index}`}
+   955→                            checked={formData.correctAnswers.includes(option)}
+   956→                            onCheckedChange={(checked) => handleCorrectAnswerChange(option, checked as boolean)}
+   957→                          />
+   958→                          <label htmlFor={`correct-${index}`} className="text-sm">
+   959→                            {option || `Option ${index + 1}`}
+   960→                          </label>
+   961→                        </div>
+   962→                      ))}
+   963→                    </div>
+   964→                  </div>
+   965→                )}
+   966→
+   967→                {formData.type === QuestionType.FILL_IN_BLANK && (
+   968→                  <div className="space-y-2">
+   969→                    <Label htmlFor="correctAnswer">Correct Answer</Label>
+   970→                    <Input
+   971→                      id="correctAnswer"
+   972→                      value={formData.correctAnswer}
+   973→                      onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+   974→                      placeholder="Enter correct answer"
+   975→                      required
+   976→                    />
+   977→                  </div>
+   978→                )}
+   979→
+   980→                <div className="space-y-2">
+   981→                  <Label htmlFor="title">Title</Label>
+   982→                  <RichTextEditor
+   983→                    value={formData.title}
+   984→                    onChange={(value) => setFormData({ ...formData, title: value })}
+   985→                    placeholder="Enter question title..."
+   986→                    className="min-h-[150px]"
+   987→                  />
+   988→                </div>
+   989→
+   990→                <div className="space-y-2">
+   991→                  <Label htmlFor="explanation">Explanation (Optional)</Label>
+   992→                  <RichTextEditor
+   993→                    value={formData.explanation}
+   994→                    onChange={(value) => setFormData({ ...formData, explanation: value })}
+   995→                    placeholder="Enter explanation..."
+   996→                    className="min-h-[100px]"
+   997→                  />
+   998→                  <div className="flex items-center gap-2 pt-2">
+   999→                    <Button
+  1000→                      type="button"
+  1001→                      variant="outline"
+  1002→                      size="sm"
+  1003→                      onClick={() => handleAIEnhance('enhance')}
+  1004→                      disabled={aiEnhancing || !formData.title || formData.options.filter(o => o.trim()).length === 0}
+  1005→                      className="flex-1"
+  1006→                    >
+  1007→                      <Sparkles className="h-4 w-4 mr-2" />
+  1008→                      {aiEnhancing ? 'Enhancing...' : 'Enhance & Beautify'}
+  1009→                    </Button>
+  1010→                    <Button
+  1011→                      type="button"
+  1012→                      variant="outline"
+  1013→                      size="sm"
+  1014→                      onClick={() => handleAIEnhance('beautify')}
+  1015→                      disabled={aiEnhancing || !formData.explanation}
+  1016→                      className="flex-1"
+  1017→                    >
+  1018→                      <Sparkles className="h-4 w-4 mr-2" />
+  1019→                      {aiEnhancing ? 'Beautifying...' : 'Beautify'}
+  1020→                    </Button>
+  1021→                    <Button
+  1022→                      type="button"
+  1023→                      variant="outline"
+  1024→                      size="sm"
+  1025→                      onClick={handleUndo}
+  1026→                      disabled={historyIndex < 0}
+  1027→                    >
+  1028→                      <Undo2 className="h-4 w-4" />
+  1029→                    </Button>
+  1030→                  </div>
+  1031→                  <p className="text-xs text-muted-foreground mt-1">
+  1032→                    <strong>Enhance & Beautify:</strong> Adds detailed explanations for each option • <strong>Beautify:</strong> Formats existing explanation with colors
+  1033→                  </p>
+  1034→                </div>
+  1035→
+  1036→                <div className="flex items-center space-x-2">
+  1037→                  <Switch
+  1038→                    id="isActive"
+  1039→                    checked={formData.isActive}
+  1040→                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+  1041→                  />
+  1042→                  <Label htmlFor="isActive">Active</Label>
+  1043→                </div>
+  1044→              </div>
+  1045→
+  1046→              <DialogFooter>
+  1047→                <LoadingButton
+  1048→                  type="submit"
+  1049→                  isLoading={submitLoading}
+  1050→                  loadingText={editingQuestion ? "Updating..." : "Creating..."}
+  1051→                >
+  1052→                  {editingQuestion ? "Update" : "Create"}
+  1053→                </LoadingButton>
+  1054→              </DialogFooter>
+  1055→            </form>
+  1056→            <div className="w-[45%] h-full">
+  1057→              <div className="sticky top-0">
+  1058→                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+  1059→                  <Brain className="h-5 w-5 text-primary" />
+  1060→                  User Preview
+  1061→                </h3>
+  1062→                <Card className="bg-card/90 dark:bg-card/90 backdrop-blur-sm shadow-lg border border-border/50">
+  1063→                  <CardHeader className="space-y-3">
+  1064→                    <div className="flex items-center justify-between">
+  1065→                      <div className="flex items-center space-x-2">
+  1066→                        <Brain className="h-5 w-5 text-primary dark:text-sidebar-primary" />
+  1067→                        <Badge variant="outline" className="bg-primary/10 text-primary dark:bg-sidebar-primary/10 dark:text-sidebar-primary-foreground">
+  1068→                          1 point
+  1069→                        </Badge>
+  1070→                      </div>
+  1071→                      <Badge variant={formData.isActive ? "default" : "secondary"}>
+  1072→                        {formData.isActive ? "Active" : "Inactive"}
+  1073→                      </Badge>
+  1074→                    </div>
+  1075→                    <div className="text-sm text-muted-foreground font-medium">
+  1076→                      {formData.reference || "Question Reference"}
+  1077→                    </div>
+  1078→                    <div className="text-xl leading-relaxed">
+  1079→                      {formData.title ? (
+  1080→                        <RichTextDisplay content={formData.title} />
+  1081→                      ) : (
+  1082→                        <span className="text-muted-foreground italic">Question title will appear here...</span>
+  1083→                      )}
+  1084→                    </div>
+  1085→                  </CardHeader>
+  1086→
+  1087→                  <CardContent className="space-y-4">
+  1088→                    {/* Multiple Choice & True/False Questions */}
+  1089→                    {(formData.type === QuestionType.MULTIPLE_CHOICE || formData.type === QuestionType.TRUE_FALSE) && (
+  1090→                      <RadioGroup>
+  1091→                        {formData.options.filter(o => o.trim()).length > 0 ? (
+  1092→                          formData.options
+  1093→                            .filter(o => o.trim())
+  1094→                            .map((option, index) => {
+  1095→                              const isSelected = formData.correctAnswer === option;
+  1096→                              return (
+  1097→                                <div
+  1098→                                  key={index}
+  1099→                                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+  1100→                                    isSelected
+  1101→                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+  1102→                                      : 'border-gray-200 dark:border-gray-700'
+  1103→                                  }`}
+  1104→                                >
+  1105→                                  <RadioGroupItem value={option} id={`preview-option-${index}`} disabled />
+  1106→                                  <Label
+  1107→                                    htmlFor={`preview-option-${index}`}
+  1108→                                    className="cursor-pointer flex-1 text-base"
+  1109→                                  >
+  1110→                                    {option}
+  1111→                                  </Label>
+  1112→                                  {isSelected && (
+  1113→                                    <div className="text-blue-500">
+  1114→                                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1115→                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  1116→                                      </svg>
+  1117→                                    </div>
+  1118→                                  )}
+  1119→                                </div>
+  1120→                              );
+  1121→                            })
+  1122→                        ) : (
+  1123→                          <p className="text-sm text-muted-foreground text-center py-4">
+  1124→                            Options will appear here...
+  1125→                          </p>
+  1126→                        )}
+  1127→                      </RadioGroup>
+  1128→                    )}
+  1129→
+  1130→                    {/* Multi-Select Questions */}
+  1131→                    {formData.type === QuestionType.MULTI_SELECT && (
+  1132→                      <div className="space-y-3">
+  1133→                        {formData.options.filter(o => o.trim()).length > 0 ? (
+  1134→                          formData.options
+  1135→                            .filter(o => o.trim())
+  1136→                            .map((option, index) => {
+  1137→                              const isSelected = formData.correctAnswers.includes(option);
+  1138→                              return (
+  1139→                                <div
+  1140→                                  key={index}
+  1141→                                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+  1142→                                    isSelected
+  1143→                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+  1144→                                      : 'border-gray-200 dark:border-gray-700'
+  1145→                                  }`}
+  1146→                                >
+  1147→                                  <Checkbox
+  1148→                                    id={`preview-option-${index}`}
+  1149→                                    checked={isSelected}
+  1150→                                    disabled
+  1151→                                  />
+  1152→                                  <Label
+  1153→                                    htmlFor={`preview-option-${index}`}
+  1154→                                    className="cursor-pointer flex-1 text-base"
+  1155→                                  >
+  1156→                                    {option}
+  1157→                                  </Label>
+  1158→                                  {isSelected && (
+  1159→                                    <div className="text-blue-500">
+  1160→                                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1161→                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  1162→                                      </svg>
+  1163→                                    </div>
+  1164→                                  )}
+  1165→                                </div>
+  1166→                              );
+  1167→                            })
+  1168→                        ) : (
+  1169→                          <p className="text-sm text-muted-foreground text-center py-4">
+  1170→                            Options will appear here...
+  1171→                          </p>
+  1172→                        )}
+  1173→                      </div>
+  1174→                    )}
+  1175→
+  1176→                    {/* Fill in Blank Questions */}
+  1177→                    {formData.type === QuestionType.FILL_IN_BLANK && (
+  1178→                      <div className="space-y-3">
+  1179→                        <div className="p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+  1180→                          <Label className="text-sm text-muted-foreground">Your Answer:</Label>
+  1181→                          {formData.correctAnswer ? (
+  1182→                            <p className="mt-2 text-base font-medium text-blue-600 dark:text-blue-400">
+  1183→                              {formData.correctAnswer}
+  1184→                            </p>
+  1185→                          ) : (
+  1186→                            <p className="mt-2 text-base text-muted-foreground italic">
+  1187→                              Correct answer will appear here...
+  1188→                            </p>
+  1189→                          )}
+  1190→                        </div>
+  1191→                      </div>
+  1192→                    )}
+  1193→
+  1194→                    {/* Explanation Preview */}
+  1195→                    {formData.explanation && (
+  1196→                      <div className="mt-6 pt-4 border-t border-border/50">
+  1197→                        <div className="text-sm font-medium text-muted-foreground mb-2">Explanation:</div>
+  1198→                        <RichTextDisplay content={formData.explanation} />
+  1199→                      </div>
+  1200→                    )}
+  1201→
+  1202→                    {/* Difficulty Badge */}
+  1203→                    <div className="flex items-center justify-between pt-4 border-t border-border/50">
+  1204→                      <Badge
+  1205→                        variant="outline"
+  1206→                        className={
+  1207→                          formData.difficulty === DifficultyLevel.EASY
+  1208→                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+  1209→                            : formData.difficulty === DifficultyLevel.MEDIUM
+  1210→                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+  1211→                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+  1212→                        }
+  1213→                      >
+  1214→                        {formData.difficulty.toLowerCase()}
+  1215→                      </Badge>
+  1216→                      <Badge variant="outline">
+  1217→                        {formData.type === QuestionType.MULTIPLE_CHOICE && "Multiple Choice"}
+  1218→                        {formData.type === QuestionType.TRUE_FALSE && "True/False"}
+  1219→                        {formData.type === QuestionType.FILL_IN_BLANK && "Fill in Blank"}
+  1220→                        {formData.type === QuestionType.MULTI_SELECT && "Multi-Select"}
+  1221→                      </Badge>
+  1222→                    </div>
+  1223→                  </CardContent>
+  1224→                </Card>
+  1225→              </div>
+  1226→            </div>
+  1227→          </div>
+  1228→        </DialogContent>
+  1229→      </Dialog>
+  1230→
+  1231→      <Dialog open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
+  1232→        <DialogContent>
+  1233→          <DialogHeader>
+  1234→            <DialogTitle>Import Questions</DialogTitle>
+  1235→            <DialogDescription>
+  1236→              Upload a CSV file to import questions into this group
+  1237→            </DialogDescription>
+  1238→          </DialogHeader>
+  1239→          <div className="space-y-4">
+  1240→            <div
+  1241→              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+  1242→                }`}
+  1243→              onDragOver={handleDragOver}
+  1244→              onDragLeave={handleDragLeave}
+  1245→              onDrop={handleDrop}
+  1246→            >
+  1247→              <input
+  1248→                ref={fileInputRef}
+  1249→                type="file"
+  1250→                accept=".csv"
+  1251→                onChange={handleFileSelect}
+  1252→                className="hidden"
+  1253→              />
+  1254→              {importFile ? (
+  1255→                <div className="space-y-2">
+  1256→                  <p className="font-medium">{importFile.name}</p>
+  1257→                  <Button type="button" variant="outline" size="sm" onClick={handleRemoveFile}>
+  1258→                    Remove
+  1259→                  </Button>
+  1260→                </div>
+  1261→              ) : (
+  1262→                <div className="space-y-2">
+  1263→                  <p className="text-sm text-muted-foreground">
+  1264→                    Drag and drop a CSV file here, or click to browse
+  1265→                  </p>
+  1266→                  <Button
+  1267→                    type="button"
+  1268→                    variant="outline"
+  1269→                    onClick={() => fileInputRef.current?.click()}
+  1270→                  >
+  1271→                    Select File
+  1272→                  </Button>
+  1273→                </div>
+  1274→              )}
+  1275→            </div>
+  1276→          </div>
+  1277→          <DialogFooter>
+  1278→            <Button
+  1279→              type="button"
+  1280→              variant="outline"
+  1281→              onClick={() => setIsImportSheetOpen(false)}
+  1282→            >
+  1283→              Cancel
+  1284→            </Button>
+  1285→            <Button
+  1286→              type="button"
+  1287→              onClick={handleImportWithGroup}
+  1288→              disabled={isImporting || !importFile}
+  1289→            >
+  1290→              {isImporting ? (
+  1291→                <>
+  1292→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+  1293→                  Importing...
+  1294→                </>
+  1295→              ) : (
+  1296→                "Import"
+  1297→              )}
+  1298→            </Button>
+  1299→          </DialogFooter>
+  1300→        </DialogContent>
+  1301→      </Dialog>
+  1302→    </div>
+  1303→  )
+  1304→}
+  1305→

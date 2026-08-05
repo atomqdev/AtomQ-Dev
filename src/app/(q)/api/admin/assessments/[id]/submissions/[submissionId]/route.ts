@@ -69,8 +69,8 @@ export async function GET(
       return {
         id: `${qa.id}_${answer?.id || 'no-answer'}`,
         questionId: qa.questionId,
+        reference: qa.question.reference,
         title: qa.question.title,
-        content: qa.question.content,
         type: qa.question.type,
         options: qa.question.options,
         correctAnswer: qa.question.correctAnswer,

@@ -4,8 +4,8 @@ import { QuestionType } from '@prisma/client'
 
 interface QuizQuestion {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string[]
   correctAnswer: string

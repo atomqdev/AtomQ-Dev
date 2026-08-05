@@ -39,13 +39,14 @@ import {
 import { toasts } from "@/lib/toasts"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import HexagonLoader from "@/components/Loader/Loading"
+import { getMultiSelectCount } from "@/lib/utils"
 
 // ==================== TYPES ====================
 
 interface Question {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string[]
   correctAnswer: string
@@ -1042,8 +1043,10 @@ export default function AssessmentTakingPage() {
                     switch (currentQuestion.type) {
                       case QuestionType.MULTIPLE_CHOICE:
                         return 'Multiple Choice'
-                      case QuestionType.MULTI_SELECT:
-                        return 'Multi Select'
+                      case QuestionType.MULTI_SELECT: {
+                        const selectCount = getMultiSelectCount(currentQuestion.correctAnswer)
+                        return `Select ${selectCount} option${selectCount !== 1 ? 's' : ''}`
+                      }
                       case QuestionType.TRUE_FALSE:
                         return 'True or False'
                       case QuestionType.FILL_IN_BLANK:
@@ -1056,7 +1059,7 @@ export default function AssessmentTakingPage() {
               </div>
 
               <div className="prose max-w-none">
-                <RichTextDisplay content={currentQuestion.content} />
+                <RichTextDisplay content={currentQuestion.title} />
               </div>
 
               {/* Answer Options */}

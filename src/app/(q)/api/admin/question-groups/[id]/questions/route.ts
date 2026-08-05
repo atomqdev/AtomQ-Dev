@@ -68,16 +68,6 @@ export async function POST(
 
     const { id } = await params
     const body = await request.json()
-    const {
-      title,
-      content,
-      type,
-      options,
-      correctAnswer,
-      explanation,
-      difficulty,
-      isActive = true
-    } = body
 
     // Check if question group exists
     const questionGroup = await db.questionGroup.findUnique({
@@ -91,8 +81,98 @@ export async function POST(
       )
     }
 
+    // Check if this is a bulk import request
+    if (body.importData && Array.isArray(body.importData)) {
+      const { importData } = body
+      const createdQuestions = []
+      let failureCount = 0
+
+      for (const qData of importData) {
+        // Skip rows missing required fields
+        if (!qData.reference || !qData.title || !qData.type || !qData.options || !qData.correctAnswer) {
+          failureCount++
+          continue
+        }
+
+        try {
+          const parsedOptions = Array.isArray(qData.options) ? qData.options : JSON.parse(qData.options)
+          const type = qData.type as QuestionType
+          const correctAnswer = qData.correctAnswer
+
+          // Validate options based on question type
+          if (type === QuestionType.MULTIPLE_CHOICE && parsedOptions.length < 2) {
+            failureCount++
+            continue
+          }
+          if (type === QuestionType.MULTI_SELECT && parsedOptions.length < 3) {
+            failureCount++
+            continue
+          }
+          if (type === QuestionType.TRUE_FALSE && parsedOptions.length !== 2) {
+            failureCount++
+            continue
+          }
+
+          // Validate correct answer is in options (except fill-in-the-blank)
+          if (type !== QuestionType.FILL_IN_BLANK) {
+            if (type === QuestionType.MULTIPLE_CHOICE || type === QuestionType.TRUE_FALSE) {
+              if (!parsedOptions.includes(correctAnswer)) {
+                failureCount++
+                continue
+              }
+            }
+            if (type === QuestionType.MULTI_SELECT) {
+              const correctAnswers = correctAnswer.split('|').map((ans: string) => ans.trim())
+              const allValid = correctAnswers.every((answer: string) => parsedOptions.includes(answer))
+              if (!allValid) {
+                failureCount++
+                continue
+              }
+            }
+          }
+
+          const question = await db.question.create({
+            data: {
+              reference: qData.reference,
+              title: qData.title,
+              type,
+              options: JSON.stringify(parsedOptions),
+              correctAnswer,
+              explanation: qData.explanation || null,
+              difficulty: qData.difficulty || DifficultyLevel.MEDIUM,
+              isActive: qData.isActive !== false,
+              groupId: id
+            }
+          })
+          createdQuestions.push(question)
+        } catch (error) {
+          console.error("Error creating question from import:", error)
+          failureCount++
+        }
+      }
+
+      return NextResponse.json({
+        message: `Successfully imported ${createdQuestions.length} question${createdQuestions.length !== 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        questions: createdQuestions,
+        successCount: createdQuestions.length,
+        failureCount,
+      }, { status: 201 })
+    }
+
+    // Single question creation
+    const {
+      reference,
+      title,
+      type,
+      options,
+      correctAnswer,
+      explanation,
+      difficulty,
+      isActive = true
+    } = body
+
     // Validate required fields
-    if (!title || !content || !type || !options || !correctAnswer) {
+    if (!reference || !title || !type || !options || !correctAnswer) {
       return NextResponse.json(
         { message: "Missing required fields" },
         { status: 400 }
@@ -151,8 +231,8 @@ export async function POST(
     // Create the question
     const question = await db.question.create({
       data: {
+        reference,
         title,
-        content,
         type,
         options: JSON.stringify(parsedOptions),
         correctAnswer,

@@ -6,12 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -39,7 +33,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
-  MoreHorizontal,
   Plus,
   Edit,
   Trash2,
@@ -205,40 +198,94 @@ export default function QuestionGroupsPage() {
       },
     },
     {
-      id: "actions",
+      id: "manageQuestions",
+      header: "Manage",
       enableHiding: false,
       cell: ({ row }) => {
         const group = row.original
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push(`/admin/question-groups/${group.id}/questions`)}>
-                <Eye className="mr-2 h-4 w-4" />
-                Manage Questions
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/admin/question-groups/${group.id}/reported-questions`)}>
-                <TriangleAlert className="mr-2 h-4 w-4 text-yellow-600" />
-                Reported Questions
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openEditDialog(group)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => openDeleteDialog(group)}
-                className="text-red-600"
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => router.push(`/admin/question-groups/${group.id}/questions`)}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Manage Questions</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      id: "reportedQuestions",
+      header: "Reported",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const group = row.original
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => router.push(`/admin/question-groups/${group.id}/reported-questions`)}
+              >
+                <TriangleAlert className="h-4 w-4 text-yellow-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reported Questions</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      id: "edit",
+      header: "Edit",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const group = row.original
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => openEditDialog(group)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit Group</TooltipContent>
+          </Tooltip>
+        )
+      },
+    },
+    {
+      id: "delete",
+      header: "Delete",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const group = row.original
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                onClick={() => openDeleteDialog(group)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Group</TooltipContent>
+          </Tooltip>
         )
       },
     },

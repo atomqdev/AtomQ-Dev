@@ -34,14 +34,15 @@ import {
   TriangleAlert
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
+import { parseMultiSelectAnswers, getMultiSelectCount } from "@/lib/utils"
 import { QuestionType } from "@prisma/client"
 import HexagonLoader from "@/components/Loader/Loading"
 import { useQuizProgressStore } from "@/stores/quiz-progress"
 
 interface Question {
   id: string
+  reference: string
   title: string
-  content: string
   type: QuestionType
   options: string[]
   correctAnswer: string
@@ -174,7 +175,7 @@ export default function QuizTakingPage() {
         }
         
         // Validate each question
-        const invalidQuestions = data.quiz.questions.filter((q: any) => !q.id || !q.content)
+        const invalidQuestions = data.quiz.questions.filter((q: any) => !q.id || !q.title)
         if (invalidQuestions.length > 0) {
           console.error("Found invalid questions:", invalidQuestions)
           toasts.error("Some quiz questions are corrupted")
@@ -776,7 +777,15 @@ export default function QuizTakingPage() {
                   </div>
                 </div>
                 <CardTitle className="text-xl leading-relaxed">
-                  <RichTextDisplay content={currentQuestion.content} />
+                  <RichTextDisplay content={currentQuestion.title} />
+                  {currentQuestion.type === QuestionType.MULTI_SELECT && (() => {
+                    const selectCount = getMultiSelectCount(currentQuestion.correctAnswer)
+                    return (
+                      <span className="inline-flex items-center ml-2 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                        Select {selectCount} option{selectCount !== 1 ? 's' : ''}
+                      </span>
+                    )
+                  })()}
                 </CardTitle>
               </CardHeader>
 
@@ -852,7 +861,7 @@ export default function QuizTakingPage() {
                 {currentQuestion.type === QuestionType.MULTI_SELECT && (
                   <div className="space-y-3">
                     {currentQuestion.options.map((option: string, index: number) => {
-                      const correctAnswers = currentQuestion.correctAnswer.split('|')
+                      const correctAnswers = parseMultiSelectAnswers(currentQuestion.correctAnswer)
                       const isCorrect = showAnswer === currentQuestion.id && correctAnswers.includes(option)
                       const isSelected = multiSelectAnswers[currentQuestion.id]?.includes(option) || false
                       const isLocked = checkedAnswers.has(currentQuestion.id)
@@ -1050,7 +1059,7 @@ export default function QuizTakingPage() {
                         </p>
                         <p className="text-green-700 dark:text-green-300">
                           {currentQuestion.type === QuestionType.MULTI_SELECT 
-                            ? currentQuestion.correctAnswer.split('|').join(', ')
+                            ? parseMultiSelectAnswers(currentQuestion.correctAnswer).join(', ')
                             : currentQuestion.type === QuestionType.FILL_IN_BLANK
                             ? currentQuestion.correctAnswer
                             : currentQuestion.options[parseInt(currentQuestion.correctAnswer)]

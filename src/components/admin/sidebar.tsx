@@ -43,6 +43,7 @@ const adminNavItems = [
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+    exact: true,
   },
   {
     title: "Users",
@@ -196,7 +197,9 @@ export function AppSidebar({
       <ScrollArea className="flex-1 px-2 py-4">
         <nav className="space-y-1">
           {adminNavItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}

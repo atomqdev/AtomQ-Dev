@@ -1,0 +1,754 @@
+     1→"use client"
+     2→
+     3→import { useState, useEffect } from "react"
+     4→import { useRouter } from "next/navigation"
+     5→import { Button } from "@/components/ui/button"
+     6→import { Badge } from "@/components/ui/badge"
+     7→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+     8→import {
+     9→  DropdownMenu,
+    10→  DropdownMenuContent,
+    11→  DropdownMenuItem,
+    12→  DropdownMenuTrigger,
+    13→} from "@/components/ui/dropdown-menu"
+    14→import {
+    15→  Sheet,
+    16→  SheetContent,
+    17→  SheetDescription,
+    18→  SheetFooter,
+    19→  SheetHeader,
+    20→  SheetTitle,
+    21→} from "@/components/ui/sheet"
+    22→import {
+    23→  AlertDialog,
+    24→  AlertDialogAction,
+    25→  AlertDialogCancel,
+    26→  AlertDialogContent,
+    27→  AlertDialogDescription,
+    28→  AlertDialogFooter,
+    29→  AlertDialogHeader,
+    30→  AlertDialogTitle,
+    31→} from "@/components/ui/alert-dialog"
+    32→import { Label } from "@/components/ui/label"
+    33→import { Input } from "@/components/ui/input"
+    34→import { Switch } from "@/components/ui/switch"
+    35→import {
+    36→  Tooltip,
+    37→  TooltipContent,
+    38→  TooltipProvider,
+    39→  TooltipTrigger,
+    40→} from "@/components/ui/tooltip"
+    41→import {
+    42→  MoreHorizontal,
+    43→  Plus,
+    44→  Edit,
+    45→  Trash2,
+    46→  Eye,
+    47→  TriangleAlert,
+    48→  ArrowUpDown,
+    49→  Loader2,
+    50→  FileQuestion,
+    51→  BookOpen,
+    52→  CheckCircle2 as CheckCircle,
+    53→} from "lucide-react"
+    54→import { toasts } from "@/lib/toasts"
+    55→import { DataTable } from "@/components/ui/data-table"
+    56→import { ColumnDef } from "@tanstack/react-table"
+    57→import HexagonLoader from "@/components/Loader/Loading"
+    58→import { LoadingButton } from "@/components/ui/laodaing-button"
+    59→import { format } from "date-fns"
+    60→
+    61→// Helper function to format dates in dd/mm/yyyy format
+    62→const formatDateDDMMYYYY = (dateString: string) => {
+    63→  const date = new Date(dateString)
+    64→  const day = String(date.getDate()).padStart(2, '0')
+    65→  const month = String(date.getMonth() + 1).padStart(2, '0')
+    66→  const year = date.getFullYear()
+    67→  return `${day}/${month}/${year}`
+    68→}
+    69→
+    70→interface QuestionGroup {
+    71→  id: string
+    72→  name: string
+    73→  isActive: boolean
+    74→  createdAt: string
+    75→  creator: {
+    76→    id: string
+    77→    name: string | null
+    78→    email: string
+    79→  }
+    80→  _count: {
+    81→    questions: number
+    82→    reportedQuestions: number
+    83→  }
+    84→}
+    85→
+    86→interface FormData {
+    87→  name: string
+    88→  isActive: boolean
+    89→}
+    90→
+    91→export default function QuestionGroupsPage() {
+    92→  const router = useRouter()
+    93→  const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([])
+    94→  const [loading, setLoading] = useState(true)
+    95→  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+    96→  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    97→  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    98→  const [selectedGroup, setSelectedGroup] = useState<QuestionGroup | null>(null)
+    99→  const [groupToDelete, setGroupToDelete] = useState<QuestionGroup | null>(null)
+   100→  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+   101→  const [submitLoading, setSubmitLoading] = useState(false)
+   102→  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+   103→  const [formData, setFormData] = useState<FormData>({
+   104→    name: "",
+   105→    isActive: true,
+   106→  })
+   107→
+   108→  // Deletion tracking state
+   109→  const [deleteInfo, setDeleteInfo] = useState<{
+   110→    questionGroup: { id: string; name: string }
+   111→    counts: {
+   112→      questions: number
+   113→      quizQuestions: number
+   114→      assessmentQuestions: number
+   115→      reportedQuestions: number
+   116→      quizzes: number
+   117→      assessments: number
+   118→    }
+   119→  } | null>(null)
+   120→  const [deletionStatus, setDeletionStatus] = useState<{
+   121→    unassign: 'pending' | 'deleting' | 'deleted'
+   122→    questions: 'pending' | 'deleting' | 'deleted'
+   123→  }>({
+   124→    unassign: 'pending',
+   125→    questions: 'pending'
+   126→  })
+   127→  const columns: ColumnDef<QuestionGroup>[] = [
+   128→    {
+   129→      accessorKey: "name",
+   130→      header: ({ column }) => {
+   131→        return (
+   132→          <Button
+   133→            variant="ghost"
+   134→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   135→          >
+   136→            Name
+   137→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   138→          </Button>
+   139→        )
+   140→      },
+   141→      cell: ({ row }) => (
+   142→        <div className="font-medium">{row.getValue("name")}</div>
+   143→      ),
+   144→    },
+   145→    {
+   146→      accessorKey: "_count.questions",
+   147→      header: "Questions",
+   148→      cell: ({ row }) => {
+   149→        const group = row.original
+   150→        return group._count?.questions || 0
+   151→      },
+   152→    },
+   153→    {
+   154→      accessorKey: "_count.reportedQuestions",
+   155→      header: "Reported",
+   156→      cell: ({ row }) => {
+   157→        const group = row.original
+   158→        const reportedCount = group._count?.reportedQuestions || 0
+   159→        return (
+   160→          <div className="flex items-center gap-2">
+   161→            <span>{reportedCount}</span>
+   162→            {reportedCount > 0 && (
+   163→              <TriangleAlert className="h-4 w-4 text-yellow-600" />
+   164→            )}
+   165→          </div>
+   166→        )
+   167→      },
+   168→    },
+   169→    {
+   170→      accessorKey: "isActive",
+   171→      header: "Status",
+   172→      cell: ({ row }) => {
+   173→        const isActive = row.getValue("isActive") as boolean
+   174→        return (
+   175→          <Badge variant={isActive ? "default" : "secondary"}>
+   176→            {isActive ? "Active" : "Inactive"}
+   177→          </Badge>
+   178→        )
+   179→      },
+   180→    },
+   181→    {
+   182→      accessorKey: "creator.name",
+   183→      header: "Created By",
+   184→      cell: ({ row }) => {
+   185→        const group = row.original
+   186→        return group.creator?.name || group.creator?.email || "-"
+   187→      },
+   188→    },
+   189→    {
+   190→      accessorKey: "createdAt",
+   191→      header: ({ column }) => {
+   192→        return (
+   193→          <Button
+   194→            variant="ghost"
+   195→            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+   196→          >
+   197→            Created At
+   198→            <ArrowUpDown className="ml-2 h-4 w-4" />
+   199→          </Button>
+   200→        )
+   201→      },
+   202→      cell: ({ row }) => {
+   203→        const date = new Date(row.getValue("createdAt"))
+   204→        return formatDateDDMMYYYY(date.toISOString())
+   205→      },
+   206→    },
+   207→    {
+   208→      id: "actions",
+   209→      enableHiding: false,
+   210→      cell: ({ row }) => {
+   211→        const group = row.original
+   212→        return (
+   213→          <DropdownMenu>
+   214→            <DropdownMenuTrigger asChild>
+   215→              <Button variant="ghost" className="h-8 w-8 p-0">
+   216→                <span className="sr-only">Open menu</span>
+   217→                <MoreHorizontal className="h-4 w-4" />
+   218→              </Button>
+   219→            </DropdownMenuTrigger>
+   220→            <DropdownMenuContent align="end">
+   221→              <DropdownMenuItem onClick={() => router.push(`/admin/question-groups/${group.id}/questions`)}>
+   222→                <Eye className="mr-2 h-4 w-4" />
+   223→                Manage Questions
+   224→              </DropdownMenuItem>
+   225→              <DropdownMenuItem onClick={() => router.push(`/admin/question-groups/${group.id}/reported-questions`)}>
+   226→                <TriangleAlert className="mr-2 h-4 w-4 text-yellow-600" />
+   227→                Reported Questions
+   228→              </DropdownMenuItem>
+   229→              <DropdownMenuItem onClick={() => openEditDialog(group)}>
+   230→                <Edit className="mr-2 h-4 w-4" />
+   231→                Edit
+   232→              </DropdownMenuItem>
+   233→              <DropdownMenuItem
+   234→                onClick={() => openDeleteDialog(group)}
+   235→                className="text-red-600"
+   236→              >
+   237→                <Trash2 className="mr-2 h-4 w-4" />
+   238→                Delete
+   239→              </DropdownMenuItem>
+   240→            </DropdownMenuContent>
+   241→          </DropdownMenu>
+   242→        )
+   243→      },
+   244→    },
+   245→  ]
+   246→
+   247→  useEffect(() => {
+   248→    fetchQuestionGroups()
+   249→  }, [])
+   250→
+   251→  const fetchQuestionGroups = async () => {
+   252→    try {
+   253→      const response = await fetch("/api/admin/question-groups")
+   254→      if (response.ok) {
+   255→        const data = await response.json()
+   256→        setQuestionGroups(data)
+   257→      }
+   258→    } catch (error) {
+   259→      toasts.networkError()
+   260→    } finally {
+   261→      setLoading(false)
+   262→    }
+   263→  }
+   264→
+   265→  const handleSubmit = async (e: React.FormEvent) => {
+   266→    e.preventDefault()
+   267→    setSubmitLoading(true)
+   268→
+   269→    const isEditing = selectedGroup !== null
+   270→
+   271→    try {
+   272→      const url = isEditing
+   273→        ? `/api/admin/question-groups/${selectedGroup.id}`
+   274→        : "/api/admin/question-groups"
+   275→
+   276→      const method = isEditing ? "PUT" : "POST"
+   277→
+   278→      const response = await fetch(url, {
+   279→        method,
+   280→        headers: {
+   281→          "Content-Type": "application/json",
+   282→        },
+   283→        body: JSON.stringify(formData),
+   284→      })
+   285→
+   286→      if (response.ok) {
+   287→        toasts.success(isEditing ? "Question group updated successfully" : "Question group created successfully")
+   288→        setIsAddDialogOpen(false)
+   289→        setIsEditDialogOpen(false)
+   290→        setSelectedGroup(null)
+   291→        resetForm()
+   292→        fetchQuestionGroups()
+   293→      } else {
+   294→        const error = await response.json()
+   295→        toasts.error(error.message || "Operation failed")
+   296→      }
+   297→    } catch (error) {
+   298→      toasts.actionFailed(isEditing ? "Question group update" : "Question group creation")
+   299→    } finally {
+   300→      setSubmitLoading(false)
+   301→    }
+   302→  }
+   303→
+   304→  const handleDeleteGroup = async (groupId: string) => {
+   305→    if (!groupToDelete || deleteConfirmation !== "CONFIRM DELETE") {
+   306→      toasts.error('Please type "CONFIRM DELETE" to confirm deletion')
+   307→      return
+   308→    }
+   309→
+   310→    // Check if all steps are completed in the correct order
+   311→    const hasAssignments = (deleteInfo?.counts.quizQuestions || 0) > 0 || (deleteInfo?.counts.assessmentQuestions || 0) > 0
+   312→    const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
+   313→
+   314→    // Check unassign step if needed
+   315→    if (hasAssignments && deletionStatus.unassign !== 'deleted') {
+   316→      toasts.error('Please unassign questions from quizzes and assessments first')
+   317→      return
+   318→    }
+   319→
+   320→    // Check questions step
+   321→    if (hasQuestions && deletionStatus.questions !== 'deleted') {
+   322→      toasts.error('Please delete all questions first')
+   323→      return
+   324→    }
+   325→
+   326→    try {
+   327→      setDeleteLoading(groupId)
+   328→      const response = await fetch(`/api/admin/question-groups/${groupId}`, {
+   329→        method: "DELETE",
+   330→      })
+   331→
+   332→      if (response.ok) {
+   333→        toasts.success(`${groupToDelete?.name || "Question group"} deleted successfully`)
+   334→        setQuestionGroups(questionGroups.filter(group => group.id !== groupId))
+   335→        setIsDeleteDialogOpen(false)
+   336→        setGroupToDelete(null)
+   337→        setDeleteInfo(null)
+   338→        setDeleteConfirmation("")
+   339→        setDeletionStatus({ unassign: 'pending', questions: 'pending' })
+   340→      } else {
+   341→        const error = await response.json()
+   342→        toasts.error(error.message || "Question group deletion failed")
+   343→      }
+   344→    } catch (error) {
+   345→      console.error("Error deleting question group:", error)
+   346→      toasts.actionFailed("Question group deletion")
+   347→    } finally {
+   348→      setDeleteLoading(null)
+   349→    }
+   350→  }
+   351→
+   352→  const openEditDialog = (group: QuestionGroup) => {
+   353→    setSelectedGroup(group)
+   354→    setFormData({
+   355→      name: group.name,
+   356→      isActive: group.isActive,
+   357→    })
+   358→    setIsEditDialogOpen(true)
+   359→  }
+   360→
+   361→  const openDeleteDialog = async (group: QuestionGroup) => {
+   362→    setGroupToDelete(group)
+   363→    setDeleteConfirmation("")
+   364→    setDeletionStatus({ unassign: 'pending', questions: 'pending' })
+   365→    setIsDeleteDialogOpen(true)
+   366→
+   367→    // Fetch detailed deletion info
+   368→    try {
+   369→      const response = await fetch(`/api/admin/question-groups/${group.id}/delete-info`)
+   370→      if (response.ok) {
+   371→        const data = await response.json()
+   372→        setDeleteInfo(data)
+   373→      }
+   374→    } catch (error) {
+   375→      console.error("Error fetching delete info:", error)
+   376→      toasts.error("Failed to fetch question group data")
+   377→    }
+   378→  }
+   379→
+   380→  const handleUnassignQuestions = async () => {
+   381→    if (!groupToDelete) return
+   382→
+   383→    try {
+   384→      setDeletionStatus(prev => ({ ...prev, unassign: 'deleting' }))
+   385→      const response = await fetch(`/api/admin/question-groups/${groupToDelete.id}/unassign-questions`, {
+   386→        method: 'DELETE'
+   387→      })
+   388→
+   389→      if (response.ok) {
+   390→        const data = await response.json()
+   391→        toasts.success(`Questions unassigned from ${data.count.quizQuestions || 0} quiz(es) and ${data.count.assessmentQuestions || 0} assessment(s)`)
+   392→        setDeletionStatus(prev => ({ ...prev, unassign: 'deleted' }))
+   393→
+   394→        // Refresh delete info to update counts
+   395→        const refreshResponse = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-info`)
+   396→        if (refreshResponse.ok) {
+   397→          const refreshData = await refreshResponse.json()
+   398→          setDeleteInfo(refreshData)
+   399→        }
+   400→      } else {
+   401→        toasts.actionFailed("Question unassignment")
+   402→        setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+   403→      }
+   404→    } catch (error) {
+   405→      console.error("Error unassigning questions:", error)
+   406→      toasts.actionFailed("Question unassignment")
+   407→      setDeletionStatus(prev => ({ ...prev, unassign: 'pending' }))
+   408→    }
+   409→  }
+   410→
+   411→  const handleDeleteQuestions = async () => {
+   412→    if (!groupToDelete) return
+   413→
+   414→    // Check if unassign is needed first
+   415→    const hasAssignments = (deleteInfo?.counts.quizQuestions || 0) > 0 || (deleteInfo?.counts.assessmentQuestions || 0) > 0
+   416→    if (hasAssignments && deletionStatus.unassign !== 'deleted') {
+   417→      toasts.error('Please unassign questions from quizzes and assessments first')
+   418→      return
+   419→    }
+   420→
+   421→    try {
+   422→      setDeletionStatus(prev => ({ ...prev, questions: 'deleting' }))
+   423→      const response = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-questions`, {
+   424→        method: 'DELETE'
+   425→      })
+   426→
+   427→      if (response.ok) {
+   428→        const data = await response.json()
+   429→        toasts.success(`${data.count.questions} question(s) and ${data.count.reportedQuestions || 0} reported question(s) deleted successfully`)
+   430→        setDeletionStatus(prev => ({ ...prev, questions: 'deleted' }))
+   431→
+   432→        // Refresh delete info to update counts
+   433→        const refreshResponse = await fetch(`/api/admin/question-groups/${groupToDelete.id}/delete-info`)
+   434→        if (refreshResponse.ok) {
+   435→          const refreshData = await refreshResponse.json()
+   436→          setDeleteInfo(refreshData)
+   437→        }
+   438→      } else {
+   439→        toasts.actionFailed("Question deletion")
+   440→        setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+   441→      }
+   442→    } catch (error) {
+   443→      console.error("Error deleting questions:", error)
+   444→      toasts.actionFailed("Question deletion")
+   445→      setDeletionStatus(prev => ({ ...prev, questions: 'pending' }))
+   446→    }
+   447→  }
+   448→
+   449→  const resetForm = () => {
+   450→    setSelectedGroup(null)
+   451→    setFormData({
+   452→      name: "",
+   453→      isActive: true,
+   454→    })
+   455→  }
+   456→
+   457→  if (loading) {
+   458→    return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
+   459→  }
+   460→
+   461→  return (
+   462→    <div className="space-y-6">
+   463→      <div className="flex justify-between items-center">
+   464→        <div>
+   465→          <h1 className="text-3xl font-bold tracking-tight">Question Groups</h1>
+   466→          <p className="text-muted-foreground">
+   467→            Manage question groups and organize your questions
+   468→          </p>
+   469→        </div>
+   470→        <div className="flex gap-2">
+   471→          <Button onClick={() => setIsAddDialogOpen(true)}>
+   472→            <Plus className="mr-2 h-4 w-4" />
+   473→            Add Question Group
+   474→          </Button>
+   475→        </div>
+   476→      </div>
+   477→
+   478→      <Card>
+   479→        <CardContent>
+   480→          <DataTable
+   481→            columns={columns}
+   482→            data={questionGroups}
+   483→            searchKey="name"
+   484→            searchPlaceholder="Search question groups..."
+   485→            filters={[
+   486→              {
+   487→                key: "isActive",
+   488→                label: "Status",
+   489→                options: [
+   490→                  { value: "all", label: "All Status" },
+   491→                  { value: "true", label: "Active" },
+   492→                  { value: "false", label: "Inactive" },
+   493→                ],
+   494→              },
+   495→            ]}
+   496→          />
+   497→        </CardContent>
+   498→      </Card>
+   499→
+   500→      {/* Add Question Group Sheet */}
+   501→      <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+   502→        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+   503→          <SheetHeader>
+   504→            <SheetTitle>Add New Question Group</SheetTitle>
+   505→            <SheetDescription>
+   506→              Create a new question group to organize your questions.
+   507→            </SheetDescription>
+   508→          </SheetHeader>
+   509→          <form onSubmit={handleSubmit}>
+   510→            <div className="grid flex-1 auto-rows-min gap-6 px-4">
+   511→              <div className="grid gap-3">
+   512→                <Label htmlFor="add-name">Name</Label>
+   513→                <Input
+   514→                  id="add-name"
+   515→                  value={formData.name}
+   516→                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+   517→                  required
+   518→                />
+   519→              </div>
+   520→              <div className="flex items-center space-x-2">
+   521→                <Switch
+   522→                  id="add-isActive"
+   523→                  checked={formData.isActive}
+   524→                  onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+   525→                />
+   526→                <Label htmlFor="add-isActive">Active</Label>
+   527→              </div>
+   528→            </div>
+   529→            <SheetFooter>
+   530→              <LoadingButton type="submit" isLoading={submitLoading} loadingText="Creating...">
+   531→                Create
+   532→              </LoadingButton>
+   533→            </SheetFooter>
+   534→          </form>
+   535→        </SheetContent>
+   536→      </Sheet>
+   537→
+   538→      {/* Edit Question Group Sheet */}
+   539→      <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+   540→        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+   541→          <SheetHeader>
+   542→            <SheetTitle>Edit Question Group</SheetTitle>
+   543→            <SheetDescription>
+   544→              Update question group details below.
+   545→            </SheetDescription>
+   546→          </SheetHeader>
+   547→          <form onSubmit={handleSubmit}>
+   548→            <div className="grid flex-1 auto-rows-min gap-6 px-4">
+   549→              <div className="grid gap-3">
+   550→                <Label htmlFor="edit-name">Name</Label>
+   551→                <Input
+   552→                  id="edit-name"
+   553→                  value={formData.name}
+   554→                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+   555→                  required
+   556→                />
+   557→              </div>
+   558→              <div className="flex items-center space-x-2">
+   559→                <Switch
+   560→                  id="edit-isActive"
+   561→                  checked={formData.isActive}
+   562→                  onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+   563→                />
+   564→                <Label htmlFor="edit-isActive">Active</Label>
+   565→              </div>
+   566→            </div>
+   567→            <SheetFooter>
+   568→              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+   569→                Cancel
+   570→              </Button>
+   571→              <LoadingButton type="submit" isLoading={submitLoading} loadingText="Updating...">
+   572→                Update
+   573→              </LoadingButton>
+   574→            </SheetFooter>
+   575→          </form>
+   576→        </SheetContent>
+   577→      </Sheet>
+   578→
+   579→      {/* Delete Question Group Dialog */}
+   580→      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+   581→        <AlertDialogContent className="max-w-2xl">
+   582→          <AlertDialogHeader>
+   583→            <AlertDialogTitle>Delete Question Group: {groupToDelete?.name}</AlertDialogTitle>
+   584→            <AlertDialogDescription>
+   585→              This action cannot be undone. Please delete all associated data before deleting the question group.
+   586→            </AlertDialogDescription>
+   587→          </AlertDialogHeader>
+   588→
+   589→          <TooltipProvider>
+   590→          <div className="mt-4 space-y-4">
+   591→            {deleteInfo ? (
+   592→              <div className="space-y-3">
+   593→                {/* Step 1: Unassign Questions from Quizzes/Assessments */}
+   594→                {((deleteInfo.counts.quizQuestions || 0) > 0 || (deleteInfo.counts.assessmentQuestions || 0) > 0) && (
+   595→                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+   596→                    <div className="flex items-center gap-3">
+   597→                      <FileQuestion className="w-5 h-5 text-orange-600" />
+   598→                      <div>
+   599→                        <p className="font-medium">Quiz/Assessment Assignments</p>
+   600→                        <p className="text-sm text-muted-foreground">
+   601→                          {deleteInfo.counts.quizQuestions || 0} quiz question(s) + {deleteInfo.counts.assessmentQuestions || 0} assessment question(s)
+   602→                        </p>
+   603→                        <p className="text-xs text-muted-foreground">
+   604→                          in {deleteInfo.counts.quizzes || 0} quiz/zes and {deleteInfo.counts.assessments || 0} assessment(s)
+   605→                        </p>
+   606→                      </div>
+   607→                    </div>
+   608→                    <div className="flex items-center gap-2">
+   609→                      {deletionStatus.unassign === 'deleted' && (
+   610→                        <CheckCircle className="w-5 h-5 text-green-600" />
+   611→                      )}
+   612→                      <Tooltip>
+   613→                        <TooltipTrigger asChild>
+   614→                          <Button
+   615→                            onClick={handleUnassignQuestions}
+   616→                            disabled={deletionStatus.unassign === 'deleted' || deletionStatus.unassign === 'deleting'}
+   617→                            variant={deletionStatus.unassign === 'deleted' ? 'outline' : 'destructive'}
+   618→                            size="icon"
+   619→                          >
+   620→                            {deletionStatus.unassign === 'deleting' ? (
+   621→                              <Loader2 className="h-4 w-4 animate-spin" />
+   622→                            ) : deletionStatus.unassign === 'deleted' ? (
+   623→                              <CheckCircle className="h-4 w-4" />
+   624→                            ) : (
+   625→                              <Trash2 className="h-4 w-4" />
+   626→                            )}
+   627→                          </Button>
+   628→                        </TooltipTrigger>
+   629→                        <TooltipContent>
+   630→                          {deletionStatus.unassign === 'deleted' ? 'Questions unassigned' : deletionStatus.unassign === 'deleting' ? 'Unassigning...' : 'Unassign questions'}
+   631→                        </TooltipContent>
+   632→                      </Tooltip>
+   633→                    </div>
+   634→                  </div>
+   635→                )}
+   636→
+   637→                {/* Step 2: Delete Questions */}
+   638→                {deleteInfo.counts.questions > 0 && (
+   639→                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+   640→                    <div className="flex items-center gap-3">
+   641→                      <BookOpen className="w-5 h-5 text-blue-600" />
+   642→                      <div>
+   643→                        <p className="font-medium">Questions</p>
+   644→                        <p className="text-sm text-muted-foreground">
+   645→                          {deleteInfo.counts.questions} question{deleteInfo.counts.questions !== 1 ? 's' : ''} in this group
+   646→                        </p>
+   647→                        {deleteInfo.counts.reportedQuestions > 0 && (
+   648→                          <p className="text-xs text-yellow-600">
+   649→                            Includes {deleteInfo.counts.reportedQuestions} reported question(s)
+   650→                          </p>
+   651→                        )}
+   652→                      </div>
+   653→                    </div>
+   654→                    <div className="flex items-center gap-2">
+   655→                      {deletionStatus.questions === 'deleted' && (
+   656→                        <CheckCircle className="w-5 h-5 text-green-600" />
+   657→                      )}
+   658→                      <Tooltip>
+   659→                        <TooltipTrigger asChild>
+   660→                          <Button
+   661→                            onClick={handleDeleteQuestions}
+   662→                            disabled={
+   663→                              deletionStatus.questions === 'deleted' ||
+   664→                              deletionStatus.questions === 'deleting' ||
+   665→                              (((deleteInfo.counts.quizQuestions || 0) > 0 || (deleteInfo.counts.assessmentQuestions || 0) > 0) && deletionStatus.unassign !== 'deleted')
+   666→                            }
+   667→                            variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
+   668→                            size="icon"
+   669→                          >
+   670→                            {deletionStatus.questions === 'deleting' ? (
+   671→                              <Loader2 className="h-4 w-4 animate-spin" />
+   672→                            ) : deletionStatus.questions === 'deleted' ? (
+   673→                              <CheckCircle className="h-4 w-4" />
+   674→                            ) : (
+   675→                              <Trash2 className="h-4 w-4" />
+   676→                            )}
+   677→                          </Button>
+   678→                        </TooltipTrigger>
+   679→                        <TooltipContent>
+   680→                          {deletionStatus.questions === 'deleted' ? 'Questions deleted' : deletionStatus.questions === 'deleting' ? 'Deleting...' : 'Delete questions'}
+   681→                        </TooltipContent>
+   682→                      </Tooltip>
+   683→                    </div>
+   684→                  </div>
+   685→                )}
+   686→
+   687→                {/* Empty State - Ready to delete */}
+   688→                {deleteInfo.counts.questions === 0 &&
+   689→                 (deleteInfo.counts.quizQuestions || 0) === 0 &&
+   690→                 (deleteInfo.counts.assessmentQuestions || 0) === 0 && (
+   691→                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+   692→                    <p className="text-green-800 text-sm font-medium">
+   693→                      ✓ All critical data removed. Ready to delete question group.
+   694→                    </p>
+   695→                  </div>
+   696→                )}
+   697→              </div>
+   698→            ) : (
+   699→              <div className="flex items-center justify-center p-8">
+   700→                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+   701→              </div>
+   702→            )}
+   703→          </div>
+   704→          </TooltipProvider>
+   705→
+   706→          {/* Final Confirmation Input */}
+   707→          <div className="mt-4 pt-4 border-t space-y-2">
+   708→            <Label htmlFor="delete-confirmation">
+   709→              <span className="font-semibold text-destructive">CONFIRM DELETE</span> to proceed:
+   710→            </Label>
+   711→            <Input
+   712→              id="delete-confirmation"
+   713→              value={deleteConfirmation}
+   714→              onChange={(e) => setDeleteConfirmation(e.target.value)}
+   715→              placeholder="CONFIRM DELETE"
+   716→              autoComplete="off"
+   717→              className="uppercase"
+   718→            />
+   719→          </div>
+   720→
+   721→          <AlertDialogFooter>
+   722→            <AlertDialogCancel onClick={() => {
+   723→              setIsDeleteDialogOpen(false)
+   724→              setGroupToDelete(null)
+   725→              setDeleteInfo(null)
+   726→              setDeleteConfirmation("")
+   727→              setDeletionStatus({ unassign: 'pending', questions: 'pending' })
+   728→            }}>
+   729→              Cancel
+   730→            </AlertDialogCancel>
+   731→            <AlertDialogAction
+   732→              onClick={() => groupToDelete && handleDeleteGroup(groupToDelete.id)}
+   733→              className="bg-red-600 hover:bg-red-700"
+   734→              disabled={
+   735→                deleteLoading !== null ||
+   736→                deleteConfirmation !== "CONFIRM DELETE"
+   737→              }
+   738→            >
+   739→              {deleteLoading === groupToDelete?.id ? (
+   740→                <>
+   741→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   742→                  Deleting...
+   743→                </>
+   744→              ) : (
+   745→                "Delete Question Group"
+   746→              )}
+   747→            </AlertDialogAction>
+   748→          </AlertDialogFooter>
+   749→        </AlertDialogContent>
+   750→      </AlertDialog>
+   751→    </div>
+   752→  )
+   753→}
+   754→
