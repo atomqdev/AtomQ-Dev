@@ -97,7 +97,7 @@ export default function QuizGroupsPage() {
   // Deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
     group: { id: string; name: string }
-    counts: { quizzes: number; questions: number; users: number; attempts: number; tabSwitches: number }
+    counts: { quizzes: number; questions: number; users: number; attempts: number }
   } | null>(null)
   const [deletionStatus, setDeletionStatus] = useState<{
     data: 'pending' | 'deleting' | 'deleted'
@@ -348,7 +348,7 @@ export default function QuizGroupsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        toasts.success(`${data.count.attempts || 0} attempt(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+        toasts.success(`${data.count.attempts || 0} attempt(s) deleted successfully`)
         setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
 
         // Refresh delete info to update counts
@@ -373,8 +373,7 @@ export default function QuizGroupsPage() {
 
     // Check if data deletion is needed first
     const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
-    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
-    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+    if (hasAttempts && deletionStatus.data !== 'deleted') {
       toasts.error('Please delete quiz data first')
       return
     }
@@ -489,13 +488,12 @@ export default function QuizGroupsPage() {
 
     // Check if all steps are completed in correct order
     const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
-    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
     const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
     const hasUsers = (deleteInfo?.counts.users || 0) > 0
     const hasQuizzes = (deleteInfo?.counts.quizzes || 0) > 0
 
-    // Check data step (attempts and tab switches)
-    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+    // Check data step (attempts)
+    if (hasAttempts && deletionStatus.data !== 'deleted') {
       toasts.error('Please delete quiz data first')
       return
     }
@@ -671,14 +669,14 @@ export default function QuizGroupsPage() {
             {deleteInfo ? (
               <div className="space-y-3">
                 {/* Step 1: Delete Quiz Data */}
-                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+                {((deleteInfo.counts.attempts || 0) > 0) && (
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
                       <FileQuestion className="w-5 h-5 text-orange-600" />
                       <div>
                         <p className="font-medium">Quiz Data</p>
                         <p className="text-sm text-muted-foreground">
-                          {deleteInfo.counts.attempts || 0} quiz attempt(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+                          {deleteInfo.counts.attempts || 0} quiz attempt(s)
                         </p>
                       </div>
                     </div>
@@ -734,7 +732,7 @@ export default function QuizGroupsPage() {
                             disabled={
                               deletionStatus.questions === 'deleted' ||
                               deletionStatus.questions === 'deleting' ||
-                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.data !== 'deleted')
+                              (((deleteInfo.counts.attempts || 0) > 0) && deletionStatus.data !== 'deleted')
                             }
                             variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
                             size="icon"
@@ -850,8 +848,7 @@ export default function QuizGroupsPage() {
                 {deleteInfo.counts.quizzes === 0 &&
                  deleteInfo.counts.questions === 0 &&
                  deleteInfo.counts.users === 0 &&
-                 deleteInfo.counts.attempts === 0 &&
-                 deleteInfo.counts.tabSwitches === 0 && (
+                 deleteInfo.counts.attempts === 0 && (
                   <div className="p-4 border rounded-lg bg-green-50 border-green-200">
                     <p className="text-green-800 text-sm font-medium">
                       ✓ All critical data removed. Ready to delete quiz group.

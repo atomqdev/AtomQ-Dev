@@ -359,3 +359,69 @@ Stage Summary:
 - Question-groups questions page now has Import (JSON), Export (JSON), Download (CSV) + existing Import CSV
 - API route supports bulk import with full question type validation per question
 - Pattern matches users page and quiz-group quiz page implementations
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: On /admin/question-groups/[id]/questions page, remove "Import CSV" button and all its functionalities, and add a "Download Import Sample" button that downloads a sample JSON file with 4 questions (one per type) showcasing rich text editor features.
+
+Work Log:
+- Read the full questions page (src/app/(q)/admin/question-groups/[id]/questions/page.tsx, originally 1485 lines)
+- Identified all CSV import functionality: Import CSV button, CSV import dialog (drag-drop), 5 state variables (fileInputRef, isImportSheetOpen, importFile, isDragOver, isImporting), 6 handler functions (handleImportQuestions, handleDragOver, handleDragLeave, handleDrop, handleFileSelect, handleRemoveFile, handleImportWithGroup)
+- Reviewed RichTextEditor (Tiptap-based) to understand supported HTML features: headings (h1-h6), bold, italic, text colors (#22c55e green, #ef4444 red, #f59e0b amber, etc.), bullet lists, ordered lists, blockquotes, links, images, inline code, code blocks
+- Reviewed the JSON import API endpoint to confirm the expected import data structure
+- Deleted the CSV import handler block (lines 603-741) using sed for reliability
+- Used MultiEdit to: (1) remove FileUp from lucide-react imports, (2) remove CSV import state variables, (3) add handleDownloadSampleImport handler with 4 sample questions, (4) add "Download Import Sample" button after "Import" button, (5) remove the old "Import CSV" button, (6) remove the CSV import Dialog component
+- Created sample JSON with 4 questions: MULTIPLE_CHOICE (AWS S3 storage classes), MULTI_SELECT (AWS security services), TRUE_FALSE (Lambda timeout), FILL_IN_BLANK (AWS CLI command) — each with rich HTML explanations showcasing headings, bold, italic, colored text (green for correct, red for incorrect), bullet lists, ordered lists, blockquotes, links, inline code, and code blocks
+- Verified: no leftover references to removed code (grep confirmed clean), ESLint passes with no errors, page compiles successfully (HTTP 200), dev server logs show no errors
+- Browser-verified: logged in as admin, navigated to questions page, confirmed "Import CSV" button is gone, "Download Import Sample" button is present (placed after Import, before Export), clicking it shows "Sample import file downloaded" toast, edited a sample question to confirm rich text HTML renders correctly (headings, colored bold text, bullet lists, blockquotes, links all displayed properly)
+
+Stage Summary:
+- File modified: src/app/(q)/admin/question-groups/[id]/questions/page.tsx (reduced from 1485 to 1345 lines)
+- Removed: Import CSV button, CSV import drag-drop dialog, 5 state variables, 7 handler functions, FileUp icon import
+- Added: "Download Import Sample" button (FileDown icon) + handleDownloadSampleImport handler that generates and downloads sample-questions-import.json
+- Sample JSON contains 4 questions (one per type: MULTIPLE_CHOICE, MULTI_SELECT, TRUE_FALSE, FILL_IN_BLANK) with rich HTML explanations demonstrating all Tiptap editor features
+- The Papa import was retained (still used by handleDownloadCSV for CSV download/export)
+- All existing functionality (JSON import/export, CSV download, question CRUD) preserved
+
+---
+Task ID: 3
+Agent: main (Z.ai Code)
+Task: On /admin/quiz-group/[id]/quiz page, fix the Attempts column to show "Unlimited" when maxAttempts is null, or show the attempts count when set. Also add a Users count column near the Questions column.
+
+Work Log:
+- Read existing quiz-group/[id]/quiz/page.tsx (1266 lines) to understand current table structure
+- Read /api/admin/quiz/route.ts to see what _count fields are returned (only quizQuestions and quizAttempts, missing quizUsers)
+- Verified prisma/schema.prisma confirms Quiz model has `quizUsers QuizUser[]` relation available
+- Updated /api/admin/quiz/route.ts: Added `quizUsers: true` to `_count.select` in all three query locations:
+  - GET handler (list quizzes)
+  - POST handler (regular quiz creation)
+  - POST handler (bulk JSON import)
+- Updated Quiz interface in the page: Added `quizUsers: number` to the `_count` type
+- Updated columns array:
+  - Replaced Attempts column (which was showing `_count.quizAttempts` = attempts made so far) with a new Attempts column based on `maxAttempts` field
+  - When `maxAttempts` is null/undefined → renders `<Badge variant="secondary">Unlimited</Badge>`
+  - Otherwise → renders the numeric maxAttempts value (e.g., 5)
+  - Added a new "Users" count column (accessorKey `_count.quizUsers`) placed immediately after the "Questions" count column
+- Updated handleExportJSON and handleDownloadCSV handlers to include `users: quiz._count?.quizUsers || 0` in the exported data
+- Ran `bun run lint` → 0 errors, 0 warnings
+- Browser-verified both display cases:
+  - Unlimited case: With maxAttempts=null, the Attempts column shows a "Unlimited" badge
+  - Finite case: Temporarily set maxAttempts=5 in DB, reloaded page, confirmed Attempts column shows "5"
+  - Users column: Shows count of quizUsers (0 for the test quiz, since no users enrolled)
+- Confirmed API SQL query in dev.log now includes the new LEFT JOIN for quizUsers count:
+  `LEFT JOIN (SELECT "public"."quiz_users"."quizId", COUNT(*) AS "_aggr_count_quizUsers" ...)`
+- Restored DB to original state (maxAttempts=null) after verification
+- Cleaned up temporary scripts/check_quiz.ts used for DB verification
+
+Stage Summary:
+- Files modified:
+  - src/app/(q)/api/admin/quiz/route.ts (3 locations: GET, POST regular, POST import — added `quizUsers: true` to _count.select)
+  - src/app/(q)/admin/quiz-group/[id]/quiz/page.tsx (Quiz interface, columns array, handleExportJSON, handleDownloadCSV)
+- Attempts column behavior:
+  - Before: Showed count of attempts made so far (`_count.quizAttempts`)
+  - After: Shows "Unlimited" badge when maxAttempts is null, otherwise shows the numeric maxAttempts value (the allowed attempts setting)
+- New "Users" column added between "Questions" count column and "Attempts" column, showing `_count.quizUsers` (number of users assigned to each quiz)
+- Export JSON and Download CSV handlers also include the new `users` count field
+- All three response paths in /api/admin/quiz (list, create, import) now return the quizUsers count via Prisma _count
+- Lint clean, browser-verified both Unlimited and finite attempts display cases

@@ -89,6 +89,7 @@ interface Quiz {
   _count: {
     quizQuestions: number
     quizAttempts: number
+    quizUsers: number
   }
 }
 
@@ -148,7 +149,6 @@ export default function QuizGroupDetailPage({
       questions: number
       users: number
       attempts: number
-      tabSwitches: number
     }
   } | null>(null)
   const [deletionStatus, setDeletionStatus] = useState<{
@@ -205,7 +205,7 @@ export default function QuizGroupDetailPage({
 
       if (response.ok) {
         const data = await response.json()
-        toasts.success(`${data.count.attempts || 0} attempt(s) and ${data.count.tabSwitches || 0} tab switch(es) deleted successfully`)
+        toasts.success(`${data.count.attempts || 0} attempt(s) deleted successfully`)
         setDeletionStatus(prev => ({ ...prev, data: 'deleted' }))
 
         const refreshResponse = await fetch(`/api/admin/quiz/${quizToDelete.id}/delete-info`)
@@ -228,8 +228,7 @@ export default function QuizGroupDetailPage({
     if (!quizToDelete) return
 
     const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
-    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
-    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+    if (hasAttempts && deletionStatus.data !== 'deleted') {
       toasts.error('Please delete quiz data first')
       return
     }
@@ -303,11 +302,10 @@ export default function QuizGroupDetailPage({
     }
 
     const hasAttempts = (deleteInfo?.counts.attempts || 0) > 0
-    const hasTabSwitches = (deleteInfo?.counts.tabSwitches || 0) > 0
     const hasQuestions = (deleteInfo?.counts.questions || 0) > 0
     const hasUsers = (deleteInfo?.counts.users || 0) > 0
 
-    if ((hasAttempts || hasTabSwitches) && deletionStatus.data !== 'deleted') {
+    if (hasAttempts && deletionStatus.data !== 'deleted') {
       toasts.error('Please delete quiz data first')
       return
     }
@@ -410,11 +408,22 @@ export default function QuizGroupDetailPage({
       },
     },
     {
-      accessorKey: "_count.quizAttempts",
+      accessorKey: "_count.quizUsers",
+      header: "Users",
+      cell: ({ row }) => {
+        const quiz = row.original
+        return quiz._count?.quizUsers || 0
+      },
+    },
+    {
+      accessorKey: "maxAttempts",
       header: "Attempts",
       cell: ({ row }) => {
         const quiz = row.original
-        return quiz._count?.quizAttempts || 0
+        if (quiz.maxAttempts === null || quiz.maxAttempts === undefined) {
+          return <Badge variant="secondary">Unlimited</Badge>
+        }
+        return quiz.maxAttempts
       },
     },
     {
@@ -614,6 +623,7 @@ export default function QuizGroupDetailPage({
       maxAttempts: quiz.maxAttempts || "",
       checkAnswerEnabled: quiz.checkAnswerEnabled ?? false,
       questions: quiz._count?.quizQuestions || 0,
+      users: quiz._count?.quizUsers || 0,
       attempts: quiz._count?.quizAttempts || 0,
       createdAt: quiz.createdAt,
     }))
@@ -645,6 +655,7 @@ export default function QuizGroupDetailPage({
       maxAttempts: quiz.maxAttempts || "",
       checkAnswerEnabled: quiz.checkAnswerEnabled ?? false,
       questions: quiz._count?.quizQuestions || 0,
+      users: quiz._count?.quizUsers || 0,
       attempts: quiz._count?.quizAttempts || 0,
       createdAt: quiz.createdAt,
     }))
@@ -1070,14 +1081,14 @@ export default function QuizGroupDetailPage({
             {deleteInfo ? (
               <div className="space-y-3">
                 {/* Step 1: Delete Quiz Data */}
-                {((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && (
+                {((deleteInfo.counts.attempts || 0) > 0) && (
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
                       <FileQuestion className="w-5 h-5 text-orange-600" />
                       <div>
                         <p className="font-medium">Quiz Data</p>
                         <p className="text-sm text-muted-foreground">
-                          {deleteInfo.counts.attempts || 0} quiz attempt(s) + {deleteInfo.counts.tabSwitches || 0} tab switch(es)
+                          {deleteInfo.counts.attempts || 0} quiz attempt(s)
                         </p>
                       </div>
                     </div>
@@ -1133,7 +1144,7 @@ export default function QuizGroupDetailPage({
                             disabled={
                               deletionStatus.questions === 'deleted' ||
                               deletionStatus.questions === 'deleting' ||
-                              (((deleteInfo.counts.attempts || 0) > 0 || (deleteInfo.counts.tabSwitches || 0) > 0) && deletionStatus.data !== 'deleted')
+                              (((deleteInfo.counts.attempts || 0) > 0) && deletionStatus.data !== 'deleted')
                             }
                             variant={deletionStatus.questions === 'deleted' ? 'outline' : 'destructive'}
                             size="icon"
@@ -1203,8 +1214,7 @@ export default function QuizGroupDetailPage({
                 {/* Empty State - Ready to delete */}
                 {deleteInfo.counts.questions === 0 &&
                  deleteInfo.counts.users === 0 &&
-                 deleteInfo.counts.attempts === 0 &&
-                 deleteInfo.counts.tabSwitches === 0 && (
+                 deleteInfo.counts.attempts === 0 && (
                   <div className="p-4 border rounded-lg bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
                     <p className="text-green-800 dark:text-green-200 text-sm font-medium">
                       ✓ All critical data removed. Ready to delete quiz.

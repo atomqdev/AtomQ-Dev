@@ -41,13 +41,6 @@ export async function GET(
       )
     }
 
-    // Count quiz tab switches
-    const quizTabSwitchesCount = await db.quizTabSwitch.count({
-      where: {
-        quizId: id
-      }
-    })
-
     return NextResponse.json({
       quiz: {
         id: quiz.id,
@@ -56,8 +49,7 @@ export async function GET(
       counts: {
         questions: quiz._count.quizQuestions,
         users: quiz._count.quizUsers,
-        attempts: quiz._count.quizAttempts,
-        tabSwitches: quizTabSwitchesCount
+        attempts: quiz._count.quizAttempts
       }
     })
   } catch (error) {

@@ -72,7 +72,7 @@ export async function POST(
       )
     }
 
-    // Get assessment/quiz to check max tabs setting
+    // Get assessment to check max tabs setting (only assessments track tab switches)
     let assessment = await db.assessment.findUnique({
       where: { id: assessmentId },
       select: { tabswitches: true },
@@ -80,25 +80,25 @@ export async function POST(
 
     let maxTabs = assessment?.tabswitches || MAX_TAB_SWITCHES
 
-    // Check existing tab switches based on type
-    let existingSwitches: any[] = []
-
-    if (isAssessment) {
-      existingSwitches = await db.assessmentTabSwitch.findMany({
-        where: {
-          attemptId: assessmentAttempt!.id,
-        },
-        orderBy: { createdAt: 'asc' },
-      })
-    } else {
-      // For quizzes, we use the new QuizTabSwitch model
-      existingSwitches = await (db as any).quizTabSwitch.findMany({
-        where: {
-          attemptId: quizAttempt!.id,
-        },
-        orderBy: { createdAt: 'asc' },
+    // Quizzes do not track tab switches — return a no-op response
+    if (!isAssessment) {
+      return NextResponse.json({
+        message: "Tab switching is not monitored for quizzes",
+        currentSwitches: 0,
+        switchesRemaining: -1,
+        shouldAutoSubmit: false,
       })
     }
+
+    // Check existing tab switches (assessment only)
+    let existingSwitches: any[] = []
+
+    existingSwitches = await db.assessmentTabSwitch.findMany({
+      where: {
+        attemptId: assessmentAttempt!.id,
+      },
+      orderBy: { createdAt: 'asc' },
+    })
 
     const currentSwitchCount = existingSwitches.length
 
@@ -114,24 +114,14 @@ export async function POST(
       )
     }
 
-    // Create new tab switch record based on type
-    if (isAssessment) {
-      await db.assessmentTabSwitch.create({
-        data: {
-          attemptId: assessmentAttempt!.id,
-          userId: session.user.id,
-          assessmentId: assessmentId,
-        },
-      })
-    } else {
-      await (db as any).quizTabSwitch.create({
-        data: {
-          attemptId: quizAttempt!.id,
-          userId: session.user.id,
-          quizId: assessmentId,
-        },
-      })
-    }
+    // Create new tab switch record (assessment only)
+    await db.assessmentTabSwitch.create({
+      data: {
+        attemptId: assessmentAttempt!.id,
+        userId: session.user.id,
+        assessmentId: assessmentId,
+      },
+    })
 
     const newSwitchCount = currentSwitchCount + 1
     const switchesRemaining = maxTabs - newSwitchCount

@@ -29,26 +29,20 @@ export async function DELETE(
     const quizIds = quizzes.map(q => q.id)
 
     if (quizIds.length === 0) {
-      return NextResponse.json({ count: { attempts: 0, tabSwitches: 0 } })
+      return NextResponse.json({ count: { attempts: 0 } })
     }
 
-    // Delete quiz answers first (depends on attempts), then attempts, then tab switches
-    const [attemptResult, tabSwitchResult] = await Promise.all([
-      db.quizAnswer.deleteMany({
-        where: { attempt: { quizId: { in: quizIds } } }
-      }).then(() => db.quizAttempt.deleteMany({
-        where: { quizId: { in: quizIds } }
-      })),
-      db.quizTabSwitch.deleteMany({
-        where: { quizId: { in: quizIds } }
-      })
-    ])
+    // Delete quiz answers first (depends on attempts), then attempts
+    const attemptResult = await db.quizAnswer.deleteMany({
+      where: { attempt: { quizId: { in: quizIds } } }
+    }).then(() => db.quizAttempt.deleteMany({
+      where: { quizId: { in: quizIds } }
+    }))
 
     return NextResponse.json({
       message: "Quiz data deleted successfully",
       count: {
-        attempts: attemptResult.count,
-        tabSwitches: tabSwitchResult.count
+        attempts: attemptResult.count
       }
     })
   } catch (error) {

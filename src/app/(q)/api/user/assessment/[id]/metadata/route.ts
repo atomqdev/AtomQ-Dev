@@ -178,19 +178,14 @@ export async function GET(
           status: 'IN_PROGRESS'
         },
         select: {
-          id: true,
-          quizTabSwitches: true
+          id: true
         }
       })
 
       hasExistingAttempt = !!existingAttempt
       existingAttemptId = existingAttempt?.id || ""
-      
-      // Tab switches for quizzes are tracked differently (relation)
-      const tabSwitches = (await db.quizTabSwitch.count({
-        where: { attemptId: existingAttemptId }
-      })) || 0
-      existingTabSwitches = tabSwitches
+      // Quizzes do not track tab switches
+      existingTabSwitches = 0
     }
 
     return NextResponse.json({

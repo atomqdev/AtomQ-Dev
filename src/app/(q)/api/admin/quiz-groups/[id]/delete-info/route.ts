@@ -33,11 +33,10 @@ export async function GET(
     const quizIds = quizzes.map(q => q.id)
 
     // Count associated data across all quizzes in the group
-    const [questions, users, attempts, tabSwitches] = await Promise.all([
+    const [questions, users, attempts] = await Promise.all([
       db.quizQuestion.count({ where: { quizId: { in: quizIds } } }),
       db.quizUser.count({ where: { quizId: { in: quizIds } } }),
-      db.quizAttempt.count({ where: { quizId: { in: quizIds } } }),
-      db.quizTabSwitch.count({ where: { quizId: { in: quizIds } } })
+      db.quizAttempt.count({ where: { quizId: { in: quizIds } } })
     ])
 
     return NextResponse.json({
@@ -46,8 +45,7 @@ export async function GET(
         quizzes: quizIds.length,
         questions,
         users,
-        attempts,
-        tabSwitches
+        attempts
       }
     })
   } catch (error) {

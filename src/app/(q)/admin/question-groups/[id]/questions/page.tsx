@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, FileUp, Trash2, Brain, Sparkles, Undo2, Upload, FileJson, FileSpreadsheet } from "lucide-react"
+import { Plus, ArrowLeft, Loader2, ChevronLeft, FileDown, Trash2, Brain, Sparkles, Undo2, Upload, FileJson, FileSpreadsheet, Eye, Pencil } from "lucide-react"
 import { format } from "date-fns"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
 import Papa from "papaparse"
@@ -73,6 +74,8 @@ export default function QuestionGroupPage() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Question | null>(null)
   const [formData, setFormData] = useState({
     reference: "",
     title: "",
@@ -84,12 +87,6 @@ export default function QuestionGroupPage() {
     difficulty: DifficultyLevel.MEDIUM as DifficultyLevel,
     isActive: true
   })
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [isImporting, setIsImporting] = useState(false)
 
   // JSON import state
   const jsonImportRef = useRef<HTMLInputElement>(null)
@@ -232,6 +229,14 @@ export default function QuestionGroupPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setPreviewQuestion(question)}
+              title="Preview question"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => handleEdit(question)}
             >
               Edit
@@ -239,8 +244,9 @@ export default function QuestionGroupPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleDelete(question.id)}
+              onClick={() => handleDeleteClick(question)}
               disabled={deleteLoading === question.id}
+              title="Delete question"
             >
               {deleteLoading === question.id ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -400,10 +406,13 @@ export default function QuestionGroupPage() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this question?")) {
-      return
-    }
+  const handleDeleteClick = (question: Question) => {
+    setDeleteTarget(question)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    const id = deleteTarget.id
 
     try {
       setDeleteLoading(id)
@@ -414,6 +423,7 @@ export default function QuestionGroupPage() {
       if (response.ok) {
         await fetchQuestions()
         toast.success("Question deleted successfully")
+        setDeleteTarget(null)
       } else {
         const errorData = await response.json()
         toast.error(`Error: ${errorData.message}`)
@@ -600,145 +610,6 @@ export default function QuestionGroupPage() {
     toast.success("Questions exported to CSV")
   }
 
-  const handleImportQuestions = () => {
-    setIsImportSheetOpen(true)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      const file = files[0]
-      if (file.type === "text/csv" || file.name.endsWith(".csv")) {
-        setImportFile(file)
-      } else {
-        toast.error("Please upload a CSV file")
-      }
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImportFile(file)
-    }
-  }
-
-  const handleRemoveFile = () => {
-    setImportFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
-
-  const handleImportWithGroup = async () => {
-    if (!importFile) {
-      toast.error("Please select a file to import")
-      return
-    }
-
-    setIsImporting(true)
-
-    Papa.parse(importFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const validQuestions = results.data.filter((row: any) => {
-            const hasReference = row.Reference && row.Reference.trim() !== ""
-            const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasType = row.Type && row.Type.trim() !== ""
-            const hasOptions = row.Options && row.Options.trim() !== ""
-            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
-
-            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
-          })
-
-          if (validQuestions.length === 0) {
-            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
-            setIsImporting(false)
-            return
-          }
-
-          const importPromises = validQuestions.map(async (question: any, index: number) => {
-            try {
-              const options = question.Options.split('|').map((opt: string) => opt.trim()).filter((opt: string) => opt)
-
-              const apiData = {
-                reference: question.Reference,
-                title: question.Title,
-                type: question.Type,
-                options: options,
-                correctAnswer: question["Correct Answer"],
-                explanation: question.Explanation || "",
-                difficulty: question.Difficulty || DifficultyLevel.MEDIUM,
-                isActive: question.Active !== "false" && question.Active !== false
-              }
-
-              const response = await fetch(`/api/admin/question-groups/${groupId}/questions`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify(apiData)
-              })
-
-              if (!response.ok) {
-                throw new Error(`Failed to create question "${question.Reference}"`)
-              }
-
-              const result = await response.json()
-              return result
-            } catch (error) {
-              console.error(`Failed to import question ${index + 1}:`, error)
-              return { error: error instanceof Error ? error.message : "Unknown error" }
-            }
-          })
-
-          const importedQuestions = await Promise.all(importPromises)
-          const successfulImports = importedQuestions.filter(result => !result.error)
-          const failedImports = importedQuestions.filter(result => result.error)
-
-          if (successfulImports.length > 0) {
-            toast.success(`Successfully imported ${successfulImports.length} question(s)`)
-            await fetchQuestions()
-          }
-
-          if (failedImports.length > 0) {
-            const errorMessages = failedImports.map(f => f.error).join(", ")
-            console.error("Failed imports:", errorMessages)
-            toast.error(`Failed to import ${failedImports.length} question(s). Check console for details.`)
-          }
-
-          setIsImportSheetOpen(false)
-          setImportFile(null)
-        } catch (error) {
-          console.error("Import error:", error)
-          toast.error("Failed to import questions. Please try again.")
-        } finally {
-          setIsImporting(false)
-        }
-      },
-      error: (error) => {
-        console.error("CSV parsing error:", error)
-        toast.error(`Failed to parse CSV file: ${error.message}`)
-        setIsImporting(false)
-      }
-    })
-  }
-
   // JSON Import handler
   const handleJsonImportClick = () => {
     jsonImportRef.current?.click()
@@ -883,6 +754,80 @@ export default function QuestionGroupPage() {
     toast.success("Questions downloaded successfully")
   }
 
+  // Download a sample import JSON file with 4 questions (one per type)
+  // showcasing rich text editor features: headings, bold, italic, text colors,
+  // bullet/ordered lists, blockquotes, links, inline code, and code blocks.
+  const handleDownloadSampleImport = () => {
+    const sampleQuestions = [
+      {
+        reference: "SAMPLE-MC-001",
+        title: `<p>Which AWS S3 storage class is designed for <strong>frequently accessed data</strong> with low latency?</p>`,
+        type: "MULTIPLE_CHOICE",
+        options: [
+          "S3 Standard",
+          "S3 Glacier",
+          "S3 Glacier Deep Archive",
+          "S3 One Zone-IA"
+        ],
+        correctAnswer: "S3 Standard",
+        explanation: `<h3>Answer Explanation</h3><p>The correct answer is <span style="color: #22c55e"><strong>S3 Standard</strong></span>.</p><p>S3 Standard is designed for frequently accessed data and provides high durability, availability, and performance.</p><ul><li><span style="color: #22c55e"><strong>S3 Standard</strong></span> — Ideal for frequently accessed data with millisecond latency.</li><li><span style="color: #ef4444"><strong>S3 Glacier</strong></span> — Designed for long-term archival with retrieval times from minutes to hours.</li><li><span style="color: #ef4444"><strong>S3 Glacier Deep Archive</strong></span> — Lowest-cost storage class, retrieval time of 12+ hours.</li><li><span style="color: #ef4444"><strong>S3 One Zone-IA</strong></span> — Stores data in a single AZ, lower availability.</li></ul><blockquote><p><em>Tip:</em> For a real-time analytics dashboard, choose a storage class that balances <strong>fast access</strong> with cost.</p></blockquote><p>Learn more in the <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html">AWS S3 Storage Classes documentation</a>.</p>`,
+        difficulty: "EASY",
+        isActive: true
+      },
+      {
+        reference: "SAMPLE-MS-002",
+        title: `<p>Which of the following AWS services are used for <strong>security and access management</strong>? <em>(Select TWO)</em></p>`,
+        type: "MULTI_SELECT",
+        options: [
+          "AWS IAM",
+          "AWS KMS",
+          "Amazon CloudFront",
+          "Amazon Route 53"
+        ],
+        correctAnswer: "AWS IAM|AWS KMS",
+        explanation: `<h3>Why these answers?</h3><p>Both <span style="color: #22c55e"><strong>AWS IAM</strong></span> and <span style="color: #22c55e"><strong>AWS KMS</strong></span> are essential for a defense-in-depth security strategy:</p><ol><li><span style="color: #22c55e"><strong>AWS IAM</strong></span> — Controls <em>who</em> can access resources and what actions they can perform.</li><li><span style="color: #22c55e"><strong>AWS KMS</strong></span> — Manages encryption keys to protect data <em>at rest</em>.</li></ol><p>The other options are <span style="color: #ef4444"><strong>incorrect</strong></span>:</p><ul><li><span style="color: #ef4444"><strong>Amazon CloudFront</strong></span> — A CDN for content delivery, not an identity or encryption service.</li><li><span style="color: #ef4444"><strong>Amazon Route 53</strong></span> — A DNS web service, unrelated to access control.</li></ul><blockquote><p><em>Best Practice:</em> Always follow the principle of <strong>least privilege</strong> when configuring IAM policies.</p></blockquote>`,
+        difficulty: "MEDIUM",
+        isActive: true
+      },
+      {
+        reference: "SAMPLE-TF-003",
+        title: `<p>AWS Lambda functions can run indefinitely without any execution timeout limit.</p>`,
+        type: "TRUE_FALSE",
+        options: [
+          "True",
+          "False"
+        ],
+        correctAnswer: "False",
+        explanation: `<h3>Explanation</h3><p>The statement is <span style="color: #ef4444"><strong>False</strong></span>.</p><p>AWS Lambda functions <strong>do</strong> have a maximum execution timeout, which is currently <em>15 minutes</em> (900 seconds).</p><h4>Key Points</h4><ul><li>Default timeout: <strong>3 seconds</strong></li><li>Maximum timeout: <strong>15 minutes</strong></li><li>Minimum timeout: <strong>1 second</strong></li></ul><blockquote><p>For long-running workloads, consider using <strong>AWS Step Functions</strong> or <strong>AWS Fargate</strong> instead.</p></blockquote><p>Reference: <a href="https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html">AWS Lambda Limits</a></p>`,
+        difficulty: "HARD",
+        isActive: true
+      },
+      {
+        reference: "SAMPLE-FB-004",
+        title: `<p>Fill in the blank: The AWS CLI command to copy a local file to an S3 bucket is <code>_____</code>.</p>`,
+        type: "FILL_IN_BLANK",
+        options: [],
+        correctAnswer: "aws s3 cp",
+        explanation: `<h3>Answer</h3><p>The correct answer is <code>aws s3 cp</code>.</p><p>This command copies files between your local machine and an S3 bucket (or between S3 locations).</p><h4>Usage Example</h4><pre><code>aws s3 cp ./local-file.txt s3://my-bucket/remote-file.txt</code></pre><h4>Breakdown</h4><ul><li><strong><code>aws s3 cp</code></strong> — The copy command.</li><li><strong><code>./local-file.txt</code></strong> — The local source file.</li><li><strong><code>s3://my-bucket/remote-file.txt</code></strong> — The S3 destination URI.</li></ul><blockquote><p><em>Note:</em> Use <code>aws s3 sync</code> to recursively copy an entire directory.</p></blockquote>`,
+        difficulty: "MEDIUM",
+        isActive: true
+      }
+    ]
+
+    const json = JSON.stringify(sampleQuestions, null, 2)
+    const blob = new Blob([json], { type: "application/json;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", "sample-questions-import.json")
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success("Sample import file downloaded")
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-[80vh]"><HexagonLoader size={80} /></div>
   }
@@ -927,6 +872,13 @@ export default function QuestionGroupPage() {
           </Button>
           <Button
             variant="outline"
+            onClick={handleDownloadSampleImport}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            Download Import Sample
+          </Button>
+          <Button
+            variant="outline"
             onClick={handleExportJSON}
             disabled={questions.length === 0}
           >
@@ -940,10 +892,6 @@ export default function QuestionGroupPage() {
           >
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Download
-          </Button>
-          <Button variant="outline" onClick={handleImportQuestions}>
-            <FileUp className="mr-2 h-4 w-4" />
-            Import CSV
           </Button>
           <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1021,6 +969,16 @@ export default function QuestionGroupPage() {
                     onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                     placeholder="Enter question reference"
                     required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title</Label>
+                  <RichTextEditor
+                    value={formData.title}
+                    onChange={(value) => setFormData({ ...formData, title: value })}
+                    placeholder="Enter question title..."
+                    className="min-h-[150px]"
                   />
                 </div>
 
@@ -1156,16 +1114,6 @@ export default function QuestionGroupPage() {
                     />
                   </div>
                 )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <RichTextEditor
-                    value={formData.title}
-                    onChange={(value) => setFormData({ ...formData, title: value })}
-                    placeholder="Enter question title..."
-                    className="min-h-[150px]"
-                  />
-                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="explanation">Explanation (Optional)</Label>
@@ -1408,77 +1356,206 @@ export default function QuestionGroupPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
-        <DialogContent>
+      {/* Question Preview Dialog */}
+      <Dialog open={!!previewQuestion} onOpenChange={(open) => { if (!open) setPreviewQuestion(null) }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Import Questions</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file to import questions into this group
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-                }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              {importFile ? (
-                <div className="space-y-2">
-                  <p className="font-medium">{importFile.name}</p>
-                  <Button type="button" variant="outline" size="sm" onClick={handleRemoveFile}>
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Drag and drop a CSV file here, or click to browse
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Select File
-                  </Button>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <DialogTitle>Question Preview</DialogTitle>
+                <DialogDescription>{previewQuestion?.reference}</DialogDescription>
+              </div>
+              {previewQuestion && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {previewQuestion.type === QuestionType.MULTIPLE_CHOICE && "Multiple Choice"}
+                    {previewQuestion.type === QuestionType.TRUE_FALSE && "True/False"}
+                    {previewQuestion.type === QuestionType.FILL_IN_BLANK && "Fill in Blank"}
+                    {previewQuestion.type === QuestionType.MULTI_SELECT && "Multi Select"}
+                  </Badge>
+                  <Badge className={
+                    previewQuestion.difficulty === DifficultyLevel.EASY
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                      : previewQuestion.difficulty === DifficultyLevel.MEDIUM
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                      : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                  }>
+                    {previewQuestion.difficulty.toLowerCase()}
+                  </Badge>
+                  <Badge variant={previewQuestion.isActive ? "default" : "secondary"}>
+                    {previewQuestion.isActive ? "Active" : "Inactive"}
+                  </Badge>
                 </div>
               )}
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsImportSheetOpen(false)}
-            >
-              Cancel
+          </DialogHeader>
+
+          {previewQuestion && (() => {
+            let parsedOptions: string[] = []
+            try {
+              parsedOptions = JSON.parse(previewQuestion.options || "[]")
+            } catch {
+              parsedOptions = []
+            }
+            const correctAnswersList = previewQuestion.type === QuestionType.MULTI_SELECT
+              ? parseMultiSelectAnswers(previewQuestion.correctAnswer)
+              : [previewQuestion.correctAnswer]
+            const correctAnswerText = previewQuestion.type === QuestionType.MULTI_SELECT
+              ? correctAnswersList.join(", ")
+              : previewQuestion.correctAnswer
+
+            return (
+              <div className="space-y-6 py-2">
+                {/* Question */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Question</h4>
+                  <div className="text-lg leading-relaxed p-4 rounded-lg border bg-muted/30">
+                    <RichTextDisplay content={previewQuestion.title} />
+                  </div>
+                </div>
+
+                {/* Options */}
+                {previewQuestion.type !== QuestionType.FILL_IN_BLANK && parsedOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Options</h4>
+                    {previewQuestion.type === QuestionType.MULTI_SELECT ? (
+                      <div className="space-y-2">
+                        {parsedOptions.map((option, index) => {
+                          const isCorrect = correctAnswersList.includes(option)
+                          return (
+                            <div
+                              key={index}
+                              className={`flex items-center justify-between gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                isCorrect
+                                  ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                                  : "border-border bg-card"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Checkbox checked={isCorrect} disabled />
+                                <span className="text-base">{option}</span>
+                              </div>
+                              {isCorrect && (
+                                <Badge className="bg-green-500 text-white">Correct</Badge>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <RadioGroup value={previewQuestion.correctAnswer} className="space-y-2">
+                        {parsedOptions.map((option, index) => {
+                          const isCorrect = correctAnswersList.includes(option)
+                          return (
+                            <div
+                              key={index}
+                              className={`flex items-center justify-between gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                isCorrect
+                                  ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                                  : "border-border bg-card"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <RadioGroupItem value={option} id={`pv-opt-${index}`} disabled />
+                                <Label htmlFor={`pv-opt-${index}`} className="text-base cursor-pointer">{option}</Label>
+                              </div>
+                              {isCorrect && (
+                                <Badge className="bg-green-500 text-white">Correct</Badge>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </RadioGroup>
+                    )}
+                  </div>
+                )}
+
+                {/* Correct Answer */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {previewQuestion.type === QuestionType.MULTI_SELECT ? "Correct Answers" : "Correct Answer"}
+                  </h4>
+                  <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                    <span className="font-medium text-green-800 dark:text-green-200">{correctAnswerText || "—"}</span>
+                  </div>
+                </div>
+
+                {/* Explanation */}
+                {previewQuestion.explanation && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Explanation</h4>
+                    <div className="p-4 rounded-lg border bg-muted/30">
+                      <RichTextDisplay content={previewQuestion.explanation} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPreviewQuestion(null)}>
+              Close
             </Button>
             <Button
-              type="button"
-              onClick={handleImportWithGroup}
-              disabled={isImporting || !importFile}
+              onClick={() => {
+                if (previewQuestion) {
+                  handleEdit(previewQuestion)
+                  setPreviewQuestion(null)
+                }
+              }}
             >
-              {isImporting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                "Import"
-              )}
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Question
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open && deleteLoading === null) setDeleteTarget(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this question?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This action cannot be undone. The question will be permanently removed from this group.</p>
+                {deleteTarget && (
+                  <div className="p-3 rounded-md border bg-muted/50 space-y-1">
+                    <div className="text-sm font-medium text-foreground">{deleteTarget.reference}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">
+                      {deleteTarget.title.replace(/<[^>]*>/g, "").slice(0, 120) || "Untitled question"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                confirmDelete()
+              }}
+              disabled={deleteLoading !== null}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading !== null ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

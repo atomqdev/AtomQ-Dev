@@ -37,11 +37,6 @@ export async function DELETE(
       where: { quizId: id }
     })
 
-    // Count quiz tab switches before deletion
-    const quizTabSwitchesCount = await db.quizTabSwitch.count({
-      where: { quizId: id }
-    })
-
     // Delete quiz answers first (they reference quiz attempts)
     await db.quizAnswer.deleteMany({
       where: {
@@ -56,16 +51,10 @@ export async function DELETE(
       where: { quizId: id }
     })
 
-    // Delete quiz tab switches
-    await db.quizTabSwitch.deleteMany({
-      where: { quizId: id }
-    })
-
     return NextResponse.json({
       message: "Quiz data deleted successfully",
       count: {
-        attempts: quizAttemptsCount,
-        tabSwitches: quizTabSwitchesCount
+        attempts: quizAttemptsCount
       }
     })
   } catch (error) {

@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
           select: {
             quizQuestions: true,
             quizAttempts: true,
+            quizUsers: true,
           }
         }
       },
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
                 select: {
                   quizQuestions: true,
                   quizAttempts: true,
+                  quizUsers: true,
                 }
               }
             }
@@ -193,6 +195,7 @@ export async function POST(request: NextRequest) {
           select: {
             quizQuestions: true,
             quizAttempts: true,
+            quizUsers: true,
           }
         }
       }
