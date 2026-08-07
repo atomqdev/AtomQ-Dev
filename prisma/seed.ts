@@ -19,7 +19,6 @@ async function main() {
   await prisma.assessmentQuestion.deleteMany()
   await prisma.assessment.deleteMany()
   await prisma.assessmentGroup.deleteMany()
-  await prisma.quizTabSwitch.deleteMany()
   await prisma.question.deleteMany()
   await prisma.questionGroup.deleteMany()
   await prisma.reportedQuestion.deleteMany()

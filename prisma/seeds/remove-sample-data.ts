@@ -99,11 +99,7 @@ async function main() {
       where: { quizId: { in: quizzes1.map(q => q.id) } }
     })
     
-    // Delete quiz tab switches
-    await prisma.quizTabSwitch.deleteMany({
-      where: { quizId: { in: quizzes1.map(q => q.id) } }
-    })
-    console.log('✅ Deleted quiz tab switches')
+  
     
     // Delete quizzes
     await prisma.quiz.deleteMany({
@@ -276,11 +272,7 @@ async function main() {
       where: { quizId: { in: quizzes2.map(q => q.id) } }
     })
     
-    // Delete quiz tab switches
-    await prisma.quizTabSwitch.deleteMany({
-      where: { quizId: { in: quizzes2.map(q => q.id) } }
-    })
-    console.log('✅ Deleted quiz tab switches')
+
     
     // Delete quizzes
     await prisma.quiz.deleteMany({
