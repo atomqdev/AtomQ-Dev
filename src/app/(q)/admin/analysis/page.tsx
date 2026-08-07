@@ -41,6 +41,9 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
+  ListChecks,
+  Timer,
+  ChevronLeft,
 } from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
 import { toasts } from "@/lib/toasts"
@@ -53,6 +56,34 @@ interface Campus {
     users: number
     quizzes: number
     assessments: number
+  }
+}
+
+interface QuizItem {
+  id: string
+  title: string
+  difficulty: string
+  status: string
+  timeLimit: number | null
+  campus: { id: string; name: string; shortName: string } | null
+  _count: {
+    quizAttempts: number
+    quizQuestions: number
+    quizUsers: number
+  }
+}
+
+interface AssessmentItem {
+  id: string
+  title: string
+  difficulty: string
+  status: string
+  timeLimit: number | null
+  campus: { id: string; name: string; shortName: string } | null
+  _count: {
+    assessmentAttempts: number
+    assessmentQuestions: number
+    assessmentUsers: number
   }
 }
 
@@ -80,6 +111,8 @@ interface AnalyticsData {
     quizzes: any[]
     assessments: any[]
   }
+  quizzes: QuizItem[]
+  assessments: AssessmentItem[]
 }
 
 export default function AnalyticsPage() {
@@ -122,17 +155,22 @@ export default function AnalyticsPage() {
     )
   }
 
-  const { overview, campuses, recentActivity, difficultyStats, statusStats } = data
+  const { overview, campuses, recentActivity, difficultyStats, statusStats, quizzes, assessments } = data
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Comprehensive insights across all campuses
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+              Comprehensive insights across all campuses
+            </p>
+          </div>
         </div>
         <Button onClick={fetchAnalytics} variant="outline">
           <Activity className="mr-2 h-4 w-4" />
@@ -188,7 +226,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {parseFloat(overview.avgQuizScore).toFixed(1)}%
+              {parseFloat(String(overview.avgQuizScore)).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Quiz average score
@@ -197,92 +235,234 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Campus Cards */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Campus Overview</CardTitle>
-          <CardDescription>
-            Performance metrics across all campuses
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {campuses.map((campus) => (
-              <Card key={campus.id} className="border-2 hover:border-primary/50 transition-all">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" />
-                      <div>
-                        <CardTitle className="text-base">{campus.name}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {campus.shortName}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-primary">
-                        {campus._count.users}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Users</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">
-                        {campus._count.quizzes}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Quizzes</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-primary">
-                        {campus._count.assessments}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Assessments
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-2 pt-2 border-t">
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/admin/analysis/campus/${campus.id}`)}
-                    >
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      View Campus Analytics
-                      <ArrowRight className="ml-auto h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Tabs for detailed analysis */}
-      <Tabs defaultValue="recent" className="space-y-4">
+      <Tabs defaultValue="quizzes" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="quizzes">
+            <FileText className="mr-2 h-4 w-4" />
+            Quizzes
+          </TabsTrigger>
+          <TabsTrigger value="assessments">
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Assessments
+          </TabsTrigger>
           <TabsTrigger value="recent">
             <Clock className="mr-2 h-4 w-4" />
             Recent Activity
           </TabsTrigger>
           <TabsTrigger value="difficulty">
             <Target className="mr-2 h-4 w-4" />
-            Difficulty Analysis
+            Difficulty
           </TabsTrigger>
           <TabsTrigger value="status">
             <Activity className="mr-2 h-4 w-4" />
-            Status Breakdown
+            Status
           </TabsTrigger>
         </TabsList>
+
+        {/* Quizzes Tab */}
+        <TabsContent value="quizzes" className="space-y-4">
+          {quizzes.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No quizzes found</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {quizzes.map((quiz) => (
+                <Card key={quiz.id} className="hover:shadow-md transition-all">
+                  <CardHeader>
+                    <CardTitle className="text-lg line-clamp-1">{quiz.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          quiz.difficulty === "EASY"
+                            ? "default"
+                            : quiz.difficulty === "MEDIUM"
+                            ? "secondary"
+                            : "destructive"
+                        }
+                        className="text-xs"
+                      >
+                        {quiz.difficulty}
+                      </Badge>
+                      <Badge
+                        variant={
+                          quiz.status === "ACTIVE"
+                            ? "default"
+                            : quiz.status === "DRAFT"
+                            ? "secondary"
+                            : "outline"
+                        }
+                        className="text-xs"
+                      >
+                        {quiz.status}
+                      </Badge>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <ListChecks className="h-3.5 w-3.5" />
+                          Questions
+                        </span>
+                        <span className="font-medium">{quiz._count.quizQuestions}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          Enrolled
+                        </span>
+                        <span className="font-medium">{quiz._count.quizUsers}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Activity className="h-3.5 w-3.5" />
+                          Attempts
+                        </span>
+                        <Badge variant="secondary">{quiz._count.quizAttempts}</Badge>
+                      </div>
+                      {quiz.timeLimit && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Timer className="h-3.5 w-3.5" />
+                            Time Limit
+                          </span>
+                          <span className="font-medium">{quiz.timeLimit} min</span>
+                        </div>
+                      )}
+                      {quiz.campus && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Building2 className="h-3.5 w-3.5" />
+                            Campus
+                          </span>
+                          <span className="text-xs font-medium">{quiz.campus.shortName}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t">
+                      <Button
+                        className="w-full"
+                        size="sm"
+                        onClick={() => router.push(`/admin/analysis/quiz/${quiz.id}`)}
+                      >
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        View Analytics
+                        <ArrowRight className="ml-auto h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Assessments Tab */}
+        <TabsContent value="assessments" className="space-y-4">
+          {assessments.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <ClipboardCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No assessments found</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {assessments.map((assessment) => (
+                <Card key={assessment.id} className="hover:shadow-md transition-all">
+                  <CardHeader>
+                    <CardTitle className="text-lg line-clamp-1">{assessment.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          assessment.difficulty === "EASY"
+                            ? "default"
+                            : assessment.difficulty === "MEDIUM"
+                            ? "secondary"
+                            : "destructive"
+                        }
+                        className="text-xs"
+                      >
+                        {assessment.difficulty}
+                      </Badge>
+                      <Badge
+                        variant={
+                          assessment.status === "ACTIVE"
+                            ? "default"
+                            : assessment.status === "DRAFT"
+                            ? "secondary"
+                            : "outline"
+                        }
+                        className="text-xs"
+                      >
+                        {assessment.status}
+                      </Badge>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <ListChecks className="h-3.5 w-3.5" />
+                          Questions
+                        </span>
+                        <span className="font-medium">{assessment._count.assessmentQuestions}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          Enrolled
+                        </span>
+                        <span className="font-medium">{assessment._count.assessmentUsers}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Activity className="h-3.5 w-3.5" />
+                          Attempts
+                        </span>
+                        <Badge variant="secondary">{assessment._count.assessmentAttempts}</Badge>
+                      </div>
+                      {assessment.timeLimit && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Timer className="h-3.5 w-3.5" />
+                            Time Limit
+                          </span>
+                          <span className="font-medium">{assessment.timeLimit} min</span>
+                        </div>
+                      )}
+                      {assessment.campus && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Building2 className="h-3.5 w-3.5" />
+                            Campus
+                          </span>
+                          <span className="text-xs font-medium">{assessment.campus.shortName}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t">
+                      <Button
+                        className="w-full"
+                        size="sm"
+                        onClick={() => router.push(`/admin/analysis/assessment/${assessment.id}`)}
+                      >
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        View Analytics
+                        <ArrowRight className="ml-auto h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
         {/* Recent Activity */}
         <TabsContent value="recent" className="space-y-4">
@@ -409,7 +589,7 @@ export default function AnalyticsPage() {
                       <Progress
                         value={
                           difficultyStats.quizzes.length > 0
-                            ? ((stat?._count || 0) / difficultyStats.quizzes.length) * 100
+                            ? ((stat?._count || 0) / difficultyStats.quizzes.reduce((sum: number, s: any) => sum + s._count, 0)) * 100
                             : 0
                         }
                         className="h-2"
@@ -441,7 +621,7 @@ export default function AnalyticsPage() {
                       <Progress
                         value={
                           difficultyStats.assessments.length > 0
-                            ? ((stat?._count || 0) / difficultyStats.assessments.length) * 100
+                            ? ((stat?._count || 0) / difficultyStats.assessments.reduce((sum: number, s: any) => sum + s._count, 0)) * 100
                             : 0
                         }
                         className="h-2"
@@ -517,6 +697,76 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Campus Cards */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Campus Overview</CardTitle>
+          <CardDescription>
+            Performance metrics across all campuses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {campuses.map((campus) => (
+              <Card key={campus.id} className="border-2 hover:border-primary/50 transition-all">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      <div>
+                        <CardTitle className="text-base">{campus.name}</CardTitle>
+                        <CardDescription className="text-xs">
+                          {campus.shortName}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-primary">
+                        {campus._count.users}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Users</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">
+                        {campus._count.quizzes}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Quizzes</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-primary">
+                        {campus._count.assessments}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Assessments
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <Button
+                      className="w-full justify-start"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/admin/analysis/campus/${campus.id}`)}
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      View Campus Analytics
+                      <ArrowRight className="ml-auto h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

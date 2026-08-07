@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import {
   MoreHorizontal,
-  ArrowLeft,
+  ChevronLeft,
   Users,
   ArrowUpDown,
   Loader2,
@@ -164,11 +164,10 @@ export default function CampusUsersPage({ params }: { params: Promise<{ id: stri
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push('/admin/campus')}
+            variant="outline"
+            onClick={() => router.back()}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Campus Users</h1>

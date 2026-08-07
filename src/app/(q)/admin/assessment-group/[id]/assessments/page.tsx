@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/tooltip"
 import { DateTimePicker } from "@/components/ui/datetime-picker"
 import {
-  ArrowLeft,
+  ChevronLeft,
   Plus,
   Edit,
   Trash2,
@@ -82,6 +82,7 @@ interface Assessment {
   negativePoints?: number | null
   randomOrder?: boolean
   startTime?: string | null
+  endtime?: string | null
   campusId?: string | null
   tabswitches?: number | null
   disableCopyPaste?: boolean
@@ -120,6 +121,7 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -137,6 +139,7 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -171,6 +174,7 @@ export default function AssessmentGroupDetailPage({
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -212,6 +216,7 @@ export default function AssessmentGroupDetailPage({
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -404,6 +409,7 @@ export default function AssessmentGroupDetailPage({
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder || false,
       startTime: assessment.startTime || "",
+      endtime: assessment.endtime || "",
       campusId: assessment.campusId || "",
       tabswitches: assessment.tabswitches?.toString() || "",
       disableCopyPaste: assessment.disableCopyPaste || false,
@@ -435,6 +441,7 @@ export default function AssessmentGroupDetailPage({
             ? parseFloat(editFormData.negativePoints)
             : null,
           startTime: editFormData.startTime || null,
+          endtime: editFormData.endtime || null,
           campusId: editFormData.campusId || null,
           tabswitches: editFormData.tabswitches
             ? parseInt(editFormData.tabswitches)
@@ -706,6 +713,7 @@ export default function AssessmentGroupDetailPage({
             ? parseFloat(formData.negativePoints)
             : null,
           startTime: formData.startTime || null,
+          endtime: formData.endtime || null,
           campusId: formData.campusId || null,
           tabswitches: formData.tabswitches
             ? parseInt(formData.tabswitches)
@@ -730,6 +738,7 @@ export default function AssessmentGroupDetailPage({
           negativePoints: "",
           randomOrder: false,
           startTime: "",
+          endtime: "",
           campusId: "",
           tabswitches: "",
           disableCopyPaste: false,
@@ -761,11 +770,10 @@ export default function AssessmentGroupDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/assessment-group")}
+          variant="outline"
+          onClick={() => router.back()}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -896,6 +904,17 @@ export default function AssessmentGroupDetailPage({
                 value={formData.startTime}
                 onChange={(value) =>
                   setFormData({ ...formData, startTime: value })
+                }
+                placeholder="Select date and time"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endtime">End Time</Label>
+              <DateTimePicker
+                id="endtime"
+                value={formData.endtime}
+                onChange={(value) =>
+                  setFormData({ ...formData, endtime: value })
                 }
                 placeholder="Select date and time"
               />
@@ -1108,6 +1127,17 @@ export default function AssessmentGroupDetailPage({
                 value={editFormData.startTime}
                 onChange={(value) =>
                   setEditFormData({ ...editFormData, startTime: value })
+                }
+                placeholder="Select date and time"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-endtime">End Time</Label>
+              <DateTimePicker
+                id="edit-endtime"
+                value={editFormData.endtime}
+                onChange={(value) =>
+                  setEditFormData({ ...editFormData, endtime: value })
                 }
                 placeholder="Select date and time"
               />

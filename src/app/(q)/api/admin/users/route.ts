@@ -159,89 +159,235 @@ export async function POST(request: NextRequest) {
     if (importData && Array.isArray(importData)) {
       const results = []
       const defaultPassword = "user@atomq"
-      const hashedPassword = await bcrypt.hash(defaultPassword, 12)
+      const defaultHashedPassword = await bcrypt.hash(defaultPassword, 12)
 
       for (const item of importData) {
         try {
           // Skip if required fields are missing
-          if (!item.name || !item.email || !item.uoid) {
+          if (!item.email) {
             results.push({
               email: item.email || 'unknown',
               status: 'failed',
-              message: 'Missing required fields (name, email, uoid)'
+              message: 'Missing required field: email'
+            })
+            continue
+          }
+
+          if (!item.uoid) {
+            results.push({
+              email: item.email,
+              status: 'failed',
+              message: 'Missing required field: uoid'
             })
             continue
           }
 
           // Check if user already exists by email
-          const existingUser = await db.user.findUnique({
+          const existingByEmail = await db.user.findUnique({
             where: { email: item.email }
           })
 
-          if (existingUser) {
-            results.push({
-              email: item.email,
-              status: 'failed',
-              message: 'User already exists'
+          // Check if user already exists by UOID (only if different from email match)
+          let existingByUOID = null
+          if (!existingByEmail || existingByEmail.uoid !== item.uoid) {
+            existingByUOID = await db.user.findUnique({
+              where: { uoid: item.uoid }
             })
-            continue
           }
 
-          // Check if UOID already exists
-          const existingUOID = await db.user.findUnique({
-            where: { uoid: item.uoid }
-          })
+          // Determine password: use provided hash, or keep existing, or default
+          let passwordToUse: string
+          if (item.password) {
+            // If import data includes a password hash (from our export), use it directly
+            // This preserves login credentials on re-import
+            passwordToUse = item.password
+          } else if (existingByEmail) {
+            // Keep existing password if no hash provided
+            passwordToUse = existingByEmail.password
+          } else {
+            // New user with no password provided - use default
+            passwordToUse = defaultHashedPassword
+          }
 
-          if (existingUOID) {
-            results.push({
-              uoid: item.uoid,
-              status: 'failed',
-              message: 'User already exists with this UOID'
+          // Resolve campusId: prefer direct ID, then look up by name
+          let campusId: string | null = null
+          if (item.campusId) {
+            campusId = item.campusId
+          } else if (item.campusName) {
+            const campus = await db.campus.findFirst({
+              where: { name: item.campusName }
             })
-            continue
+            campusId = campus?.id || null
+          } else if (item.campusShortName) {
+            const campus = await db.campus.findFirst({
+              where: { shortName: item.campusShortName }
+            })
+            campusId = campus?.id || null
           }
 
-          // Create user with default password
-          const user = await db.user.create({
-            data: {
-              uoid: item.uoid,
-              name: item.name,
-              email: item.email,
-              password: hashedPassword,
-              phone: item.phone || null,
-              campus: item.campus || null,
-              role: item.role || UserRole.USER,
-              isActive: item.isActive !== false, // Default to true if not specified
-            },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              uoid: true,
-              role: true,
-              isActive: true,
-              phone: true,
-              campus: {
-                select: {
-                  name: true
-                }
-              },
-              createdAt: true,
-            }
-          })
-
-          // Transform user data
-          const transformedUser = {
-            ...user,
-            campus: user.campus?.name || null
+          // Resolve departmentId: prefer direct ID, then look up by name
+          let departmentId: string | null = null
+          if (item.departmentId) {
+            departmentId = item.departmentId
+          } else if (item.departmentName || item.department) {
+            const deptName = item.departmentName || item.department
+            const dept = await db.department.findFirst({
+              where: { name: deptName }
+            })
+            departmentId = dept?.id || null
           }
 
-          results.push({
+          // Resolve batchId: prefer direct ID, then look up by name
+          let batchId: string | null = null
+          if (item.batchId) {
+            batchId = item.batchId
+          } else if (item.batchName || item.batch) {
+            const batchName = item.batchName || item.batch
+            const batch = await db.batch.findFirst({
+              where: { name: batchName }
+            })
+            batchId = batch?.id || null
+          }
+
+          // Resolve registrationCodeId: prefer direct ID, then look up by code
+          let registrationCodeId: string | null = null
+          if (item.registrationCodeId) {
+            registrationCodeId = item.registrationCodeId
+          } else if (item.registrationCode) {
+            const regCode = await db.registrationCode.findFirst({
+              where: { code: item.registrationCode }
+            })
+            registrationCodeId = regCode?.id || null
+          }
+
+          // Prepare user data (common for both create and update)
+          const userPayload: any = {
+            uoid: item.uoid,
+            name: item.name || null,
             email: item.email,
-            status: 'success',
-            user: transformedUser,
-            message: 'User created successfully'
-          })
+            password: passwordToUse,
+            phone: item.phone || null,
+            section: item.section || 'A',
+            role: item.role || UserRole.USER,
+            isActive: item.isActive !== false,
+            avatar: item.avatar || null,
+            campusId: campusId,
+            departmentId: departmentId,
+            batchId: batchId,
+            registrationCodeId: registrationCodeId,
+          }
+
+          // UPSERT: Update existing user or create new one
+          if (existingByEmail) {
+            // UOID conflict with a DIFFERENT user
+            if (existingByUOID && existingByUOID.id !== existingByEmail.id) {
+              results.push({
+                email: item.email,
+                status: 'failed',
+                message: `UOID "${item.uoid}" is already used by another user (${existingByUOID.email})`
+              })
+              continue
+            }
+
+            // Update existing user - preserve password if not explicitly provided in import
+            const updatePayload = { ...userPayload }
+            if (!item.password) {
+              // Don't overwrite existing password if no hash was provided in import
+              delete updatePayload.password
+            }
+
+            const updatedUser = await db.user.update({
+              where: { id: existingByEmail.id },
+              data: updatePayload,
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                uoid: true,
+                role: true,
+                isActive: true,
+                phone: true,
+                campus: {
+                  select: {
+                    name: true
+                  }
+                },
+                department: {
+                  select: {
+                    name: true
+                  }
+                },
+                batch: {
+                  select: {
+                    name: true
+                  }
+                },
+                createdAt: true,
+              }
+            })
+
+            results.push({
+              email: item.email,
+              status: 'updated',
+              user: {
+                ...updatedUser,
+                campus: updatedUser.campus?.name || null,
+                department: updatedUser.department?.name || null,
+                batch: updatedUser.batch?.name || null,
+              },
+              message: 'User updated successfully'
+            })
+          } else if (existingByUOID) {
+            // UOID exists but email doesn't - this is a conflict
+            results.push({
+              email: item.email,
+              status: 'failed',
+              message: `UOID "${item.uoid}" is already used by another user (${existingByUOID.email})`
+            })
+            continue
+          } else {
+            // Create new user
+            const newUser = await db.user.create({
+              data: userPayload,
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                uoid: true,
+                role: true,
+                isActive: true,
+                phone: true,
+                campus: {
+                  select: {
+                    name: true
+                  }
+                },
+                department: {
+                  select: {
+                    name: true
+                  }
+                },
+                batch: {
+                  select: {
+                    name: true
+                  }
+                },
+                createdAt: true,
+              }
+            })
+
+            results.push({
+              email: item.email,
+              status: 'created',
+              user: {
+                ...newUser,
+                campus: newUser.campus?.name || null,
+                department: newUser.department?.name || null,
+                batch: newUser.batch?.name || null,
+              },
+              message: 'User created successfully'
+            })
+          }
         } catch (error) {
           console.error('Error importing user:', error)
           results.push({
@@ -252,13 +398,16 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const successCount = results.filter(r => r.status === 'success').length
+      const createdCount = results.filter(r => r.status === 'created').length
+      const updatedCount = results.filter(r => r.status === 'updated').length
       const failureCount = results.filter(r => r.status === 'failed').length
 
       return NextResponse.json({
-        message: `Import completed: ${successCount} users created, ${failureCount} failed`,
+        message: `Import completed: ${createdCount} created, ${updatedCount} updated, ${failureCount} failed`,
         results,
-        successCount,
+        createdCount,
+        updatedCount,
+        successCount: createdCount + updatedCount,
         failureCount
       })
     }

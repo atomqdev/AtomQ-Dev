@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import {
-  ArrowLeft,
   ClipboardCheck,
+  ChevronLeft,
   Target,
   Award,
   Clock,
@@ -177,11 +177,9 @@ export default function AssessmentAnalysisPage() {
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
-            size="sm"
-            onClick={() => router.push("/admin/analysis")}
+            onClick={() => router.back()}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold">{assessment.title}</h1>

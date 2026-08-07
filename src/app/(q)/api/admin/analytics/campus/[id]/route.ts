@@ -6,7 +6,7 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,8 +14,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const campus = await db.campus.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -61,7 +63,7 @@ export async function GET(
 
     // Get quizzes for this campus
     const quizzes = await db.quiz.findMany({
-      where: { campusId: params.id },
+      where: { campusId: id },
       include: {
         _count: {
           select: {
@@ -73,7 +75,7 @@ export async function GET(
 
     // Get assessments for this campus
     const assessments = await db.assessment.findMany({
-      where: { campusId: params.id },
+      where: { campusId: id },
       include: {
         _count: {
           select: {
@@ -87,7 +89,7 @@ export async function GET(
     // Calculate performance metrics
     const topPerformers = await db.user.findMany({
       where: {
-        campusId: params.id,
+        campusId: id,
         quizAttempts: {
           some: {
             status: "SUBMITTED",

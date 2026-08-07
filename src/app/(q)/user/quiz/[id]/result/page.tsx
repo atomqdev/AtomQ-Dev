@@ -20,7 +20,8 @@ import {
   List,
   Check,
   X,
-  ChevronDown
+  ChevronDown,
+  EyeOff
 } from "lucide-react"
 import { toast } from "sonner"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
@@ -33,6 +34,7 @@ interface QuizResult {
     title: string
     description?: string
     timeLimit?: number
+    showAnswers: boolean
   }
   score: number
   totalPoints: number
@@ -41,14 +43,14 @@ interface QuizResult {
   answers: Array<{
     questionId: string
     userAnswer: string
-    isCorrect: boolean
+    isCorrect: boolean | null
     pointsEarned: number
     question: {
       reference: string
       title: string
       type: QuestionType
       correctAnswer: string
-      explanation?: string
+      explanation?: string | null
       difficulty: DifficultyLevel
       options?: string[]
     }
@@ -114,16 +116,16 @@ export default function QuizResultPage() {
 
   const getCorrectAnswersCount = () => {
     if (!result) return 0
-    return result.answers.filter(answer => answer.isCorrect).length
+    return result.answers.filter(answer => answer.isCorrect === true).length
   }
 
   const getFilteredAnswers = () => {
     if (!result) return []
     switch (activeTab) {
       case "success":
-        return result.answers.filter(answer => answer.isCorrect)
+        return result.answers.filter(answer => answer.isCorrect === true)
       case "failed":
-        return result.answers.filter(answer => !answer.isCorrect)
+        return result.answers.filter(answer => answer.isCorrect === false)
       default:
         return result.answers
     }
@@ -131,12 +133,12 @@ export default function QuizResultPage() {
 
   const getSuccessCount = () => {
     if (!result) return 0
-    return result.answers.filter(answer => answer.isCorrect).length
+    return result.answers.filter(answer => answer.isCorrect === true).length
   }
 
   const getFailedCount = () => {
     if (!result) return 0
-    return result.answers.filter(answer => !answer.isCorrect).length
+    return result.answers.filter(answer => answer.isCorrect === false).length
   }
 
   if (loading) {
@@ -147,6 +149,7 @@ export default function QuizResultPage() {
     return <div className="flex items-center justify-center h-64">Result not found</div>
   }
 
+  const showAnswers = result.quiz.showAnswers
   const scorePercentage = getScorePercentage()
   const correctAnswers = getCorrectAnswersCount()
   const totalQuestions = result.answers.length
@@ -193,6 +196,25 @@ export default function QuizResultPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Show Answers Disabled Banner */}
+        {!showAnswers && (
+          <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <EyeOff className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Answer details are hidden
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    The quiz administrator has disabled answer visibility. You can view your score and submitted answers, but correct answers and explanations are not shown.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-card/90 dark:bg-card/90">
@@ -216,7 +238,7 @@ export default function QuizResultPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Correct</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {correctAnswers}/{totalQuestions}
+                    {showAnswers ? `${correctAnswers}/${totalQuestions}` : `—/${totalQuestions}`}
                   </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-600" />
@@ -253,22 +275,31 @@ export default function QuizResultPage() {
           </Card>
         </div>
 
-        {/* Tabs for Filtering */}
+        {/* Tabs for Filtering - only show Success/Failed tabs when showAnswers is enabled */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="all" className="flex items-center gap-2">
-              <List className="h-4 w-4" />
-              All ({totalQuestions})
-            </TabsTrigger>
-            <TabsTrigger value="success" className="flex items-center gap-2">
-              <Check className="h-4 w-4" />
-              Success ({successCount})
-            </TabsTrigger>
-            <TabsTrigger value="failed" className="flex items-center gap-2">
-              <X className="h-4 w-4" />
-              Failed ({failedCount})
-            </TabsTrigger>
-          </TabsList>
+          {showAnswers ? (
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <List className="h-4 w-4" />
+                All ({totalQuestions})
+              </TabsTrigger>
+              <TabsTrigger value="success" className="flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Success ({successCount})
+              </TabsTrigger>
+              <TabsTrigger value="failed" className="flex items-center gap-2">
+                <X className="h-4 w-4" />
+                Failed ({failedCount})
+              </TabsTrigger>
+            </TabsList>
+          ) : (
+            <TabsList className="grid w-full grid-cols-1 mb-6">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <List className="h-4 w-4" />
+                All Questions ({totalQuestions})
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           <TabsContent value="all" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -277,6 +308,7 @@ export default function QuizResultPage() {
                   key={answer.questionId} 
                   answer={answer} 
                   index={index} 
+                  showAnswers={showAnswers}
                   expandedExplanation={expandedExplanation}
                   setExpandedExplanation={setExpandedExplanation}
                 />
@@ -284,33 +316,39 @@ export default function QuizResultPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="success" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredAnswers.map((answer, index) => (
-                <QuestionCard 
-                  key={answer.questionId} 
-                  answer={answer} 
-                  index={index} 
-                  expandedExplanation={expandedExplanation}
-                  setExpandedExplanation={setExpandedExplanation}
-                />
-              ))}
-            </div>
-          </TabsContent>
+          {showAnswers && (
+            <>
+              <TabsContent value="success" className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredAnswers.map((answer, index) => (
+                    <QuestionCard 
+                      key={answer.questionId} 
+                      answer={answer} 
+                      index={index} 
+                      showAnswers={showAnswers}
+                      expandedExplanation={expandedExplanation}
+                      setExpandedExplanation={setExpandedExplanation}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
 
-          <TabsContent value="failed" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredAnswers.map((answer, index) => (
-                <QuestionCard 
-                  key={answer.questionId} 
-                  answer={answer} 
-                  index={index} 
-                  expandedExplanation={expandedExplanation}
-                  setExpandedExplanation={setExpandedExplanation}
-                />
-              ))}
-            </div>
-          </TabsContent>
+              <TabsContent value="failed" className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredAnswers.map((answer, index) => (
+                    <QuestionCard 
+                      key={answer.questionId} 
+                      answer={answer} 
+                      index={index} 
+                      showAnswers={showAnswers}
+                      expandedExplanation={expandedExplanation}
+                      setExpandedExplanation={setExpandedExplanation}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
+            </>
+          )}
         </Tabs>
 
         {/* Actions */}
@@ -328,11 +366,13 @@ export default function QuizResultPage() {
 function QuestionCard({ 
   answer, 
   index, 
+  showAnswers,
   expandedExplanation,
   setExpandedExplanation 
 }: { 
   answer: QuizResult["answers"][0]; 
   index: number;
+  showAnswers: boolean;
   expandedExplanation: string | null;
   setExpandedExplanation: (value: string | null) => void;
 }) {
@@ -345,12 +385,19 @@ function QuestionCard({
       setExpandedExplanation(answer.questionId);
     }
   };
+
+  // Determine card styling based on showAnswers setting
+  const getCardStyling = () => {
+    if (!showAnswers) {
+      return "border-border bg-card"
+    }
+    return answer.isCorrect 
+      ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20' 
+      : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
+  }
+
   return (
-    <Card className={`h-fit transition-all hover:shadow-md border ${
-      answer.isCorrect 
-        ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20' 
-        : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
-    }`}>
+    <Card className={`h-fit transition-all hover:shadow-md border ${getCardStyling()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -362,16 +409,22 @@ function QuestionCard({
               } className="text-xs">
                 {answer.question.difficulty}
               </Badge>
-              <Badge variant="outline" className="text-xs">
-                {answer.pointsEarned}/{answer.pointsEarned + (answer.isCorrect ? 0 : 1)} pts
-              </Badge>
+              {showAnswers && (
+                <Badge variant="outline" className="text-xs">
+                  {answer.pointsEarned}/{answer.pointsEarned + (answer.isCorrect ? 0 : 1)} pts
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 ml-2">
-            {answer.isCorrect ? (
-              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+            {showAnswers ? (
+              answer.isCorrect ? (
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              )
             ) : (
-              <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <EyeOff className="h-5 w-5 text-muted-foreground flex-shrink-0" />
             )}
           </div>
         </div>
@@ -381,7 +434,7 @@ function QuestionCard({
         {/* Question Content */}
         <div className="text-sm text-muted-foreground">
           <RichTextDisplay content={answer.question.title} />
-          {answer.question.type === 'MULTI_SELECT' && (() => {
+          {answer.question.type === 'MULTI_SELECT' && showAnswers && (() => {
             const selectCount = getMultiSelectCount(answer.question.correctAnswer)
             return (
               <span className="inline-flex items-center ml-2 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -396,13 +449,15 @@ function QuestionCard({
           <div className="flex items-start gap-2">
             <span className="text-xs font-medium text-muted-foreground min-w-fit">Your Answer:</span>
             <span className={`text-xs break-words ${
-              answer.isCorrect ? 'text-green-600 font-medium' : 'text-red-600'
+              showAnswers 
+                ? (answer.isCorrect ? 'text-green-600 font-medium' : 'text-red-600')
+                : 'text-foreground'
             }`}>
               {answer.userAnswer || "Not answered"}
             </span>
           </div>
 
-          {!answer.isCorrect && (
+          {showAnswers && !answer.isCorrect && answer.question.correctAnswer && (
             <div className="flex items-start gap-2">
               <span className="text-xs font-medium text-muted-foreground min-w-fit">Correct Answer:</span>
               <span className="text-xs text-green-600 break-words">
@@ -412,8 +467,8 @@ function QuestionCard({
           )}
         </div>
 
-        {/* Explanation */}
-        {answer.question.explanation && (
+        {/* Explanation - only show when showAnswers is enabled */}
+        {showAnswers && answer.question.explanation && (
           <div className="pt-2">
             <div className="w-full">
               <button

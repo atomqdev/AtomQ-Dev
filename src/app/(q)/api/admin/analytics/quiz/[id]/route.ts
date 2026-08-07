@@ -6,7 +6,7 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,8 +14,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const quiz = await db.quiz.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         quizQuestions: {
           include: {
@@ -51,7 +53,10 @@ export async function GET(
         ? ((submittedAttempts.length / quiz.quizAttempts.length) * 100).toFixed(1)
         : "0.0",
       avgScore: submittedAttempts.length > 0
-        ? (submittedAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / submittedAttempts.length).toFixed(2)
+        ? submittedAttempts.reduce((sum, a) => {
+            const pct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
+            return sum + pct;
+          }, 0) / submittedAttempts.length
         : 0,
       avgTimeTaken: submittedAttempts.length > 0
         ? Math.round(submittedAttempts.reduce((sum, a) => sum + (a.timeTaken || 0), 0) / submittedAttempts.length)
@@ -87,7 +92,7 @@ export async function GET(
 
       return {
         id: question.id,
-        reference: question.reference,
+        title: question.title,
         type: question.type,
         difficulty: question.difficulty,
         totalAttempts,
@@ -98,8 +103,18 @@ export async function GET(
 
     // Top performers
     const topPerformers = [...submittedAttempts]
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, 10);
+      .sort((a, b) => {
+        const aPct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
+        const bPct = b.totalPoints && b.totalPoints > 0 ? ((b.score || 0) / b.totalPoints) * 100 : (b.score || 0);
+        return bPct - aPct;
+      })
+      .slice(0, 10)
+      .map(attempt => ({
+        ...attempt,
+        score: attempt.totalPoints && attempt.totalPoints > 0
+          ? ((attempt.score || 0) / attempt.totalPoints) * 100
+          : (attempt.score || 0),
+      }));
 
     // Time analysis
     const timeRanges = [

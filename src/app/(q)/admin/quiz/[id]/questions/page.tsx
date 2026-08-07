@@ -77,7 +77,6 @@ import {
   GripVertical,
   Search,
   Plus,
-  ArrowLeft,
   Edit,
   Trash2,
   Eye,
@@ -942,11 +941,9 @@ export default function QuizQuestionsPage() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={() => router.back()}
-            className="h-9"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
       </div>

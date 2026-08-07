@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Save, 
-  ArrowLeft, 
+  ChevronLeft, 
   Clock, 
   Users, 
   Settings,
@@ -136,12 +136,10 @@ export default function EditQuizPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button
-            variant="ghost"
-            size="sm"
+            variant="outline"
             onClick={() => router.back()}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Edit Quiz</h1>

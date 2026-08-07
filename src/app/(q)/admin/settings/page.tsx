@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,13 +16,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from "@/components/ui/sheet"
 import { toasts } from "@/lib/toasts"
-import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Code, Copy, Plus, Trash2, PowerOff } from "lucide-react"
+import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Code, Copy, Plus, Trash2, PowerOff, ChevronLeft } from "lucide-react"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 
 export default function SettingsPage() {
+  const router = useRouter()
   const {
     settings,
     isLoading: settingsLoading,
@@ -323,11 +325,16 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your application settings and preferences
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your application settings and preferences
+            </p>
+          </div>
         </div>
       </div>
 

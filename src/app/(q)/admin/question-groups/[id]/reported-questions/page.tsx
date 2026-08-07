@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TriangleAlert, Bug, Edit, ArrowLeft, Loader2, Trash2, Plus } from "lucide-react"
+import { TriangleAlert, Bug, Edit, ChevronLeft, Loader2, Trash2, Plus } from "lucide-react"
 import { format } from "date-fns"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
@@ -489,7 +489,7 @@ export default function ReportedQuestionsPage() {
           </p>
         </div>
         <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
       </div>
 

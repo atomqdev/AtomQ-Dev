@@ -43,6 +43,7 @@ import {
   FileQuestion,
   BookOpen,
   CheckCircle2 as CheckCircle,
+  ChevronLeft,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
@@ -311,6 +312,12 @@ export default function QuestionGroupsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.name.trim()) {
+      toasts.error("Name is required")
+      return
+    }
+
     setSubmitLoading(true)
 
     const isEditing = selectedGroup !== null
@@ -508,11 +515,16 @@ export default function QuestionGroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Question Groups</h1>
-          <p className="text-muted-foreground">
-            Manage question groups and organize your questions
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Question Groups</h1>
+            <p className="text-muted-foreground">
+              Manage question groups and organize your questions
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setIsAddDialogOpen(true)}>

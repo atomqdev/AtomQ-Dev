@@ -57,6 +57,7 @@ import {
   BookOpen,
   UserCheck,
   UserX,
+  ChevronLeft,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { UserRole, StudentSection } from "@prisma/client"
@@ -798,35 +799,42 @@ export default function UsersPage() {
     toasts.success("Users downloaded successfully")
   }
 
-  const handleExportJSON = () => {
-    const exportData = users.map(user => ({
-      name: user.name,
-      email: user.email,
-      uoid: user.uoid || "",
-      role: user.role,
-      phone: user.phone || "",
-      isActive: user.isActive,
-      campus: user.campus || null,
-      campusShortName: user.campusShortName || null,
-      department: user.department || null,
-      batch: user.batch || null,
-      section: user.section || null,
-      registrationCode: user.registrationCode || null,
-      createdAt: user.createdAt,
-    }))
+  const handleExportJSON = async () => {
+    try {
+      // Use server-side export API to get all user fields including password hashes
+      const params = new URLSearchParams()
+      if (filterCampusId && filterCampusId !== 'all') params.set('campusId', filterCampusId)
+      if (filterDepartmentId && filterDepartmentId !== 'all') params.set('departmentId', filterDepartmentId)
+      if (filterBatchId && filterBatchId !== 'all') params.set('batchId', filterBatchId)
+      if (filterSection && filterSection !== 'all') params.set('section', filterSection)
+      if (debouncedSearchQuery.trim()) params.set('search', debouncedSearchQuery.trim())
 
-    const json = JSON.stringify(exportData, null, 2)
-    const blob = new Blob([json], { type: "application/json;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", "users.json")
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toasts.success(`Exported ${exportData.length} user${exportData.length !== 1 ? 's' : ''} as JSON`)
+      const queryString = params.toString()
+      const url = `/api/admin/users/export${queryString ? `?${queryString}` : ''}`
+
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error('Failed to export users')
+      }
+
+      const data = await response.json()
+
+      const json = JSON.stringify(data.users, null, 2)
+      const blob = new Blob([json], { type: "application/json;charset=utf-8;" })
+      const link = document.createElement("a")
+      const urlObj = URL.createObjectURL(blob)
+      link.setAttribute("href", urlObj)
+      link.setAttribute("download", "users.json")
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(urlObj)
+      toasts.success(`Exported ${data.users.length} user${data.users.length !== 1 ? 's' : ''} as JSON`)
+    } catch (error) {
+      console.error('Error exporting users:', error)
+      toasts.error('Failed to export users')
+    }
   }
 
   const handleImportClick = () => {
@@ -882,7 +890,7 @@ export default function UsersPage() {
 
       if (response.ok) {
         const result = await response.json()
-        toasts.success(result.message || `Import completed: ${result.successCount} created, ${result.failureCount} failed`)
+        toasts.success(result.message || `Import completed: ${result.successCount} successful, ${result.failureCount} failed`)
         await fetchUsers()
       } else if (response.status === 401) {
         toasts.error("Session expired. Please log in again.")
@@ -922,11 +930,16 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">
-            Manage user accounts and permissions
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+            <p className="text-muted-foreground">
+              Manage user accounts and permissions
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <input

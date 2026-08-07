@@ -23,7 +23,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  ArrowLeft,
   Search,
   UserPlus,
   UserMinus,
@@ -448,7 +447,6 @@ export default function AssessmentEnrollmentsPage() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={() => router.back()}
           >
             <ChevronLeft className="h-4 w-4" />

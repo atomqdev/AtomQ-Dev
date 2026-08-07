@@ -41,7 +41,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
-  ArrowLeft,
+  ChevronLeft,
   Plus,
   Eye,
   Edit,
@@ -85,6 +85,9 @@ interface Quiz {
   randomOrder?: boolean
   maxAttempts?: number | null
   checkAnswerEnabled?: boolean
+  showAnswers?: boolean
+  startDate?: string | null
+  endDate?: string | null
   createdAt: string
   _count: {
     quizQuestions: number
@@ -121,6 +124,7 @@ interface CreateFormData {
   startDate: string
   endDate: string
   checkAnswerEnabled: boolean
+  showAnswers: boolean
 }
 
 export default function QuizGroupDetailPage({
@@ -134,6 +138,8 @@ export default function QuizGroupDetailPage({
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -174,7 +180,144 @@ export default function QuizGroupDetailPage({
     startDate: "",
     endDate: "",
     checkAnswerEnabled: false,
+    showAnswers: false,
   })
+
+  const resetFormData = () => {
+    setFormData({
+      title: "",
+      description: "",
+      timeLimit: "",
+      difficulty: DifficultyLevel.EASY,
+      status: QuizStatus.DRAFT,
+      negativeMarking: false,
+      negativePoints: "",
+      randomOrder: false,
+      maxAttempts: "",
+      startDate: "",
+      endDate: "",
+      checkAnswerEnabled: false,
+      showAnswers: false,
+    })
+  }
+
+  const [editFormData, setEditFormData] = useState<CreateFormData>({
+    title: "",
+    description: "",
+    timeLimit: "",
+    difficulty: DifficultyLevel.EASY,
+    status: QuizStatus.DRAFT,
+    negativeMarking: false,
+    negativePoints: "",
+    randomOrder: false,
+    maxAttempts: "",
+    startDate: "",
+    endDate: "",
+    checkAnswerEnabled: false,
+    showAnswers: false,
+  })
+
+  const resetEditFormData = () => {
+    setEditFormData({
+      title: "",
+      description: "",
+      timeLimit: "",
+      difficulty: DifficultyLevel.EASY,
+      status: QuizStatus.DRAFT,
+      negativeMarking: false,
+      negativePoints: "",
+      randomOrder: false,
+      maxAttempts: "",
+      startDate: "",
+      endDate: "",
+      checkAnswerEnabled: false,
+      showAnswers: false,
+    })
+  }
+
+  const openEditDialog = (quiz: Quiz) => {
+    setSelectedQuiz(quiz)
+
+    const formatDateForInput = (dateString: string | null | undefined) => {
+      if (!dateString) return ""
+      const date = new Date(dateString)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    setEditFormData({
+      title: quiz.title,
+      description: quiz.description || "",
+      timeLimit: quiz.timeLimit?.toString() || "",
+      difficulty: quiz.difficulty,
+      status: quiz.status,
+      negativeMarking: quiz.negativeMarking ?? false,
+      negativePoints: quiz.negativePoints?.toString() || "",
+      randomOrder: quiz.randomOrder ?? false,
+      maxAttempts: quiz.maxAttempts === null || quiz.maxAttempts === undefined ? "" : quiz.maxAttempts.toString(),
+      startDate: formatDateForInput(quiz.startDate),
+      endDate: formatDateForInput(quiz.endDate),
+      checkAnswerEnabled: quiz.checkAnswerEnabled ?? false,
+      showAnswers: quiz.showAnswers ?? false,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editFormData.title.trim()) {
+      toasts.error("Title is required")
+      return
+    }
+    if (
+      editFormData.startDate &&
+      editFormData.endDate &&
+      new Date(editFormData.endDate) <= new Date(editFormData.startDate)
+    ) {
+      toasts.error("End date must be after start date")
+      return
+    }
+    if (!selectedQuiz) return
+    setSubmitLoading(true)
+
+    try {
+      const response = await fetch(`/api/admin/quiz/${selectedQuiz.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...editFormData,
+          timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
+          negativePoints: editFormData.negativePoints
+            ? parseFloat(editFormData.negativePoints)
+            : null,
+          maxAttempts:
+            editFormData.maxAttempts === "" ? null : parseInt(editFormData.maxAttempts),
+          startDate: formatDateToUTC(editFormData.startDate),
+          endDate: formatDateToUTC(editFormData.endDate),
+        }),
+      })
+
+      if (response.ok) {
+        toasts.success("Quiz updated successfully")
+        setIsEditDialogOpen(false)
+        setSelectedQuiz(null)
+        resetEditFormData()
+        fetchQuizzes()
+        fetchGroup()
+      } else {
+        const error = await response.json()
+        toasts.error(error.message || "Failed to update quiz")
+      }
+    } catch (error) {
+      toasts.actionFailed("Quiz update")
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
 
   const openDeleteDialog = async (quiz: Quiz) => {
     setQuizToDelete(quiz)
@@ -503,7 +646,7 @@ export default function QuizGroupDetailPage({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => router.push(`/admin/quiz/${quiz.id}/edit`)}
+                onClick={() => openEditDialog(quiz)}
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -749,20 +892,7 @@ export default function QuizGroupDetailPage({
       if (response.ok) {
         toasts.success("Quiz created successfully in this group")
         setIsAddDialogOpen(false)
-        setFormData({
-          title: "",
-          description: "",
-          timeLimit: "",
-          difficulty: DifficultyLevel.EASY,
-          status: QuizStatus.DRAFT,
-          negativeMarking: false,
-          negativePoints: "",
-          randomOrder: false,
-          maxAttempts: "",
-          startDate: "",
-          endDate: "",
-          checkAnswerEnabled: false,
-        })
+        resetFormData()
         fetchQuizzes()
         fetchGroup()
       } else {
@@ -788,11 +918,10 @@ export default function QuizGroupDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/quiz-group")}
+          variant="outline"
+          onClick={() => router.back()}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -1053,6 +1182,18 @@ export default function QuizGroupDetailPage({
                 }
               />
             </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="create-show-answers">
+                Show Answers
+              </Label>
+              <Switch
+                id="create-show-answers"
+                checked={formData.showAnswers}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, showAnswers: checked })
+                }
+              />
+            </div>
             <SheetFooter>
               <LoadingButton
                 type="submit"
@@ -1060,6 +1201,183 @@ export default function QuizGroupDetailPage({
                 className="w-full"
               >
                 Create Quiz
+              </LoadingButton>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit Quiz Sheet */}
+      <Sheet open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open)
+        if (!open) {
+          setSelectedQuiz(null)
+          resetEditFormData()
+        }
+      }}>
+        <SheetContent className="w-full sm:w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Quiz</SheetTitle>
+            <SheetDescription>
+              Update quiz details and settings.
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">
+                Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-title"
+                value={editFormData.title}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter quiz title"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editFormData.description}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter quiz description"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={editFormData.difficulty}
+                  onValueChange={(value: DifficultyLevel) => setEditFormData(prev => ({ ...prev, difficulty: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+                    <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+                    <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-time-limit">Time Limit (min)</Label>
+                <Input
+                  id="edit-time-limit"
+                  type="number"
+                  value={editFormData.timeLimit}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, timeLimit: e.target.value }))}
+                  placeholder="e.g. 30"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editFormData.status}
+                  onValueChange={(value: QuizStatus) => setEditFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={QuizStatus.DRAFT}>Draft</SelectItem>
+                    <SelectItem value={QuizStatus.ACTIVE}>Active</SelectItem>
+                    <SelectItem value={QuizStatus.INACTIVE}>Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-max-attempts">Max Attempts</Label>
+                <Input
+                  id="edit-max-attempts"
+                  type="number"
+                  min="1"
+                  value={editFormData.maxAttempts}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, maxAttempts: e.target.value }))}
+                  placeholder="Empty = unlimited"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-negative-marking">Negative Marking</Label>
+              <Switch
+                id="edit-negative-marking"
+                checked={editFormData.negativeMarking}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, negativeMarking: checked }))}
+              />
+            </div>
+            {editFormData.negativeMarking && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-negative-points">Negative Points</Label>
+                <Input
+                  id="edit-negative-points"
+                  type="number"
+                  step="0.1"
+                  value={editFormData.negativePoints}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, negativePoints: e.target.value }))}
+                  placeholder="e.g. 0.25"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-start-date">Start Date</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-end-date">End Date</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-random-order">Random Question Order</Label>
+              <Switch
+                id="edit-random-order"
+                checked={editFormData.randomOrder}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, randomOrder: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-check-answer-enabled">Allow Check Answers</Label>
+              <Switch
+                id="edit-check-answer-enabled"
+                checked={editFormData.checkAnswerEnabled}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, checkAnswerEnabled: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-show-answers">Show Answers</Label>
+              <Switch
+                id="edit-show-answers"
+                checked={editFormData.showAnswers}
+                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, showAnswers: checked }))}
+              />
+            </div>
+            <SheetFooter className="flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => {
+                setIsEditDialogOpen(false)
+                setSelectedQuiz(null)
+                resetEditFormData()
+              }}>
+                Cancel
+              </Button>
+              <LoadingButton type="submit" isLoading={submitLoading}>
+                Update Quiz
               </LoadingButton>
             </SheetFooter>
           </form>

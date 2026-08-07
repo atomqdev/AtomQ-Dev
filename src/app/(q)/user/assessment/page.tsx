@@ -265,7 +265,7 @@ export default function UserAssessmentsPage() {
                 {assessment.bestScore !== null && (
                   <div className="flex items-center text-xs">
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-yellow-500" />
-                    Best Score: {Math.round(assessment.bestScore)}%
+                    Best Score: {assessment.questionCount > 0 ? Math.round((assessment.bestScore / assessment.questionCount) * 100) : Math.round(assessment.bestScore)}%
                   </div>
                 )}
 

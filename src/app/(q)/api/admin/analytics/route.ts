@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Status breakdown
-    const [quizStatusStats, assessmentStatusStats] = await Promise.all([
+    const [quizStatusStats, assessmentStatusStats, quizzes, assessments] = await Promise.all([
       db.quizAttempt.groupBy({
         by: ["status"],
         _count: true,
@@ -102,6 +102,32 @@ export async function GET(request: NextRequest) {
       db.assessmentAttempt.groupBy({
         by: ["status"],
         _count: true,
+      }),
+      db.quiz.findMany({
+        include: {
+          _count: {
+            select: {
+              quizAttempts: true,
+              quizQuestions: true,
+              quizUsers: true,
+            },
+          },
+          campus: { select: { id: true, name: true, shortName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.assessment.findMany({
+        include: {
+          _count: {
+            select: {
+              assessmentAttempts: true,
+              assessmentQuestions: true,
+              assessmentUsers: true,
+            },
+          },
+          campus: { select: { id: true, name: true, shortName: true } },
+        },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -137,6 +163,24 @@ export async function GET(request: NextRequest) {
         quizzes: quizStatusStats,
         assessments: assessmentStatusStats,
       },
+      quizzes: quizzes.map(quiz => ({
+        id: quiz.id,
+        title: quiz.title,
+        difficulty: quiz.difficulty,
+        status: quiz.status,
+        timeLimit: quiz.timeLimit,
+        campus: quiz.campus,
+        _count: quiz._count,
+      })),
+      assessments: assessments.map(assessment => ({
+        id: assessment.id,
+        title: assessment.title,
+        difficulty: assessment.difficulty,
+        status: assessment.status,
+        timeLimit: assessment.timeLimit,
+        campus: assessment.campus,
+        _count: assessment._count,
+      })),
     });
   } catch (error) {
     console.error("Error fetching analytics:", error);

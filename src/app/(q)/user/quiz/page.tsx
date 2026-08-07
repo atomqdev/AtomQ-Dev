@@ -276,7 +276,7 @@ export default function UserQuizPage() {
                 {quiz.bestScore !== null && (
                   <div className="flex items-center text-xs">
                     <Trophy className="w-3.5 h-3.5 mr-1 text-yellow-500" />
-                    Best Score: {Math.round(quiz.bestScore)}%
+                    Best Score: {quiz.questionCount > 0 ? Math.round((quiz.bestScore / quiz.questionCount) * 100) : Math.round(quiz.bestScore)}%
                   </div>
                 )}
 

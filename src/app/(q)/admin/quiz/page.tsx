@@ -59,6 +59,7 @@ import {
   ArrowUpDown,
   Loader2,
   CheckCircle2 as CheckCircle,
+  ChevronLeft,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -107,6 +108,7 @@ interface Quiz {
   endDate?: string
   createdAt: string
   checkAnswerEnabled?: boolean
+  showAnswers?: boolean
   _count: {
     quizQuestions: number
     quizAttempts: number
@@ -126,6 +128,7 @@ interface CreateFormData {
   startDate: string
   endDate: string
   checkAnswerEnabled: boolean
+  showAnswers: boolean
 }
 
 interface EditFormData {
@@ -141,6 +144,7 @@ interface EditFormData {
   startDate: string
   endDate: string
   checkAnswerEnabled: boolean
+  showAnswers: boolean
 }
 
 export default function QuizzesPage() {
@@ -189,6 +193,7 @@ export default function QuizzesPage() {
     startDate: "",
     endDate: "",
     checkAnswerEnabled: false,
+    showAnswers: false,
   })
 
   const [editFormData, setEditFormData] = useState<EditFormData>({
@@ -204,6 +209,7 @@ export default function QuizzesPage() {
     startDate: "",
     endDate: "",
     checkAnswerEnabled: false,
+    showAnswers: false,
   })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -386,6 +392,12 @@ export default function QuizzesPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!createFormData.title.trim()) {
+      toasts.error("Title is required")
+      return
+    }
+
     setSubmitLoading(true)
 
     // Validate date inputs
@@ -433,6 +445,12 @@ export default function QuizzesPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!editFormData.title.trim()) {
+      toasts.error("Title is required")
+      return
+    }
+
     setSubmitLoading(true)
 
     if (!selectedQuiz) return
@@ -552,6 +570,7 @@ export default function QuizzesPage() {
       startDate: formatDateLocal(quiz.startDate),
       endDate: formatDateLocal(quiz.endDate),
       checkAnswerEnabled: quiz.checkAnswerEnabled || false,
+      showAnswers: quiz.showAnswers ?? false,
     })
     setIsEditDialogOpen(true)
   }
@@ -695,6 +714,7 @@ export default function QuizzesPage() {
       startDate: "",
       endDate: "",
       checkAnswerEnabled: false,
+      showAnswers: false,
     })
   }
 
@@ -712,6 +732,7 @@ export default function QuizzesPage() {
       startDate: "",
       endDate: "",
       checkAnswerEnabled: false,
+      showAnswers: false,
     })
   }
 
@@ -786,11 +807,16 @@ export default function QuizzesPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quizzes</h1>
-          <p className="text-muted-foreground">
-            Create and manage quiz assessments
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Quizzes</h1>
+            <p className="text-muted-foreground">
+              Create and manage quiz assessments
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportQuizzes}>
@@ -1004,6 +1030,16 @@ export default function QuizzesPage() {
                   <Label htmlFor="create-check-answer-enabled">Allow Check Answers</Label>
                 </div>
               </div>
+              <div className="grid gap-3">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="create-show-answers"
+                    checked={createFormData.showAnswers}
+                    onCheckedChange={(checked) => setCreateFormData({ ...createFormData, showAnswers: checked })}
+                  />
+                  <Label htmlFor="create-show-answers">Show Answers</Label>
+                </div>
+              </div>
             </div>
             <SheetFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -1022,7 +1058,13 @@ export default function QuizzesPage() {
       </Sheet>
 
       {/* Edit Quiz Sheet */}
-      <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Sheet open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open)
+        if (!open) {
+          setSelectedQuiz(null)
+          resetEditForm()
+        }
+      }}>
         <SheetContent className="sm:max-w-[600px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Quiz</SheetTitle>
@@ -1180,9 +1222,23 @@ export default function QuizzesPage() {
                   <Label htmlFor="edit-check-answer-enabled">Allow Check Answers</Label>
                 </div>
               </div>
+              <div className="grid gap-3">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-show-answers"
+                    checked={editFormData.showAnswers}
+                    onCheckedChange={(checked) => setEditFormData({ ...editFormData, showAnswers: checked })}
+                  />
+                  <Label htmlFor="edit-show-answers">Show Answers</Label>
+                </div>
+              </div>
             </div>
             <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setIsEditDialogOpen(false)
+                setSelectedQuiz(null)
+                resetEditForm()
+              }}>
                 Cancel
               </Button>
               <LoadingButton 

@@ -56,6 +56,7 @@ import {
   Key,
   Copy,
   CheckCircle2 as CheckCircle,
+  ChevronLeft,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
@@ -139,6 +140,7 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -156,6 +158,7 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
+  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -208,6 +211,7 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -225,6 +229,7 @@ export default function AssessmentsPage() {
     negativePoints: "",
     randomOrder: false,
     startTime: "",
+    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -445,6 +450,12 @@ export default function AssessmentsPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!createFormData.title.trim()) {
+      toasts.error("Title is required")
+      return
+    }
+
     setSubmitLoading(true)
 
     try {
@@ -458,6 +469,7 @@ export default function AssessmentsPage() {
           timeLimit: createFormData.timeLimit ? parseInt(createFormData.timeLimit) : null,
           negativePoints: createFormData.negativePoints ? parseFloat(createFormData.negativePoints) : null,
           startTime: createFormData.startTime || null,
+          endtime: createFormData.endtime || null,
           campusId: createFormData.campusId || null,
           tabswitches: createFormData.tabswitches ? parseInt(createFormData.tabswitches) : null,
           disableCopyPaste: createFormData.disableCopyPaste,
@@ -484,6 +496,12 @@ export default function AssessmentsPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!editFormData.title.trim()) {
+      toasts.error("Title is required")
+      return
+    }
+
     setSubmitLoading(true)
 
     if (!selectedAssessment) return
@@ -499,6 +517,7 @@ export default function AssessmentsPage() {
           timeLimit: editFormData.timeLimit ? parseInt(editFormData.timeLimit) : null,
           negativePoints: editFormData.negativePoints ? parseFloat(editFormData.negativePoints) : null,
           startTime: editFormData.startTime || null,
+          endtime: editFormData.endtime || null,
           campusId: editFormData.campusId || null,
           tabswitches: editFormData.tabswitches ? parseInt(editFormData.tabswitches) : null,
           disableCopyPaste: editFormData.disableCopyPaste,
@@ -605,6 +624,7 @@ export default function AssessmentsPage() {
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder,
       startTime: formatDateTimeLocal(assessment.startTime),
+      endtime: formatDateTimeLocal(assessment.endtime),
       campusId: assessment.campus?.id || "",
       tabswitches: assessment.tabswitches?.toString() || "",
       disableCopyPaste: assessment.disableCopyPaste,
@@ -751,6 +771,7 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
+      endtime: "",
       campusId: "",
       tabswitches: "",
       disableCopyPaste: false,
@@ -770,6 +791,7 @@ export default function AssessmentsPage() {
       negativePoints: "",
       randomOrder: false,
       startTime: "",
+      endtime: "",
       campusId: "",
       tabswitches: "",
       disableCopyPaste: false,
@@ -814,11 +836,16 @@ export default function AssessmentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Assessments</h1>
-          <p className="text-muted-foreground">
-            Manage assessments, questions, and user enrollments
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Assessments</h1>
+            <p className="text-muted-foreground">
+              Manage assessments, questions, and user enrollments
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportAssessments}>
@@ -953,6 +980,16 @@ export default function AssessmentsPage() {
                   placeholder="Select date and time"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endtime">End Time</Label>
+                <DateTimePicker
+                  id="endtime"
+                  value={createFormData.endtime}
+                  onChange={(value) => setCreateFormData(prev => ({ ...prev, endtime: value }))}
+                  placeholder="Select date and time"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1057,7 +1094,13 @@ export default function AssessmentsPage() {
       </Sheet>
 
       {/* Edit Assessment Dialog */}
-      <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Sheet open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open)
+        if (!open) {
+          setSelectedAssessment(null)
+          resetEditForm()
+        }
+      }}>
         <SheetContent className="w-full sm:w-[540px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Assessment</SheetTitle>
@@ -1143,6 +1186,16 @@ export default function AssessmentsPage() {
                   id="edit-startTime"
                   value={editFormData.startTime}
                   onChange={(value) => setEditFormData(prev => ({ ...prev, startTime: value }))}
+                  placeholder="Select date and time"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-endtime">End Time</Label>
+                <DateTimePicker
+                  id="edit-endtime"
+                  value={editFormData.endtime}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, endtime: value }))}
                   placeholder="Select date and time"
                 />
               </div>
@@ -1238,7 +1291,11 @@ export default function AssessmentsPage() {
             </div>
 
             <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setIsEditDialogOpen(false)
+                setSelectedAssessment(null)
+                resetEditForm()
+              }}>
                 Cancel
               </Button>
               <LoadingButton type="submit" isLoading={submitLoading}>
