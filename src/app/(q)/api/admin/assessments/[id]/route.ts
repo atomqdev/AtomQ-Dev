@@ -77,6 +77,7 @@ export async function PUT(
       negativePoints,
       randomOrder,
       startTime,
+      endtime: endtimeInput,
       campusId,
       tabswitches,
       disableCopyPaste,
@@ -84,35 +85,54 @@ export async function PUT(
       accessKey,
     } = data;
 
-    // Calculate endtime from startTime + duration if both are provided
-    let endtime: Date | null = null;
-    if (startTime && timeLimit) {
-      const startDate = new Date(startTime);
-      const durationMinutes = parseInt(timeLimit);
-      endtime = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-    }
-
     const { id: assessmentId } = await params;
+
+    // Build update data - only include fields that are explicitly provided
+    // to avoid overwriting existing values with null/undefined
+    const updateData: any = {
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(timeLimit !== undefined && { timeLimit: timeLimit ? parseInt(timeLimit) : null }),
+      ...(difficulty !== undefined && { difficulty }),
+      ...(status !== undefined && { status }),
+      ...(negativeMarking !== undefined && { negativeMarking }),
+      ...(negativePoints !== undefined && { negativePoints: negativeMarking ? parseFloat(negativePoints) : null }),
+      ...(randomOrder !== undefined && { randomOrder }),
+      ...(startTime !== undefined && { startTime: startTime ? new Date(startTime) : null }),
+      ...(campusId !== undefined && { campusId: campusId || null }),
+      ...(tabswitches !== undefined && { tabswitches: tabswitches ? parseInt(tabswitches) : null }),
+      ...(disableCopyPaste !== undefined && { disableCopyPaste: disableCopyPaste || false }),
+      ...(autosubmit !== undefined && { autosubmit: autosubmit || false }),
+      ...(accessKey !== undefined && { accessKey: accessKey || null }),
+    };
+
+    // Calculate endtime only if startTime or timeLimit or endtime is explicitly provided
+    if (endtimeInput !== undefined || startTime !== undefined || timeLimit !== undefined) {
+      let endtime: Date | null = null;
+      if (endtimeInput) {
+        endtime = new Date(endtimeInput);
+      } else {
+        // Fetch current values for fields not provided
+        const current = await db.assessment.findUnique({
+          where: { id: assessmentId },
+          select: { startTime: true, timeLimit: true },
+        });
+        const effectiveStartTime = startTime || current?.startTime?.toISOString();
+        const effectiveTimeLimit = timeLimit || current?.timeLimit;
+        if (effectiveStartTime && effectiveTimeLimit) {
+          const startDate = new Date(effectiveStartTime);
+          const durationMinutes = parseInt(String(effectiveTimeLimit));
+          if (!isNaN(durationMinutes)) {
+            endtime = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+          }
+        }
+      }
+      updateData.endtime = endtime;
+    }
 
     const assessment = await db.assessment.update({
       where: { id: assessmentId },
-      data: {
-        title,
-        description,
-        timeLimit: timeLimit ? parseInt(timeLimit) : null,
-        difficulty,
-        status,
-        negativeMarking,
-        negativePoints: negativeMarking ? parseFloat(negativePoints) : null,
-        randomOrder,
-        startTime: startTime ? new Date(startTime) : null,
-        endtime,
-        campusId: campusId || null,
-        tabswitches: tabswitches ? parseInt(tabswitches) : null,
-        disableCopyPaste: disableCopyPaste || false,
-        autosubmit: autosubmit || false,
-        accessKey: accessKey || null,
-      },
+      data: updateData,
       include: {
         creator: {
           select: {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { UserRole, AttemptStatus } from "@prisma/client"
+import { UserRole, AttemptStatus, QuestionType } from "@prisma/client"
 
 export async function POST(
   request: NextRequest,
@@ -29,6 +29,9 @@ export async function POST(
       )
     }
 
+    // Validate isAutoSubmitted is a proper boolean
+    const autoSubmitted = isAutoSubmitted === true
+
     // Determine if this is an Assessment or Quiz attempt
     let assessmentAttempt = await db.assessmentAttempt.findFirst({
       where: {
@@ -40,7 +43,6 @@ export async function POST(
 
     let quizAttempt = null
     let isAssessment = true
-    let attemptModel = 'AssessmentAttempt'
 
     if (!assessmentAttempt) {
       quizAttempt = await db.quizAttempt.findFirst({
@@ -53,7 +55,6 @@ export async function POST(
 
       if (quizAttempt) {
         isAssessment = false
-        attemptModel = 'QuizAttempt'
       }
     }
 
@@ -71,133 +72,168 @@ export async function POST(
       )
     }
 
-    // Update attempt status to submitted based on type
-    if (isAssessment) {
-      await db.assessmentAttempt.update({
-        where: { id: attemptId },
-        data: {
-          status: AttemptStatus.SUBMITTED,
-          submittedAt: new Date(),
-          isAutoSubmitted: isAutoSubmitted || false,
-        },
-      })
-    } else {
-      await db.quizAttempt.update({
-        where: { id: attemptId },
-        data: {
-          status: AttemptStatus.SUBMITTED,
-          submittedAt: new Date(),
-          isAutoSubmitted: isAutoSubmitted || false,
-        },
-      })
-    }
+    // Use a transaction to ensure atomicity: status update + answers + scoring all succeed or all fail
+    const result = await db.$transaction(async (tx) => {
+      // Atomic status update - only succeeds if status is NOT SUBMITTED (prevents double-submit)
+      let statusUpdate
+      if (isAssessment) {
+        statusUpdate = await tx.assessmentAttempt.updateMany({
+          where: { id: attemptId, status: { not: AttemptStatus.SUBMITTED } },
+          data: {
+            status: AttemptStatus.SUBMITTED,
+            submittedAt: new Date(),
+            isAutoSubmitted: autoSubmitted,
+          },
+        })
+      } else {
+        statusUpdate = await (tx as any).quizAttempt.updateMany({
+          where: { id: attemptId, status: { not: AttemptStatus.SUBMITTED } },
+          data: {
+            status: AttemptStatus.SUBMITTED,
+            submittedAt: new Date(),
+            isAutoSubmitted: autoSubmitted,
+          },
+        })
+      }
 
-    // Save answers based on type
-    let savedAnswers
+      // If no rows were updated, another request already submitted
+      if (statusUpdate.count === 0) {
+        throw new Error("ALREADY_SUBMITTED")
+      }
 
-    if (isAssessment) {
-      savedAnswers = await Promise.all(
-        Object.entries(answers).map(([questionId, answer]) =>
-          db.assessmentAnswer.create({
-            data: {
-              attemptId: attemptId,
-              questionId: questionId,
-              userAnswer: answer as string,
-            },
-          })
-        )
-      )
-    } else {
-      savedAnswers = await Promise.all(
-        Object.entries(answers).map(([questionId, answer]) =>
-          (db as any).quizAnswer.create({
-            data: {
-              attemptId: attemptId,
-              questionId: questionId,
-              userAnswer: answer as string,
-            },
-          })
-        )
-      )
-    }
+      // Save answers using createMany for atomicity (all-or-nothing)
+      const answerEntries = Object.entries(answers) as [string, string][]
 
-    // Calculate score
-    let correctCount = 0
-    let totalPointsEarned = 0
+      if (isAssessment) {
+        await tx.assessmentAnswer.createMany({
+          data: answerEntries.map(([questionId, userAnswer]) => ({
+            attemptId,
+            questionId,
+            userAnswer,
+          })),
+          skipDuplicates: true,
+        })
+      } else {
+        await (tx as any).quizAnswer.createMany({
+          data: answerEntries.map(([questionId, userAnswer]) => ({
+            attemptId,
+            questionId,
+            userAnswer,
+          })),
+          skipDuplicates: true,
+        })
+      }
 
-    let questions
+      // Calculate score
+      let correctCount = 0
+      let totalPointsEarned = 0
+      let questions
 
-    if (isAssessment) {
-      questions = await db.assessmentQuestion.findMany({
-        where: { assessmentId: assessmentId },
-        include: {
-          question: true,
-        },
-        orderBy: { order: 'asc' },
-      })
+      if (isAssessment) {
+        questions = await tx.assessmentQuestion.findMany({
+          where: { assessmentId },
+          include: { question: true },
+          orderBy: { order: 'asc' },
+        })
 
-      for (const aq of questions) {
-        const userAnswer = answers[aq.questionId]
-        const isCorrect = userAnswer === aq.question.correctAnswer
+        for (const aq of questions) {
+          const userAnswer = answers[aq.questionId]
+          let isCorrect = false
 
-        if (isCorrect) {
-          correctCount++
-          totalPointsEarned += aq.points || 1
+          if (aq.question.type === QuestionType.MULTI_SELECT) {
+            try {
+              const userOptions = JSON.parse(userAnswer || '[]').sort()
+              const correctOptions = JSON.parse(aq.question.correctAnswer || '[]').sort()
+              isCorrect = JSON.stringify(userOptions) === JSON.stringify(correctOptions)
+            } catch {
+              isCorrect = false
+            }
+          } else {
+            isCorrect = userAnswer === aq.question.correctAnswer
+          }
+
+          if (isCorrect) {
+            correctCount++
+            totalPointsEarned += aq.points || 1
+          }
+        }
+      } else {
+        questions = await (tx as any).quizQuestion.findMany({
+          where: { quizId: assessmentId },
+          include: { question: true },
+          orderBy: { order: 'asc' },
+        })
+
+        for (const aq of questions) {
+          const userAnswer = answers[aq.questionId]
+          let isCorrect = false
+
+          if (aq.question.type === QuestionType.MULTI_SELECT) {
+            try {
+              const userOptions = JSON.parse(userAnswer || '[]').sort()
+              const correctOptions = JSON.parse(aq.question.correctAnswer || '[]').sort()
+              isCorrect = JSON.stringify(userOptions) === JSON.stringify(correctOptions)
+            } catch {
+              isCorrect = false
+            }
+          } else {
+            isCorrect = userAnswer === aq.question.correctAnswer
+          }
+
+          if (isCorrect) {
+            correctCount++
+            totalPointsEarned += aq.points || 1
+          }
         }
       }
-    } else {
-      questions = await (db as any).quizQuestion.findMany({
-        where: { quizId: assessmentId },
-        include: {
-          question: true,
-        },
-        orderBy: { order: 'asc' },
-      })
 
-      for (const aq of questions) {
-        const userAnswer = answers[aq.questionId]
-        const isCorrect = userAnswer === aq.question.correctAnswer
+      const totalPoints = questions.reduce((sum: number, aq: any) => sum + (aq.points || 1), 0)
+      const score = totalPoints > 0 ? (totalPointsEarned / totalPoints) * 100 : 0
 
-        if (isCorrect) {
-          correctCount++
-          totalPointsEarned += aq.points || 1
-        }
+      // Update attempt with score
+      if (isAssessment) {
+        await tx.assessmentAttempt.update({
+          where: { id: attemptId },
+          data: {
+            score: Math.round(score),
+            totalPoints,
+            startedAt: assessmentAttempt?.startedAt || new Date(),
+          },
+        })
+      } else {
+        await (tx as any).quizAttempt.update({
+          where: { id: attemptId },
+          data: {
+            score: Math.round(score),
+            totalPoints,
+            startedAt: quizAttempt?.startedAt || new Date(),
+          },
+        })
       }
-    }
 
-    const totalPoints = questions.reduce((sum, aq) => sum + (aq.points || 1), 0)
-    const score = totalPoints > 0 ? (totalPointsEarned / totalPoints) * 100 : 0
-
-    // Update attempt with score based on type
-    if (isAssessment) {
-      await db.assessmentAttempt.update({
-        where: { id: attemptId },
-        data: {
-          score: Math.round(score),
-          totalPoints: totalPoints,
-          startedAt: assessmentAttempt?.startedAt || new Date(),
-        },
-      })
-    } else {
-      await (db as any).quizAttempt.update({
-        where: { id: attemptId },
-        data: {
-          score: Math.round(score),
-          totalPoints: totalPoints,
-          startedAt: quizAttempt?.startedAt || new Date(),
-        },
-      })
-    }
+      return {
+        score: Math.round(score),
+        correctCount,
+        totalCount: questions.length,
+        answerCount: answerEntries.length,
+      }
+    })
 
     return NextResponse.json({
       message: "Assessment submitted successfully",
       attemptId,
-      score: Math.round(score),
-      correctCount,
-      totalCount: questions.length,
-      answers: savedAnswers.length,
+      score: result.score,
+      correctCount: result.correctCount,
+      totalCount: result.totalCount,
+      answers: result.answerCount,
     })
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "ALREADY_SUBMITTED") {
+      return NextResponse.json(
+        { message: "This attempt has already been submitted" },
+        { status: 400 }
+      )
+    }
     console.error("Error submitting assessment:", error)
     return NextResponse.json(
       { message: "Failed to submit assessment" },

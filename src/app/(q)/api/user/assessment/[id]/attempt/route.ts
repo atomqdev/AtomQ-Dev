@@ -99,7 +99,32 @@ export async function POST(
       )
     }
 
-    // Check existing attempt based on type
+    // Check for any existing attempt (submitted or in-progress) to enforce single-attempt rule
+    let anyExistingAttempt
+    if (isAssessment) {
+      anyExistingAttempt = await db.assessmentAttempt.findFirst({
+        where: {
+          assessmentId: id,
+          userId,
+        }
+      })
+    } else {
+      anyExistingAttempt = await db.quizAttempt.findFirst({
+        where: {
+          quizId: id,
+          userId,
+        }
+      })
+    }
+
+    if (anyExistingAttempt && anyExistingAttempt.status === AttemptStatus.SUBMITTED) {
+      return NextResponse.json(
+        { message: "You have already submitted this assessment. Only one attempt is allowed." },
+        { status: 403 }
+      )
+    }
+
+    // Check existing in-progress attempt based on type
     let existingAttempt, existingAttemptModel
 
     if (isAssessment) {
@@ -182,7 +207,7 @@ export async function POST(
       }
       // For quizzes, we'd need to track tab switches separately
 
-      const maxTabs = assessment.maxTabs || 3
+      const maxTabs = assessment.tabswitches || 3
       const switchesRemaining = maxTabs ? maxTabs - tabSwitchCount : null
       const shouldAutoSubmit = maxTabs ? tabSwitchCount >= maxTabs : false
 
@@ -192,7 +217,7 @@ export async function POST(
         title: assessment.title,
         description: assessment.description || "",
         timeLimit: assessment.timeLimit,
-        maxTabs: assessment.maxTabs,
+        maxTabs: assessment.tabswitches,
         disableCopyPaste: assessment.disableCopyPaste,
         checkAnswerEnabled: false,
         startTime: assessment.startTime,
@@ -308,7 +333,7 @@ export async function POST(
       title: assessment.title,
       description: assessment.description || "",
       timeLimit: assessment.timeLimit,
-      maxTabs: assessment.maxTabs,
+      maxTabs: assessment.tabswitches,
       disableCopyPaste: assessment.disableCopyPaste,
       checkAnswerEnabled: false,
       startTime: assessment.startTime,

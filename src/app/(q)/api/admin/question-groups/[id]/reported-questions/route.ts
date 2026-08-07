@@ -5,8 +5,10 @@ import { db } from "@/lib/db"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: questionGroupId } = await params
+
   try {
     const session = await getServerSession(authOptions)
     
@@ -17,8 +19,6 @@ export async function GET(
     if (session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-
-    const { id: questionGroupId } = params
 
     // Get all reported questions for this question group with PENDING status
     const reportedQuestions = await db.reportedQuestion.findMany({
@@ -57,8 +57,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: questionGroupId } = await params
+
   try {
     const session = await getServerSession(authOptions)
     
@@ -69,8 +71,6 @@ export async function PATCH(
     if (session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-
-    const { id: questionGroupId } = params
     const { reportId, status } = await request.json()
 
     if (!reportId || !status) {

@@ -6,7 +6,7 @@ import { UserRole } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,8 +14,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const questions = await db.assessmentQuestion.findMany({
-      where: { assessmentId: params.id },
+      where: { assessmentId: id },
       include: {
         question: true,
       },
@@ -36,7 +38,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -44,13 +46,14 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const data = await request.json();
     const { questionId, order, points } = data;
 
     // Check if question already exists in assessment
     const existingQuestion = await db.assessmentQuestion.findFirst({
       where: {
-        assessmentId: params.id,
+        assessmentId: id,
         questionId,
       },
     });
@@ -64,7 +67,7 @@ export async function POST(
 
     const assessmentQuestion = await db.assessmentQuestion.create({
       data: {
-        assessmentId: params.id,
+        assessmentId: id,
         questionId,
         order: order || 1,
         points: points || 1.0,

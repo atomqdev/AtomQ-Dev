@@ -34,7 +34,8 @@ import {
   Info,
   Send,
   User,
-  IdCard
+  IdCard,
+  Loader2
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
@@ -122,6 +123,9 @@ export default function AssessmentTakingPage() {
 
   const [showAutoSubmitWarning, setShowAutoSubmitWarning] = useState(false)
   const [isAutoSubmitting, setIsAutoSubmitting] = useState(false)
+  const [showViolationModal, setShowViolationModal] = useState(false)
+  const [violationMessage, setViolationMessage] = useState("")
+  const [violationRedirecting, setViolationRedirecting] = useState(false)
 
   const [showFullscreenExitModal, setShowFullscreenExitModal] = useState(false)
 
@@ -145,8 +149,13 @@ export default function AssessmentTakingPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const securityCheckRef = useRef<NodeJS.Timeout | null>(null)
   const tabSwitchDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const fullscreenDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const lastFullscreenStateRef = useRef<boolean>(false)
   const devToolsWarningShownRef = useRef<boolean>(false)
+  const showViolationModalRef = useRef<boolean>(false)
+  const handleSubmitRef = useRef<(isAutoSubmitted?: boolean) => Promise<void>>(async () => {})
+  const triggerAutoSubmitRef = useRef<() => void>(() => {})
+  const timeExpiredRef = useRef<boolean>(false)
 
   // ==================== SYNC REFS WITH STATE ====================
   
@@ -173,6 +182,10 @@ export default function AssessmentTakingPage() {
   useEffect(() => {
     isAutoSubmittingRef.current = isAutoSubmitting
   }, [isAutoSubmitting])
+
+  useEffect(() => {
+    showViolationModalRef.current = showViolationModal
+  }, [showViolationModal])
 
   // ==================== API CALLS ====================
 
@@ -330,12 +343,15 @@ export default function AssessmentTakingPage() {
       return
     }
 
-    // Debounce to avoid multiple recordings
-    if (tabSwitchDebounceRef.current) {
-      clearTimeout(tabSwitchDebounceRef.current)
+    // Debounce to avoid multiple recordings (separate ref from tab-switch)
+    if (fullscreenDebounceRef.current) {
+      clearTimeout(fullscreenDebounceRef.current)
     }
 
-    tabSwitchDebounceRef.current = setTimeout(async () => {
+    fullscreenDebounceRef.current = setTimeout(async () => {
+      // Re-check guards inside debounce callback (submit may have started during debounce window)
+      if (isSubmittingRef.current || isAutoSubmittingRef.current) return
+
       try {
         const response = await fetch(`/api/user/assessment/${params.id}/tab-switch`, {
           method: 'POST',
@@ -365,7 +381,13 @@ export default function AssessmentTakingPage() {
 
         // Check if we should auto-submit (regardless of response status)
         if (data.shouldAutoSubmit) {
-          triggerAutoSubmit()
+          // Close fullscreen exit modal if open, show violation modal instead
+          setShowFullscreenExitModal(false)
+          setViolationMessage(
+            `You have exceeded the maximum allowed tab switches (${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}). Your assessment is being submitted automatically.`
+          )
+          setShowViolationModal(true)
+          triggerAutoSubmitRef.current()
         } else if (response.ok) {
           // Only show warnings if the request was successful
           if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
@@ -377,7 +399,7 @@ export default function AssessmentTakingPage() {
       } catch (error) {
         console.error("Error recording fullscreen exit:", error)
       }
-      tabSwitchDebounceRef.current = null
+      fullscreenDebounceRef.current = null
     }, FULLSCREEN_EXIT_DEBOUNCE_MS)
   }, [params.id])
 
@@ -395,7 +417,9 @@ export default function AssessmentTakingPage() {
   // ==================== SUBMISSION ====================
 
   const handleSubmit = useCallback(async (isAutoSubmitted: boolean = false) => {
-    if (isSubmittingRef.current || isAutoSubmittingRef.current || !attemptId) {
+    // Guard: only check isSubmittingRef (actual API call in progress), NOT isAutoSubmittingRef
+    // isAutoSubmittingRef is set by triggerAutoSubmit BEFORE calling us, so checking it here would block our own call
+    if (isSubmittingRef.current || !assessmentAttemptIdRef.current) {
       return
     }
 
@@ -403,8 +427,11 @@ export default function AssessmentTakingPage() {
     isSubmittingRef.current = true
 
     try {
-      const allAnswers: Record<string, string> = { ...answers }
-      Object.entries(multiSelectAnswers).forEach(([questionId, selectedOptions]) => {
+      // Always read answers from refs (never stale closure state)
+      const currentAnswers = answersRef.current
+      const currentMultiAnswers = multiSelectAnswersRef.current
+      const allAnswers: Record<string, string> = { ...currentAnswers }
+      Object.entries(currentMultiAnswers).forEach(([questionId, selectedOptions]) => {
         allAnswers[questionId] = JSON.stringify(selectedOptions.sort())
       })
 
@@ -414,37 +441,63 @@ export default function AssessmentTakingPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          attemptId,
+          attemptId: assessmentAttemptIdRef.current,
           answers: allAnswers,
-          isAutoSubmitted,
+          isAutoSubmitted: isAutoSubmitted === true,
         }),
       })
 
       if (response.ok) {
-        // Wait 2 seconds before showing toast and redirecting
-        setTimeout(() => {
-          if (isAutoSubmitted) {
-            toasts.success("Assessment submitted successfully!")
-            // Redirect to assessment list after auto-submission
+        if (isAutoSubmitted && showViolationModalRef.current) {
+          // Tab switch violation auto-submit - update modal to show redirecting state
+          setViolationRedirecting(true)
+          // Redirect to assessment list after a short delay
+          setTimeout(() => {
             router.push('/user/assessment')
-          } else {
-            toasts.success("Assessment submitted successfully!")
-            router.push(`/user/assessment/${params.id}/result`)
-          }
-        }, 2000)
+          }, 3000)
+        } else if (isAutoSubmitted) {
+          // Timer expiry auto-submit
+          toasts.success("Assessment submitted successfully!")
+          setTimeout(() => {
+            router.push('/user/assessment')
+          }, 2000)
+        } else {
+          toasts.success("Assessment submitted successfully!")
+          router.push(`/user/assessment/${params.id}/result`)
+        }
       } else {
         const error = await response.json()
         toasts.error(error.message || "Failed to submit assessment")
+        // Reset all submitting flags on failure so user can retry
         setSubmitting(false)
         isSubmittingRef.current = false
+        setIsAutoSubmitting(false)
+        isAutoSubmittingRef.current = false
+        // If violation modal is showing and submit failed, update it with error state
+        if (showViolationModalRef.current) {
+          setViolationMessage("Failed to submit assessment. Please try again.")
+          setViolationRedirecting(false)
+        }
       }
     } catch (error) {
       console.error("Error submitting assessment:", error)
       toasts.error("Failed to submit assessment")
+      // Reset all submitting flags on failure so user can retry
       setSubmitting(false)
       isSubmittingRef.current = false
+      setIsAutoSubmitting(false)
+      isAutoSubmittingRef.current = false
+      if (showViolationModalRef.current) {
+        setViolationMessage("Network error. Please check your connection and try again.")
+        setViolationRedirecting(false)
+      }
     }
-  }, [attemptId, answers, multiSelectAnswers, params.id, router])
+  }, [params.id, router])
+
+  // Keep handleSubmitRef always pointing to the latest handleSubmit
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit
+  }, [handleSubmit])
 
   const handleConfirmSubmit = useCallback(async () => {
     setShowSubmitDialog(false)
@@ -465,12 +518,15 @@ export default function AssessmentTakingPage() {
       return
     }
 
-    // Debounce to avoid multiple recordings
+    // Debounce to avoid multiple recordings (separate ref from fullscreen-exit)
     if (tabSwitchDebounceRef.current) {
       clearTimeout(tabSwitchDebounceRef.current)
     }
 
     tabSwitchDebounceRef.current = setTimeout(async () => {
+      // Re-check guards inside debounce callback (submit may have started during debounce window)
+      if (isSubmittingRef.current || isAutoSubmittingRef.current) return
+
       try {
         const response = await fetch(`/api/user/assessment/${params.id}/tab-switch`, {
           method: 'POST',
@@ -500,7 +556,13 @@ export default function AssessmentTakingPage() {
 
         // Check if we should auto-submit (regardless of response status)
         if (data.shouldAutoSubmit) {
-          triggerAutoSubmit()
+          // Close fullscreen exit modal if open, show violation modal instead
+          setShowFullscreenExitModal(false)
+          setViolationMessage(
+            `You have exceeded the maximum allowed tab switches (${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}). Your assessment is being submitted automatically.`
+          )
+          setShowViolationModal(true)
+          triggerAutoSubmitRef.current()
         } else if (response.ok) {
           // Only show warnings if the request was successful
           if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
@@ -526,11 +588,26 @@ export default function AssessmentTakingPage() {
     setIsAutoSubmitting(true)
     isAutoSubmittingRef.current = true
 
-    // Submit immediately without any warning or delay
-    handleSubmit(true) // Pass true for isAutoSubmitted
-  }, [handleSubmit])
+    // Submit immediately using ref to avoid stale closure
+    handleSubmitRef.current(true)
+  }, [])
+
+  // Keep triggerAutoSubmitRef always pointing to the latest
+  useEffect(() => {
+    triggerAutoSubmitRef.current = triggerAutoSubmit
+  }, [triggerAutoSubmit])
 
   // ==================== TIMER MANAGEMENT ====================
+
+  // Use a separate effect for timer expiry to avoid side effects in state updater
+  useEffect(() => {
+    if (timeRemaining <= 0 && !timeExpiredRef.current && assessmentAttemptIdRef.current && !isSubmittingRef.current && !isAutoSubmittingRef.current) {
+      timeExpiredRef.current = true
+      setIsAutoSubmitting(true)
+      isAutoSubmittingRef.current = true
+      handleSubmitRef.current(true)
+    }
+  }, [timeRemaining])
 
   useEffect(() => {
     if (timeRemaining > 0 && !submitting && !isAutoSubmitting) {
@@ -540,12 +617,6 @@ export default function AssessmentTakingPage() {
           if (newTime <= 0) {
             clearInterval(intervalRef.current!)
             intervalRef.current = null
-
-            setIsAutoSubmitting(true)
-            isAutoSubmittingRef.current = true
-
-            // Submit immediately without any warning or delay
-            handleSubmit(true) // Time expiry should also be marked as auto-submitted
           }
           return newTime
         })
@@ -558,7 +629,7 @@ export default function AssessmentTakingPage() {
         intervalRef.current = null
       }
     }
-  }, [timeRemaining, submitting, isAutoSubmitting, handleSubmit])
+  }, [timeRemaining, submitting, isAutoSubmitting])
 
   // ==================== EVENT LISTENERS ====================
 
@@ -579,6 +650,9 @@ export default function AssessmentTakingPage() {
       }
       if (tabSwitchDebounceRef.current) {
         clearTimeout(tabSwitchDebounceRef.current)
+      }
+      if (fullscreenDebounceRef.current) {
+        clearTimeout(fullscreenDebounceRef.current)
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
@@ -1229,6 +1303,59 @@ export default function AssessmentTakingPage() {
                   Enable Fullscreen to Continue
                 </Button>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Tab Switch Violation Modal - UNCLOSABLE */}
+        {showViolationModal && (
+          <Dialog
+            open={showViolationModal}
+            onOpenChange={() => { /* Prevent closing */ }}
+          >
+            <DialogContent
+              showCloseButton={false}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              className="sm:max-w-md"
+            >
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                  <XCircle className="h-5 w-5" />
+                  Assessment Violated
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-3">
+                <p className="text-sm font-medium text-red-600">
+                  {violationMessage}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Reason: Exceeded maximum tab switches ({tabSwitchCount}/{assessment?.maxTabs || 3})
+                </p>
+                {violationRedirecting ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Assessment submitted. Redirecting to assessments page...
+                  </div>
+                ) : !isAutoSubmitting && !submitting ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-red-500 font-medium">Submit failed. You can retry or go back.</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleSubmitRef.current(true)} className="flex-1">
+                        Retry Submit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => router.push('/user/assessment')} className="flex-1">
+                        Go to Assessments
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting assessment automatically...
+                  </div>
+                )}
+              </div>
             </DialogContent>
           </Dialog>
         )}

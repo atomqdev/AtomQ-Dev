@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
       negativePoints,
       randomOrder,
       startTime,
+      endtime: endtimeInput,
       campusId,
       tabswitches,
       disableCopyPaste,
@@ -120,9 +121,11 @@ export async function POST(request: NextRequest) {
       groupId,
     } = data;
 
-    // Calculate endtime from startTime + duration if both are provided
+    // Calculate endtime: use explicit endtime if provided, otherwise derive from startTime + timeLimit
     let endtime: Date | null = null;
-    if (startTime && timeLimit) {
+    if (endtimeInput) {
+      endtime = new Date(endtimeInput);
+    } else if (startTime && timeLimit) {
       const startDate = new Date(startTime);
       const durationMinutes = parseInt(timeLimit);
       endtime = new Date(startDate.getTime() + durationMinutes * 60 * 1000);

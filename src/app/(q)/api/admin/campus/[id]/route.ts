@@ -13,11 +13,13 @@ const updateCampusSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   try {
     const campus = await db.campus.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         departments: {
           select: {
@@ -77,15 +79,17 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   try {
     const body = await request.json()
     const validatedData = updateCampusSchema.parse(body)
 
     // Check if campus exists
     const existingCampus = await db.campus.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingCampus) {
@@ -99,7 +103,7 @@ export async function PUT(
     const duplicateCampus = await db.campus.findFirst({
       where: {
         AND: [
-          { id: { not: params.id } },
+          { id: { not: id } },
           {
             OR: [
               { name: validatedData.name },
@@ -119,7 +123,7 @@ export async function PUT(
 
     // Update campus and departments/batches
     const campus = await db.campus.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: validatedData.name,
         shortName: validatedData.shortName,
@@ -200,12 +204,14 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   try {
     // Check if campus exists
     const existingCampus = await db.campus.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -243,7 +249,7 @@ export async function DELETE(
 
     // Delete the campus (departments will be deleted due to cascade)
     await db.campus.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json(

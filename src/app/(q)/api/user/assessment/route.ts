@@ -113,15 +113,22 @@ export async function GET(request: NextRequest) {
       const startTime = assessment.startTime ? new Date(assessment.startTime) : null
       const endTime = assessment.endtime ? new Date(assessment.endtime) : null
 
-      // Check if assessment has expired
-      if (endTime && endTime < now) {
+      // Time constraints only affect whether a NEW attempt can be started
+      // They should NOT override the status of an already completed/submitted attempt
+      if (attemptStatus === 'not_started' || attemptStatus === 'in_progress') {
+        // Check if assessment has expired
+        if (endTime && endTime < now) {
+          canAttempt = false
+          attemptStatus = 'expired'
+        }
+        // Check if assessment hasn't started yet
+        else if (startTime && startTime > now) {
+          canAttempt = false
+          attemptStatus = 'not_started'
+        }
+      } else if (attemptStatus === 'completed') {
+        // Already submitted (manually or auto-submitted) - don't allow re-attempt
         canAttempt = false
-        attemptStatus = 'expired'
-      }
-      // Check if assessment hasn't started yet
-      else if (startTime && startTime > now) {
-        canAttempt = false
-        attemptStatus = 'not_started'
       }
 
       return {

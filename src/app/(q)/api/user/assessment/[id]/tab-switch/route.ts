@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole } from "@prisma/client"
 
-// Tab switch limit
+// Tab switch limit fallback
 const MAX_TAB_SWITCHES = 3
 
 export async function POST(
@@ -72,14 +72,6 @@ export async function POST(
       )
     }
 
-    // Get assessment to check max tabs setting (only assessments track tab switches)
-    let assessment = await db.assessment.findUnique({
-      where: { id: assessmentId },
-      select: { tabswitches: true },
-    })
-
-    let maxTabs = assessment?.tabswitches || MAX_TAB_SWITCHES
-
     // Quizzes do not track tab switches — return a no-op response
     if (!isAssessment) {
       return NextResponse.json({
@@ -90,47 +82,89 @@ export async function POST(
       })
     }
 
-    // Check existing tab switches (assessment only)
-    let existingSwitches: any[] = []
+    // Use a transaction to atomically count + create, preventing race conditions
+    const result = await db.$transaction(async (tx) => {
+      // Re-check attempt status inside transaction (may have been submitted between the outer check and here)
+      const currentAttempt = await tx.assessmentAttempt.findUnique({
+        where: { id: assessmentAttempt!.id },
+        select: { status: true },
+      })
 
-    existingSwitches = await db.assessmentTabSwitch.findMany({
-      where: {
-        attemptId: assessmentAttempt!.id,
-      },
-      orderBy: { createdAt: 'asc' },
+      if (currentAttempt?.status === 'SUBMITTED') {
+        return { alreadySubmitted: true }
+      }
+
+      // Get assessment max tabs setting
+      const assessment = await tx.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { tabswitches: true },
+      })
+
+      const maxTabs = assessment?.tabswitches || MAX_TAB_SWITCHES
+
+      // Count existing switches atomically
+      const existingCount = await tx.assessmentTabSwitch.count({
+        where: {
+          attemptId: assessmentAttempt!.id,
+        },
+      })
+
+      // If already at or over limit, don't create another record
+      if (existingCount >= maxTabs) {
+        return {
+          limitAlreadyReached: true,
+          currentSwitches: existingCount,
+          maxTabs,
+        }
+      }
+
+      // Create the new tab switch record
+      await tx.assessmentTabSwitch.create({
+        data: {
+          attemptId: assessmentAttempt!.id,
+          userId: session.user.id,
+          assessmentId: assessmentId,
+        },
+      })
+
+      const newSwitchCount = existingCount + 1
+      const switchesRemaining = maxTabs - newSwitchCount
+      const limitReached = newSwitchCount >= maxTabs
+
+      return {
+        currentSwitches: newSwitchCount,
+        switchesRemaining: Math.max(switchesRemaining, 0),
+        shouldAutoSubmit: limitReached,
+        limitAlreadyReached: false,
+        alreadySubmitted: false,
+      }
     })
 
-    const currentSwitchCount = existingSwitches.length
+    if (result.alreadySubmitted) {
+      return NextResponse.json(
+        { message: "This assessment has already been submitted" },
+        { status: 400 }
+      )
+    }
 
-    if (currentSwitchCount >= maxTabs) {
+    if (result.limitAlreadyReached) {
       return NextResponse.json(
         {
           message: "Maximum tab switches reached",
-          currentSwitches: currentSwitchCount,
-          maxSwitches: maxTabs,
+          currentSwitches: result.currentSwitches,
+          maxSwitches: result.maxTabs,
+          switchesRemaining: 0,
           shouldAutoSubmit: true,
         },
         { status: 400 }
       )
     }
 
-    // Create new tab switch record (assessment only)
-    await db.assessmentTabSwitch.create({
-      data: {
-        attemptId: assessmentAttempt!.id,
-        userId: session.user.id,
-        assessmentId: assessmentId,
-      },
-    })
-
-    const newSwitchCount = currentSwitchCount + 1
-    const switchesRemaining = maxTabs - newSwitchCount
-
     return NextResponse.json({
-      message: "Tab switch recorded",
-      currentSwitches: newSwitchCount,
-      switchesRemaining: switchesRemaining,
-      shouldAutoSubmit: false,
+      message: result.shouldAutoSubmit ? "Maximum tab switches reached" : "Tab switch recorded",
+      currentSwitches: result.currentSwitches,
+      switchesRemaining: result.switchesRemaining,
+      shouldAutoSubmit: result.shouldAutoSubmit,
     })
   } catch (error) {
     console.error("Error recording tab switch:", error)

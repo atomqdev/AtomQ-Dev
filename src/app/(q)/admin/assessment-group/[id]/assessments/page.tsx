@@ -52,6 +52,8 @@ import {
   Loader2,
   FileCheck,
   Key,
+  Copy,
+  Check,
   CheckCircle2 as CheckCircle,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
@@ -60,7 +62,30 @@ import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { DifficultyLevel, QuizStatus } from "@prisma/client"
-import { formatDateDDMMYYYY } from "@/lib/date-utils"
+import { formatDateDDMMYYYYTime } from "@/lib/date-utils"
+
+function AccessKeyCell({ accessKey }: { accessKey: string | null | undefined }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    if (accessKey) {
+      navigator.clipboard.writeText(accessKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+  if (!accessKey) return <span className="text-muted-foreground">-</span>
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 gap-1.5 font-mono text-xs"
+      onClick={handleCopy}
+    >
+      {accessKey}
+      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+    </Button>
+  )
+}
 
 const generateAccessKey = () => {
   const generatePart = () => {
@@ -121,7 +146,6 @@ interface CreateFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -139,7 +163,6 @@ interface EditFormData {
   negativePoints: string
   randomOrder: boolean
   startTime: string
-  endtime: string
   campusId: string
   tabswitches: string
   disableCopyPaste: boolean
@@ -174,7 +197,6 @@ export default function AssessmentGroupDetailPage({
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -216,7 +238,6 @@ export default function AssessmentGroupDetailPage({
     negativePoints: "",
     randomOrder: false,
     startTime: "",
-    endtime: "",
     campusId: "",
     tabswitches: "",
     disableCopyPaste: false,
@@ -409,7 +430,6 @@ export default function AssessmentGroupDetailPage({
       negativePoints: assessment.negativePoints?.toString() || "",
       randomOrder: assessment.randomOrder || false,
       startTime: assessment.startTime || "",
-      endtime: assessment.endtime || "",
       campusId: assessment.campusId || "",
       tabswitches: assessment.tabswitches?.toString() || "",
       disableCopyPaste: assessment.disableCopyPaste || false,
@@ -441,7 +461,7 @@ export default function AssessmentGroupDetailPage({
             ? parseFloat(editFormData.negativePoints)
             : null,
           startTime: editFormData.startTime || null,
-          endtime: editFormData.endtime || null,
+          endtime: null,
           campusId: editFormData.campusId || null,
           tabswitches: editFormData.tabswitches
             ? parseInt(editFormData.tabswitches)
@@ -513,11 +533,37 @@ export default function AssessmentGroupDetailPage({
       },
     },
     {
+      accessorKey: "startTime",
+      header: "Start",
+      cell: ({ row }) => {
+        const startTime = row.original.startTime
+        return startTime ? formatDateDDMMYYYYTime(startTime) : "-"
+      },
+    },
+    {
       accessorKey: "timeLimit",
       header: "Time Limit",
       cell: ({ row }) => {
         const timeLimit = row.getValue("timeLimit") as number | null
         return timeLimit ? `${timeLimit} min` : "-"
+      },
+    },
+    {
+      accessorKey: "accessKey",
+      header: "Access Key",
+      cell: ({ row }) => <AccessKeyCell accessKey={row.original.accessKey} />,
+    },
+    {
+      accessorKey: "tabswitches",
+      header: "Tab Switches",
+      cell: ({ row }) => {
+        const tabswitches = row.original.tabswitches
+        if (tabswitches === null || tabswitches === undefined) return <span className="text-muted-foreground">-</span>
+        return (
+          <Badge variant={tabswitches > 0 ? "destructive" : "secondary"}>
+            {tabswitches}
+          </Badge>
+        )
       },
     },
     {
@@ -534,32 +580,6 @@ export default function AssessmentGroupDetailPage({
       cell: ({ row }) => {
         const assessment = row.original
         return assessment._count?.assessmentUsers || 0
-      },
-    },
-    {
-      accessorKey: "_count.assessmentAttempts",
-      header: "Attempts",
-      cell: ({ row }) => {
-        const assessment = row.original
-        return assessment._count?.assessmentAttempts || 0
-      },
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Created At
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt"))
-        return formatDateDDMMYYYY(date.toISOString())
       },
     },
     {
@@ -713,7 +733,7 @@ export default function AssessmentGroupDetailPage({
             ? parseFloat(formData.negativePoints)
             : null,
           startTime: formData.startTime || null,
-          endtime: formData.endtime || null,
+          endtime: null,
           campusId: formData.campusId || null,
           tabswitches: formData.tabswitches
             ? parseInt(formData.tabswitches)
@@ -738,7 +758,6 @@ export default function AssessmentGroupDetailPage({
           negativePoints: "",
           randomOrder: false,
           startTime: "",
-          endtime: "",
           campusId: "",
           tabswitches: "",
           disableCopyPaste: false,
@@ -904,17 +923,6 @@ export default function AssessmentGroupDetailPage({
                 value={formData.startTime}
                 onChange={(value) =>
                   setFormData({ ...formData, startTime: value })
-                }
-                placeholder="Select date and time"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endtime">End Time</Label>
-              <DateTimePicker
-                id="endtime"
-                value={formData.endtime}
-                onChange={(value) =>
-                  setFormData({ ...formData, endtime: value })
                 }
                 placeholder="Select date and time"
               />
@@ -1127,17 +1135,6 @@ export default function AssessmentGroupDetailPage({
                 value={editFormData.startTime}
                 onChange={(value) =>
                   setEditFormData({ ...editFormData, startTime: value })
-                }
-                placeholder="Select date and time"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-endtime">End Time</Label>
-              <DateTimePicker
-                id="edit-endtime"
-                value={editFormData.endtime}
-                onChange={(value) =>
-                  setEditFormData({ ...editFormData, endtime: value })
                 }
                 placeholder="Select date and time"
               />
