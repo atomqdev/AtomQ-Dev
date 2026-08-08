@@ -39,6 +39,7 @@ echo "NEXTAUTH_URL: $NEXTAUTH_URL" >> "$LOGFILE"
 echo "NODE_ENV: $NODE_ENV" >> "$LOGFILE"
 echo "NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:0:10}..." >> "$LOGFILE"
 echo "OPENAI_API_KEY: ${OPENAI_API_KEY:0:15}..." >> "$LOGFILE"
+echo "RESEND_API_KEY: ${RESEND_API_KEY:0:10}..." >> "$LOGFILE"
 echo "================================" >> "$LOGFILE"
 
 # Start the dev server fully detached via setsid + disown
@@ -49,6 +50,7 @@ setsid env -i \
   NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
   NODE_ENV="$NODE_ENV" \
   OPENAI_API_KEY="$OPENAI_API_KEY" \
+  RESEND_API_KEY="$RESEND_API_KEY" \
   PATH="$PATH" \
   HOME="$HOME" \
   bun run dev >> "$LOGFILE" 2>&1 &

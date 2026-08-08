@@ -7,6 +7,12 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 })
 
+// OTP verification schema
+export const otpSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  otp: z.string().length(6, "OTP must be 6 digits").regex(/^\d{6}$/, "OTP must contain only digits"),
+})
+
 // Register schema
 export const registerSchema = z.object({
   uoid: z.string().min(1, "UOID is required"),
