@@ -18,7 +18,7 @@ let maintenanceModeCache: {
 
 const MAINTENANCE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
-async function getMaintenanceMode(): Promise<boolean> {
+export async function getMaintenanceMode(): Promise<boolean> {
   const now = Date.now()
 
   // Return cached value if still valid
