@@ -2,6 +2,12 @@
  * Email sending utility using Resend
  * Used for admin login OTP verification
  *
+ * Configuration:
+ *   RESEND_API_KEY    — Resend API key (required)
+ *   RESEND_FROM_EMAIL — Sender address from a verified domain
+ *                        e.g. "AtomQ <noreply@atomq.dev>"
+ *                        Defaults to "AtomQ <onboarding@resend.dev>" (test only)
+ *
  * In development mode (NODE_ENV !== 'production'), email send failures
  * are tolerated — the OTP is always logged to server console so the
  * flow can be tested even without a working email service.
@@ -12,9 +18,22 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Sender address — must be from a verified domain in Resend.
-// For testing: Resend allows 'onboarding@resend.dev' to send to the account email only.
-// For production: Change this to your verified domain (e.g., 'AtomQ <noreply@atomq.dev>')
-const DEFAULT_FROM = 'AtomQ <onboarding@resend.dev>'
+// Set RESEND_FROM_EMAIL in production to your verified domain sender.
+// Example: RESEND_FROM_EMAIL="AtomQ <noreply@atomq.dev>"
+//
+// "onboarding@resend.dev" is Resend's test sender — it can ONLY send
+// to the email address of the Resend account owner. It will NOT work
+// in production for sending to arbitrary admin emails.
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'AtomQ <onboarding@resend.dev>'
+
+// Warn once at startup if using test sender in production
+if (process.env.NODE_ENV === 'production' && DEFAULT_FROM.includes('onboarding@resend.dev')) {
+  console.warn(
+    '[OTP] WARNING: Using Resend test sender (onboarding@resend.dev) in production. ' +
+    'This can only send emails to the Resend account owner. ' +
+    'Set RESEND_FROM_EMAIL to a verified domain sender, e.g. "AtomQ <noreply@atomq.dev>"'
+  )
+}
 
 export interface SendOtpEmailOptions {
   to: string
@@ -74,7 +93,9 @@ export async function sendOtpEmail({ to, otp, name, expiryMinutes = 5 }: SendOtp
   try {
     const html = buildOtpHtml(otp, displayName, expiryMinutes)
 
-    const { error } = await resend.emails.send({
+    console.log(`[OTP] Sending email from "${DEFAULT_FROM}" to "${to}"`)
+
+    const { data, error } = await resend.emails.send({
       from: DEFAULT_FROM,
       to,
       subject: 'Your Admin Login OTP - AtomQ',
@@ -82,26 +103,37 @@ export async function sendOtpEmail({ to, otp, name, expiryMinutes = 5 }: SendOtp
     })
 
     if (error) {
-      console.warn('[OTP] Resend email send failed:', error.message || error)
+      console.error('[OTP] Resend returned error:', JSON.stringify(error, null, 2))
 
       // In non-production, tolerate email failures (OTP is logged to console)
       if (!isProduction) {
         console.log('[OTP] Dev mode: Allowing OTP flow to continue despite email failure')
         return { success: true }
       }
-      return { success: false, error: 'Failed to send verification email' }
+
+      // Provide specific error message for common Resend issues
+      const errMsg = typeof error.message === 'string' ? error.message : String(error)
+      if (errMsg.includes('validation') || errMsg.includes('Verification')) {
+        console.error(
+          '[OTP] HINT: The sender address may not be verified, or the recipient is not allowed. ' +
+          'Set RESEND_FROM_EMAIL to a verified domain sender in production.'
+        )
+      }
+
+      return { success: false, error: `Email delivery failed: ${errMsg}` }
     }
 
-    console.log(`[OTP] Verification email sent successfully to ${to}`)
+    console.log(`[OTP] Verification email sent successfully to ${to} (id: ${data?.id})`)
     return { success: true }
-  } catch (err) {
-    console.error('[OTP] Email send threw exception:', err)
+  } catch (err: any) {
+    console.error('[OTP] Email send threw exception:', err?.message || err)
 
     // In non-production, tolerate email failures
     if (!isProduction) {
       console.log('[OTP] Dev mode: Allowing OTP flow to continue despite email exception')
       return { success: true }
     }
-    return { success: false, error: 'Failed to send verification email' }
+
+    return { success: false, error: `Email delivery failed: ${err?.message || 'Unknown error'}` }
   }
 }

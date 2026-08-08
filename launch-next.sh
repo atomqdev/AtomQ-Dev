@@ -40,6 +40,7 @@ echo "NODE_ENV: $NODE_ENV" >> "$LOGFILE"
 echo "NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:0:10}..." >> "$LOGFILE"
 echo "OPENAI_API_KEY: ${OPENAI_API_KEY:0:15}..." >> "$LOGFILE"
 echo "RESEND_API_KEY: ${RESEND_API_KEY:0:10}..." >> "$LOGFILE"
+echo "RESEND_FROM_EMAIL: $RESEND_FROM_EMAIL" >> "$LOGFILE"
 echo "================================" >> "$LOGFILE"
 
 # Start the dev server fully detached via setsid + disown
@@ -51,6 +52,7 @@ setsid env -i \
   NODE_ENV="$NODE_ENV" \
   OPENAI_API_KEY="$OPENAI_API_KEY" \
   RESEND_API_KEY="$RESEND_API_KEY" \
+  RESEND_FROM_EMAIL="$RESEND_FROM_EMAIL" \
   PATH="$PATH" \
   HOME="$HOME" \
   bun run dev >> "$LOGFILE" 2>&1 &
