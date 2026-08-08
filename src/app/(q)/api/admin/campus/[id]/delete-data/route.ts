@@ -108,7 +108,9 @@ export async function DELETE(
         }
       })
 
-      // Delete all question groups created by users of this campus
+      // Delete assessment groups and quiz groups created by users of this campus
+      // Only delete groups that are NOT used by quizzes/assessments on other campuses
+      // to prevent cross-campus data corruption
       const userIds = await db.user.findMany({
         where: {
           campusId: id
@@ -118,12 +120,77 @@ export async function DELETE(
         }
       })
 
-      // Delete question groups (and their questions)
-      await db.questionGroup.deleteMany({
+      const userIdList = userIds.map(u => u.id)
+
+      // Find question groups that are ONLY used by this campus's quizzes/assessments
+      // A question group is safe to delete if all questions in it are only used by
+      // quizzes/assessments belonging to this campus (or not used at all)
+      const campusQuestionIds = await db.question.findMany({
         where: {
-          creatorId: {
-            in: userIds.map(u => u.id)
+          group: {
+            creatorId: { in: userIdList }
+          },
+          quizQuestions: {
+            every: {
+              quiz: { campusId: id }
+            }
+          },
+          assessmentQuestions: {
+            every: {
+              assessment: { campusId: id }
+            }
           }
+        },
+        select: { groupId: true }
+      })
+
+      const safeToDeleteQuestionGroupIds = [...new Set(campusQuestionIds.map(q => q.groupId).filter(Boolean))] as string[]
+
+      // Delete only safe question groups (and their questions)
+      const questionGroupsDeleted = await db.questionGroup.deleteMany({
+        where: {
+          id: { in: safeToDeleteQuestionGroupIds }
+        }
+      })
+
+      // Find quiz groups that are ONLY used by this campus's quizzes
+      const safeQuizGroups = await db.quizGroup.findMany({
+        where: {
+          creatorId: { in: userIdList },
+          quizzes: {
+            every: { campusId: id }
+          }
+        },
+        select: { id: true }
+      })
+
+      const quizGroupsDeleted = await db.quizGroup.deleteMany({
+        where: {
+          id: { in: safeQuizGroups.map(g => g.id) }
+        }
+      })
+
+      // Find assessment groups that are ONLY used by this campus's assessments
+      const safeAssessmentGroups = await db.assessmentGroup.findMany({
+        where: {
+          creatorId: { in: userIdList },
+          assessments: {
+            every: { campusId: id }
+          }
+        },
+        select: { id: true }
+      })
+
+      const assessmentGroupsDeleted = await db.assessmentGroup.deleteMany({
+        where: {
+          id: { in: safeAssessmentGroups.map(g => g.id) }
+        }
+      })
+
+      // Delete registration codes for this campus
+      const regCodesDeleted = await db.registrationCode.deleteMany({
+        where: {
+          campusId: id
         }
       })
 
@@ -151,6 +218,10 @@ export async function DELETE(
           deleted: {
             assessments: assessmentsDeleted.count,
             quizzes: quizzesDeleted.count,
+            questionGroups: questionGroupsDeleted.count,
+            quizGroups: quizGroupsDeleted.count,
+            assessmentGroups: assessmentGroupsDeleted.count,
+            registrationCodes: regCodesDeleted.count,
             departments: departmentsDeleted.count,
             batches: batchesDeleted
           }

@@ -72,6 +72,20 @@ export async function POST(
       )
     }
 
+    // Fetch assessment/quiz config for negative marking settings
+    let assessmentConfig: any = null
+    if (isAssessment) {
+      assessmentConfig = await db.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { negativeMarking: true, negativePoints: true },
+      })
+    } else {
+      assessmentConfig = await (db as any).quiz.findUnique({
+        where: { id: assessmentId },
+        select: { negativeMarking: true, negativePoints: true },
+      })
+    }
+
     // Use a transaction to ensure atomicity: status update + answers + scoring all succeed or all fail
     const result = await db.$transaction(async (tx) => {
       // Atomic status update - only succeeds if status is NOT SUBMITTED (prevents double-submit)
@@ -148,6 +162,8 @@ export async function POST(
             } catch {
               isCorrect = false
             }
+          } else if (aq.question.type === QuestionType.FILL_IN_BLANK) {
+            isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           } else {
             isCorrect = userAnswer === aq.question.correctAnswer
           }
@@ -155,6 +171,8 @@ export async function POST(
           if (isCorrect) {
             correctCount++
             totalPointsEarned += aq.points || 1
+          } else if (assessmentConfig?.negativeMarking && assessmentConfig?.negativePoints) {
+            totalPointsEarned -= assessmentConfig.negativePoints
           }
         }
       } else {
@@ -176,6 +194,8 @@ export async function POST(
             } catch {
               isCorrect = false
             }
+          } else if (aq.question.type === QuestionType.FILL_IN_BLANK) {
+            isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           } else {
             isCorrect = userAnswer === aq.question.correctAnswer
           }
@@ -183,6 +203,8 @@ export async function POST(
           if (isCorrect) {
             correctCount++
             totalPointsEarned += aq.points || 1
+          } else if (assessmentConfig?.negativeMarking && assessmentConfig?.negativePoints) {
+            totalPointsEarned -= assessmentConfig.negativePoints
           }
         }
       }

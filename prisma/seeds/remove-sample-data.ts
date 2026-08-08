@@ -472,13 +472,13 @@ async function main() {
   // ========================================
   // Part 6: Clean up test admin user if created
   // ========================================
-  console.log('\n🔑 Part 6: Cleaning up test admin user...')
+  console.log('\n🔑 Part 6: Checking for orphaned test admin user...')
   const testAdmin = await prisma.user.findUnique({
     where: { email: 'testadmin@seed.org' }
   })
 
   if (!testAdmin) {
-    console.log('ℹ️  No test admin user found.')
+    console.log('ℹ️  No test admin user found. Skipping.')
   } else {
     // Delete question groups created by this admin
     const adminQuestionGroups = await prisma.questionGroup.findMany({
@@ -499,12 +499,22 @@ async function main() {
       })
       console.log('✅ Deleted question groups created by test admin')
     }
+
+    // Delete quiz groups created by this admin
+    await prisma.quizGroup.deleteMany({
+      where: { creatorId: testAdmin.id }
+    })
+
+    // Delete assessment groups created by this admin
+    await prisma.assessmentGroup.deleteMany({
+      where: { creatorId: testAdmin.id }
+    })
     
     // Delete the test admin user
     await prisma.user.delete({
       where: { id: testAdmin.id }
     })
-    console.log('✅ Deleted test admin user\n')
+    console.log('✅ Deleted orphaned test admin user\n')
   }
 
   // ========================================
@@ -532,7 +542,7 @@ async function main() {
   console.log('   📝 Question Group: Assessment AWS Questions')
   console.log('   🎯 Quiz: Monthly Test Quiz')
   console.log('   📋 Assessment: Timed Assessment Test')
-  console.log('   🔑 Admin: testadmin@seed.org (if existed)')
+  console.log('   🔑 Orphaned testadmin@seed.org (if existed)')
   console.log('   🔍 Reported Questions: All cleaned up')
   console.log('\n' + '='.repeat(60))
 }

@@ -15,7 +15,7 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
   phone: z.string().optional(),
-  registrationCode: z.string().optional(),
+  registrationCode: z.string().min(1, "Registration code is required"),
   departmentId: z.string().optional(),
   batchId: z.string().optional(),
   section: z.enum(["A", "B", "C", "D", "E", "F"]).optional(),

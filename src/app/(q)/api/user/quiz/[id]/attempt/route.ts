@@ -46,9 +46,9 @@ export async function GET(
                     title: true,
                     type: true,
                     options: true,
-                    correctAnswer: true,
-                    explanation: true,
                     difficulty: true
+                    // correctAnswer and explanation are NOT included during active attempt
+                    // to prevent cheating via DevTools network inspection
                   }
                 }
               },
@@ -129,8 +129,7 @@ export async function GET(
             title: qq.question.title || `Question ${index + 1}`,
             type: qq.question.type,
             options: options,
-            correctAnswer: qq.question.correctAnswer || '0',
-            explanation: qq.question.explanation || '',
+            // correctAnswer and explanation are NOT sent during active attempt
             difficulty: qq.question.difficulty,
             order: qq.order,
             points: qq.points

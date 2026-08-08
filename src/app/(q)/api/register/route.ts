@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Validate registration code if provided
+    // Validate registration code (required)
     let validRegistrationCode = null
     if (validatedFields.data.registrationCode) {
       validRegistrationCode = await db.registrationCode.findUnique({
@@ -77,6 +77,12 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+    } else {
+      // Registration code is required - reject if not provided
+      return NextResponse.json(
+        { message: 'Registration code is required' },
+        { status: 400 }
+      )
     }
 
     const existingUser = await db.user.findUnique({

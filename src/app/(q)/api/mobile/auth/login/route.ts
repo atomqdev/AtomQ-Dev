@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { checkRateLimit, clearLoginAttempts } from "@/lib/rate-limit"
 import { generateToken } from "@/lib/mobile-auth"
+import { getMaintenanceMode } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +33,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check maintenance mode - block non-admin users during maintenance
+    const isMaintenance = await getMaintenanceMode()
+    if (isMaintenance) {
+      // We need to check if user is admin, but we don't have user yet
+      // Find user first, then check
+    }
+
     // Find user
     const user = await db.user.findUnique({
       where: { email },
@@ -59,10 +67,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check maintenance mode - only allow admin users during maintenance
+    if (isMaintenance && user.role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, message: "System is under maintenance. Please try again later." },
+        { status: 503 }
+      )
+    }
+
     if (!user.isActive) {
       return NextResponse.json(
-        { success: false, message: "Your account has been disabled" },
-        { status: 403 }
+        { success: false, message: "Invalid email or password" },
+        { status: 401 }
       )
     }
 

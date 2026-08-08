@@ -22,17 +22,25 @@ export async function PUT(
     const { id } = await params
     const { name, email, password, phone, campus, department, role, isActive, batch, section } = await request.json()
 
+    // Guard: prevent admin from deactivating their own account
+    if (id === session.user.id && isActive === false) {
+      return NextResponse.json(
+        { message: "Cannot deactivate your own account" },
+        { status: 400 }
+      )
+    }
+
     // Convert isActive to boolean if it's a string or keep it as is if already boolean
-    let isActiveBoolean: boolean
+    let isActiveBoolean: boolean | undefined
     if (typeof isActive === 'boolean') {
       isActiveBoolean = isActive
-    } else if (isActive === 'true' || isActive === true) {
+    } else if (isActive === 'true') {
       isActiveBoolean = true
-    } else if (isActive === 'false' || isActive === false) {
+    } else if (isActive === 'false') {
       isActiveBoolean = false
     } else {
-      // Default to true if not provided or invalid
-      isActiveBoolean = true
+      // Not provided or invalid — leave undefined so we don't overwrite
+      isActiveBoolean = undefined
     }
 
     const updateData: any = {
@@ -40,7 +48,7 @@ export async function PUT(
       email,
       phone: phone || null,
       role,
-      isActive: isActiveBoolean
+      ...(isActiveBoolean !== undefined && { isActive: isActiveBoolean })
     }
 
     // Handle campus assignment

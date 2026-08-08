@@ -12,7 +12,8 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
     "db:sample-seed-data": "tsx prisma/seeds/seed-sample-data.ts",
-    "db:remove-sample-data": "tsx prisma/seeds/remove-sample-data.ts"
+    "db:remove-sample-data": "tsx prisma/seeds/remove-sample-data.ts",
+    "db:seed-admins": "tsx prisma/seeds/seed-admins.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

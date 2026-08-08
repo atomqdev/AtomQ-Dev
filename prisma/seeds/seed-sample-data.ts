@@ -168,26 +168,18 @@ async function main() {
   }
 
   // ========================================
-  // PART 3: Find or create admin user as creator
+  // PART 3: Find existing admin user as creator
   // ========================================
-  console.log('\n🔑 Finding/Creating admin user for assessments...')
+  console.log('\n🔑 Finding admin user for assessments...')
   let creator = await prisma.user.findFirst({
     where: { role: UserRole.ADMIN }
   })
 
   if (!creator) {
-    creator = await prisma.user.create({
-      data: {
-        uoid: 'ADMIN01',
-        email: 'testadmin@seed.org',
-        name: 'Test Admin for Seed',
-        password: await bcrypt.hash('testadmin@seed.org', 10), // Use email as password
-        role: UserRole.ADMIN,
-        isActive: true,
-      },
-    })
-    console.log('✅ Created admin user for seed data')
+    console.error('❌ No admin user found. Please run the main seed first (bun run db:seed)')
+    process.exit(1)
   }
+  console.log('✅ Using admin as creator:', creator.email)
 
   // ========================================
   // PART 4: Create Assessment Question Group with 20 AWS Questions
@@ -726,9 +718,9 @@ async function main() {
   console.log(`   Contains Assessment: ${assessment.title}`)
   
   console.log('\n🔑 User Credentials:')
-  console.log('   Assessment Admin (Creator):')
-  console.log('   Email: testadmin@seed.org')
-  console.log('   Password: testadmin@seed.org')
+  console.log('   Admins:')
+  console.log('   - mohanraj@atomcode.dev / Mr@1811321')
+  console.log('   - gurusanthosh@atomcode.dev / @(Pass5611)')
   console.log('\n   Assessment Users:')
   console.log('   Email: assessmentuser{1-20}@test.org')
   console.log('   Password: [use the same email as password]')

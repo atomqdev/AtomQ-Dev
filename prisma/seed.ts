@@ -83,20 +83,30 @@ async function main() {
 
   console.log('Created sample campuses:', campus1.name, campus2.name, campus3.name)
 
-  // Create admin user
-  const adminPassword = await bcrypt.hash('admin@atomcode.dev', 10)
-  const admin = await prisma.user.create({
+  // Create admin users
+  const mohanrajPassword = await bcrypt.hash('Mr@1811321', 10)
+  const mohanraj = await prisma.user.create({
     data: {
-      uoid: 'ADMIN001',
-      email: 'admin@atomcode.dev',
-      name: 'Atom Admin',
-      password: adminPassword,
+      uoid: 'ADMIN-MOHANRAJ',
+      email: 'mohanraj@atomcode.dev',
+      name: 'Mohanraj M',
+      password: mohanrajPassword,
       role: UserRole.ADMIN,
-      campusId: campus1.id,
     },
   })
+  console.log('Created admin user:', mohanraj.email)
 
-  console.log('Created admin user:', admin.email)
+  const guruPassword = await bcrypt.hash('@(Pass5611)', 10)
+  const guru = await prisma.user.create({
+    data: {
+      uoid: 'ADMIN-GURU',
+      email: 'gurusanthosh@atomcode.dev',
+      name: 'Guru Santhosh S',
+      password: guruPassword,
+      role: UserRole.ADMIN,
+    },
+  })
+  console.log('Created admin user:', guru.email)
 
   // Create sample users
   const userPassword = await bcrypt.hash('user123', 10)
@@ -142,7 +152,7 @@ async function main() {
     data: {
       name: 'General Knowledge',
       isActive: true,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
     },
   })
 
@@ -182,7 +192,7 @@ async function main() {
     data: {
       name: 'Programming Quizzes',
       isActive: true,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
     },
   })
 
@@ -190,7 +200,7 @@ async function main() {
     data: {
       name: 'Aptitude Quizzes',
       isActive: true,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
     },
   })
 
@@ -201,7 +211,7 @@ async function main() {
       timeLimit: 10,
       difficulty: DifficultyLevel.EASY,
       status: QuizStatus.ACTIVE,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
       campusId: campus1.id,
       groupId: quizGroup1.id,
       quizQuestions: {
@@ -223,7 +233,7 @@ async function main() {
     data: {
       name: 'Technical Assessments',
       isActive: true,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
     },
   })
 
@@ -231,7 +241,7 @@ async function main() {
     data: {
       name: 'Soft Skills Assessments',
       isActive: true,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
     },
   })
 
@@ -242,7 +252,7 @@ async function main() {
       timeLimit: 15,
       difficulty: DifficultyLevel.MEDIUM,
       status: QuizStatus.ACTIVE,
-      creatorId: admin.id,
+      creatorId: mohanraj.id,
       campusId: campus1.id,
       groupId: assessmentGroup1.id,
       assessmentQuestions: {
@@ -274,7 +284,9 @@ async function main() {
   console.log('Created default settings: Atom Q')
 
   console.log('✅ Demo data seeded successfully!')
-  console.log('🔑 Admin: admin@atomcode.dev / admin@atomcode.dev')
+  console.log('🔑 Admins:')
+  console.log('   - mohanraj@atomcode.dev / Mr@1811321')
+  console.log('   - gurusanthosh@atomcode.dev / @(Pass5611)')
   console.log('👥 Sample Users: student@mit.edu, student@stanford.edu, student@harvard.edu / user123')
   console.log('🏫 Campuses: MIT, Stanford, Harvard')
   console.log('📝 Question Group: General Knowledge (' + sampleQuestions.length + ' questions)')

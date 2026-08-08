@@ -87,22 +87,19 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
   const onSubmit = async (data: LoginFormData) => {
     const email = data.email
     
-    // Check rate limiting
-    const rateLimitResult = checkRateLimit(email)
-    if (!rateLimitResult.allowed) {
-      if (rateLimitResult.lockedUntil) {
-        const lockTimeRemaining = Math.ceil((rateLimitResult.lockedUntil - Date.now()) / 60000)
+    // Check rate limiting status (read-only, don't increment counter)
+    // The server-side authorize() in auth.ts handles the actual rate limit enforcement
+    const { getLoginAttempts } = await import('@/lib/rate-limit')
+    const attempts = getLoginAttempts(email)
+    if (attempts.lockedUntil) {
+      const lockTimeRemaining = Math.ceil((attempts.lockedUntil - Date.now()) / 60000)
+      if (lockTimeRemaining > 0) {
         const errorMessage = `Too many login attempts. Account locked for ${lockTimeRemaining} minutes.`
         setError(errorMessage)
         onError?.(errorMessage)
         toasts.loginFailed(errorMessage)
-      } else {
-        const errorMessage = 'Too many login attempts. Please try again later.'
-        setError(errorMessage)
-        onError?.(errorMessage)
-        toasts.loginFailed(errorMessage)
+        return
       }
-      return
     }
 
     setIsLoading(true)

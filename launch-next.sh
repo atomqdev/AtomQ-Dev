@@ -51,7 +51,7 @@ setsid env -i \
   OPENAI_API_KEY="$OPENAI_API_KEY" \
   PATH="$PATH" \
   HOME="$HOME" \
-  node node_modules/.bin/next dev -p 3000 >> "$LOGFILE" 2>&1 &
+  bun run dev >> "$LOGFILE" 2>&1 &
 DISOWNED_PID=$!
 echo "$DISOWNED_PID" > "$PIDFILE"
 disown $DISOWNED_PID

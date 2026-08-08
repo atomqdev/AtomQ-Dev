@@ -180,9 +180,10 @@ export async function POST(
       }
 
       // Return existing attempt data
+      const showAnswers = !!assessment.showAnswers
       const questions = isAssessment 
-        ? assessment.assessmentQuestions.map((aq, index) => formatAssessmentQuestion(aq, index))
-        : assessment.quizQuestions.map((aq, index) => formatQuizQuestion(aq, index))
+        ? assessment.assessmentQuestions.map((aq, index) => formatAssessmentQuestion(aq, index, showAnswers))
+        : assessment.quizQuestions.map((aq, index) => formatQuizQuestion(aq, index, showAnswers))
 
       const validQuestions = questions.filter(q => q !== null)
 
@@ -287,6 +288,19 @@ export async function POST(
       }
     }
 
+    // Verify enrollment for assessments before creating a new attempt
+    if (isAssessment) {
+      const enrollment = await db.assessmentUser.findFirst({
+        where: { assessmentId: id, userId }
+      })
+      if (!enrollment) {
+        return NextResponse.json(
+          { message: "You are not enrolled in this assessment" },
+          { status: 403 }
+        )
+      }
+    }
+
     // Create new attempt based on type
     let attempt
     if (isAssessment) {
@@ -309,10 +323,10 @@ export async function POST(
       })
     }
 
-    // Format questions for frontend
+    // Format questions for frontend (new attempt - never show answers)
     const questions = isAssessment
-      ? assessment.assessmentQuestions.map((aq, index) => formatAssessmentQuestion(aq, index))
-      : assessment.quizQuestions.map((aq, index) => formatQuizQuestion(aq, index))
+      ? assessment.assessmentQuestions.map((aq, index) => formatAssessmentQuestion(aq, index, false))
+      : assessment.quizQuestions.map((aq, index) => formatQuizQuestion(aq, index, false))
 
     const validQuestions = questions.filter(q => q !== null)
     
@@ -358,7 +372,7 @@ export async function POST(
 }
 
 // Helper function to format assessment question
-function formatAssessmentQuestion(aq: any, index: number) {
+function formatAssessmentQuestion(aq: any, index: number, showAnswers: boolean = false) {
   try {
     if (!aq.question?.id || !aq.question?.title || !aq.question?.type) {
       console.error(`Assessment question at index ${index} missing required fields:`, aq.question)
@@ -384,18 +398,23 @@ function formatAssessmentQuestion(aq: any, index: number) {
       options = []
     }
 
-    return {
+    const result: any = {
       id: aq.question.id,
       reference: aq.question.reference,
       title: aq.question.title || `Question ${index + 1}`,
       type: aq.question.type,
       options: options,
-      correctAnswer: aq.question.correctAnswer || '0',
-      explanation: aq.question.explanation || '',
       difficulty: aq.question.difficulty,
       order: aq.order,
       points: aq.points
     }
+
+    if (showAnswers) {
+      result.correctAnswer = aq.question.correctAnswer || '0'
+      result.explanation = aq.question.explanation || ''
+    }
+
+    return result
   } catch (error) {
     console.error(`Failed to process assessment question ${aq.question?.id || index}:`, {
       error: error instanceof Error ? error.message : String(error),
@@ -406,7 +425,7 @@ function formatAssessmentQuestion(aq: any, index: number) {
 }
 
 // Helper function to format quiz question
-function formatQuizQuestion(aq: any, index: number) {
+function formatQuizQuestion(aq: any, index: number, showAnswers: boolean = false) {
   try {
     if (!aq.question?.id || !aq.question?.title || !aq.question?.type) {
       console.error(`Quiz question at index ${index} missing required fields:`, aq.question)
@@ -432,18 +451,23 @@ function formatQuizQuestion(aq: any, index: number) {
       options = []
     }
 
-    return {
+    const result: any = {
       id: aq.question.id,
       reference: aq.question.reference,
       title: aq.question.title || `Question ${index + 1}`,
       type: aq.question.type,
       options: options,
-      correctAnswer: aq.question.correctAnswer || '0',
-      explanation: aq.question.explanation || '',
       difficulty: aq.question.difficulty,
       order: aq.order,
       points: aq.points
     }
+
+    if (showAnswers) {
+      result.correctAnswer = aq.question.correctAnswer || '0'
+      result.explanation = aq.question.explanation || ''
+    }
+
+    return result
   } catch (error) {
     console.error(`Failed to process quiz question ${aq.question?.id || index}:`, {
       error: error instanceof Error ? error.message : String(error),

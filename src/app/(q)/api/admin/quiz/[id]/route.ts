@@ -73,23 +73,27 @@ export async function PUT(
       endDate
     } = await request.json()
 
+    // Build update data — only set a field when it is explicitly provided
+    // to avoid silently overwriting existing values with defaults on partial updates.
+    const data: Record<string, unknown> = {}
+
+    if (title !== undefined) data.title = title
+    if (description !== undefined) data.description = description
+    if (timeLimit !== undefined) data.timeLimit = timeLimit != null && timeLimit !== "" ? parseInt(String(timeLimit)) : null
+    if (difficulty !== undefined) data.difficulty = difficulty
+    if (status !== undefined) data.status = status
+    if (negativeMarking !== undefined) data.negativeMarking = negativeMarking === true || negativeMarking === "true"
+    if (negativePoints !== undefined) data.negativePoints = negativePoints != null && negativePoints !== "" ? parseFloat(String(negativePoints)) : 0.5
+    if (randomOrder !== undefined) data.randomOrder = randomOrder === true || randomOrder === "true"
+    if (maxAttempts !== undefined) data.maxAttempts = maxAttempts != null && maxAttempts !== "" ? parseInt(String(maxAttempts)) : null
+    if (showAnswers !== undefined) data.showAnswers = showAnswers
+    if (checkAnswerEnabled !== undefined) data.checkAnswerEnabled = checkAnswerEnabled
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null
+
     const quiz = await db.quiz.update({
       where: { id },
-      data: {
-        title,
-        description,
-        timeLimit: timeLimit != null && timeLimit !== "" ? parseInt(String(timeLimit)) : null,
-        difficulty: difficulty || DifficultyLevel.MEDIUM,
-        status: status || QuizStatus.ACTIVE,
-        negativeMarking: negativeMarking === true || negativeMarking === "true",
-        negativePoints: negativePoints != null && negativePoints !== "" ? parseFloat(String(negativePoints)) : 0.5,
-        randomOrder: randomOrder === true || randomOrder === "true",
-        maxAttempts: maxAttempts != null && maxAttempts !== "" ? parseInt(String(maxAttempts)) : null,
-        showAnswers,
-        checkAnswerEnabled,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null
-      }
+      data
     })
 
     return NextResponse.json(quiz)

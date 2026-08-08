@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { UserRole } from "@prisma/client"
 
 export async function GET(
   request: NextRequest,
@@ -8,6 +11,12 @@ export async function GET(
   const { id } = await params
 
   try {
+    // Auth check
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== UserRole.ADMIN) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const campus = await db.campus.findUnique({
       where: { id },
       select: {

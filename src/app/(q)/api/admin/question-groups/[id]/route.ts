@@ -155,6 +155,29 @@ export async function DELETE(
       )
     }
 
+    // Check for impacted quizzes and assessments before deleting
+    const impactedQuizCount = await db.quizQuestion.count({
+      where: { question: { groupId: id } }
+    })
+
+    const impactedAssessmentCount = await db.assessmentQuestion.count({
+      where: { question: { groupId: id } }
+    })
+
+    const hasImpact = impactedQuizCount > 0 || impactedAssessmentCount > 0
+    const force = request.nextUrl.searchParams.get("force") === "true"
+
+    if (hasImpact && !force) {
+      return NextResponse.json(
+        {
+          message: "Question group has questions used in quizzes or assessments. Use ?force=true to delete anyway.",
+          impactedQuizzes: impactedQuizCount,
+          impactedAssessments: impactedAssessmentCount
+        },
+        { status: 400 }
+      )
+    }
+
     // Delete the question group (this will also delete associated questions due to cascade)
     await db.questionGroup.delete({
       where: { id }

@@ -41,8 +41,9 @@ async function getMaintenanceMode(): Promise<boolean> {
     return isMaintenance
   } catch (error) {
     console.error("Error checking maintenance mode:", error)
-    // If database fails or settings table doesn't exist, assume no maintenance mode for safety
-    return false
+    // Fail-closed: if we can't verify the maintenance state, assume maintenance mode
+    // This prevents bypass when the database is unreachable during an active maintenance period
+    return true
   }
 }
 
@@ -111,11 +112,8 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user || !user.isActive) {
-            if (!user) {
-              throw new Error('Invalid email or password')
-            } else if (!user.isActive) {
-              throw new Error('Your account has been disabled. Please contact an administrator.')
-            }
+            // Return same message for both cases to prevent user enumeration
+            throw new Error('Invalid email or password')
           }
 
           const isPasswordValid = await bcrypt.compare(

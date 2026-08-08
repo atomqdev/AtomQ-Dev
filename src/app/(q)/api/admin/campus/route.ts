@@ -38,6 +38,7 @@ export async function GET() {
               }
             },
             quizzes: true,
+            assessments: true,
           }
         },
         departments: {
@@ -111,7 +112,7 @@ export async function GET() {
         batches: campus._count.batches,
         students: campus._count.users,
         quizzes: campus._count.quizzes,
-        assessments: campus._count.quizzes // Using quizzes count as assessments count
+        assessments: campus._count.assessments
       }
     }))
 
@@ -206,6 +207,7 @@ export async function POST(request: NextRequest) {
               }
             },
             quizzes: true,
+            assessments: true,
           }
         }
       }
@@ -219,7 +221,7 @@ export async function POST(request: NextRequest) {
         batches: campus._count.batches,
         students: campus._count.users,
         quizzes: campus._count.quizzes,
-        assessments: campus._count.quizzes
+        assessments: campus._count.assessments
       }
     }
 
