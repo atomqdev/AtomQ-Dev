@@ -988,14 +988,14 @@ export default function QuizGroupDetailPage({
 
       {/* Add Quiz Sheet */}
       <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-md">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Create New Quiz</SheetTitle>
             <SheetDescription>
               Create a new quiz with the specified settings.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleCreateQuiz} className="space-y-4 px-4">
+          <form id="create-quiz-form" onSubmit={handleCreateQuiz} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2">
               <Label htmlFor="create-title">
                 Title <span className="text-red-500">*</span>
@@ -1022,26 +1022,45 @@ export default function QuizGroupDetailPage({
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Difficulty</Label>
-              <Select
-                value={formData.difficulty}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    difficulty: value as DifficultyLevel,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
-                  <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
-                  <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={formData.difficulty}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      difficulty: value as DifficultyLevel,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DifficultyLevel.EASY}>Easy</SelectItem>
+                    <SelectItem value={DifficultyLevel.MEDIUM}>Medium</SelectItem>
+                    <SelectItem value={DifficultyLevel.HARD}>Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, status: value as QuizStatus })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={QuizStatus.DRAFT}>Draft</SelectItem>
+                    <SelectItem value={QuizStatus.ACTIVE}>Active</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="create-time-limit">Time Limit (minutes)</Label>
@@ -1055,23 +1074,6 @@ export default function QuizGroupDetailPage({
                 placeholder="e.g. 30"
                 min="1"
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, status: value as QuizStatus })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={QuizStatus.DRAFT}>Draft</SelectItem>
-                  <SelectItem value={QuizStatus.ACTIVE}>Active</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="create-negative-marking">Negative Marking</Label>
@@ -1175,16 +1177,25 @@ export default function QuizGroupDetailPage({
                 }
               />
             </div>
-            <SheetFooter>
-              <LoadingButton
-                type="submit"
-                isLoading={submitLoading}
-                className="w-full"
-              >
-                Create Quiz
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="create-quiz-form"
+              isLoading={submitLoading}
+              className="w-full"
+            >
+              Create Quiz
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
@@ -1196,14 +1207,14 @@ export default function QuizGroupDetailPage({
           resetEditFormData()
         }
       }}>
-        <SheetContent className="w-full sm:w-[540px] overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="w-full sm:w-[540px] flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Edit Quiz</SheetTitle>
             <SheetDescription>
               Update quiz details and settings.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 mt-6">
+          <form id="edit-quiz-form" onSubmit={handleEditSubmit} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2">
               <Label htmlFor="edit-title">
                 Title <span className="text-red-500">*</span>
@@ -1244,19 +1255,6 @@ export default function QuizGroupDetailPage({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-time-limit">Time Limit (min)</Label>
-                <Input
-                  id="edit-time-limit"
-                  type="number"
-                  value={editFormData.timeLimit}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, timeLimit: e.target.value }))}
-                  placeholder="e.g. 30"
-                  min="1"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
                   value={editFormData.status}
@@ -1271,6 +1269,19 @@ export default function QuizGroupDetailPage({
                     <SelectItem value={QuizStatus.INACTIVE}>Inactive</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-time-limit">Time Limit (min)</Label>
+                <Input
+                  id="edit-time-limit"
+                  type="number"
+                  value={editFormData.timeLimit}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, timeLimit: e.target.value }))}
+                  placeholder="e.g. 30"
+                  min="1"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-max-attempts">Max Attempts</Label>
@@ -1341,19 +1352,25 @@ export default function QuizGroupDetailPage({
                 onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, checkAnswerEnabled: checked }))}
               />
             </div>
-            <SheetFooter className="flex-row gap-2">
-              <Button type="button" variant="outline" onClick={() => {
-                setIsEditDialogOpen(false)
-                setSelectedQuiz(null)
-                resetEditFormData()
-              }}>
-                Cancel
-              </Button>
-              <LoadingButton type="submit" isLoading={submitLoading}>
-                Update Quiz
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="edit-quiz-form"
+              isLoading={submitLoading}
+              className="w-full"
+            >
+              Update Quiz
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 

@@ -832,14 +832,14 @@ export default function AssessmentGroupDetailPage({
 
       {/* Add Assessment Sheet */}
       <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-md">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Create Assessment</SheetTitle>
             <SheetDescription>
               Create a new assessment with questions and settings
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleCreateAssessment} className="space-y-4 px-4">
+          <form id="create-assessment-form" onSubmit={handleCreateAssessment} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2">
               <Label htmlFor="title">
                 Title <span className="text-red-500">*</span>
@@ -1029,29 +1029,38 @@ export default function AssessmentGroupDetailPage({
                 }
               />
             </div>
-            <SheetFooter>
-              <LoadingButton
-                type="submit"
-                isLoading={submitLoading}
-                className="w-full"
-              >
-                Create Assessment
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="create-assessment-form"
+              isLoading={submitLoading}
+              className="w-full"
+            >
+              Create Assessment
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
       {/* Edit Assessment Sheet */}
       <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-md">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Edit Assessment</SheetTitle>
             <SheetDescription>
               Update assessment settings and configuration.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 px-4">
+          <form id="edit-assessment-form" onSubmit={handleEditSubmit} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2">
               <Label htmlFor="edit-title">
                 Title <span className="text-red-500">*</span>
@@ -1241,16 +1250,25 @@ export default function AssessmentGroupDetailPage({
                 }
               />
             </div>
-            <SheetFooter>
-              <LoadingButton
-                type="submit"
-                isLoading={editLoading}
-                className="w-full"
-              >
-                Update Assessment
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="edit-assessment-form"
+              isLoading={editLoading}
+              className="w-full"
+            >
+              Update Assessment
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 

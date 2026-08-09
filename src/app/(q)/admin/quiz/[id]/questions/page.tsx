@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { LoadingButton } from "@/components/ui/laodaing-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -24,14 +23,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,15 +72,11 @@ import {
   Trash2,
   Eye,
   X,
-  Download,
-  Upload,
   ChevronLeft,
   FileDown,
-  FileUp
 } from "lucide-react"
 import { toast } from "sonner"
 import { QuestionType, DifficultyLevel } from "@prisma/client"
-import Papa from "papaparse"
 import HexagonLoader from "@/components/Loader/Loading"
 import { parseMultiSelectAnswers, getMultiSelectCount } from "@/lib/utils"
 
@@ -261,14 +248,6 @@ export default function QuizQuestionsPage() {
   const [quizTitle, setQuizTitle] = useState("")
   const [selectedQuestionsToAdd, setSelectedQuestionsToAdd] = useState<string[]>([])
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  // Import sheet states
-  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false)
-  const [selectedQuestionGroup, setSelectedQuestionGroup] = useState<string>("")
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [isImporting, setIsImporting] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -471,370 +450,6 @@ export default function QuizQuestionsPage() {
     toast.success("Questions exported to CSV")
   }
 
-  const handleImportQuestions = () => {
-    fileInputRef.current?.click()
-  }
-
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      const file = files[0]
-      if (file.type === "text/csv" || file.name.endsWith(".csv")) {
-        setImportFile(file)
-      } else {
-        toast.error("Please upload a CSV file")
-      }
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImportFile(file)
-    }
-  }
-
-  const handleRemoveFile = () => {
-    setImportFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
-
-  const handleImportWithGroup = async () => {
-    if (!importFile) {
-      toast.error("Please select a file to import")
-      return
-    }
-    
-    if (!selectedQuestionGroup) {
-      toast.error("Please select a question group")
-      return
-    }
-
-    setIsImporting(true)
-
-    Papa.parse(importFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-
-          // Filter out empty rows and validate required fields
-          const validQuestions = results.data.filter((row: any) => {
-            const hasReference = row.Reference && row.Reference.trim() !== ""
-            const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasType = row.Type && row.Type.trim() !== ""
-            const hasOptions = row.Options && row.Options.trim() !== ""
-            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
-
-            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
-          })
-
-
-          if (validQuestions.length === 0) {
-            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
-            return
-          }
-
-          // Create questions in the selected group
-          const importPromises = validQuestions.map(async (question: any, index: number) => {
-            try {
-
-              // Normalize question type
-              let questionType = question.Type?.toString().toUpperCase().trim()
-              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
-                questionType = QuestionType.MULTIPLE_CHOICE
-                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
-              }
-
-              // Parse options
-              let options = []
-              if (question.Options) {
-                const optionsStr = question.Options.toString().trim()
-                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
-                  try {
-                    const parsed = JSON.parse(optionsStr)
-                    if (Array.isArray(parsed)) {
-                      options = parsed
-                    }
-                  } catch {
-                    options = optionsStr.split('|').map(opt => opt.trim())
-                  }
-                } else {
-                  options = optionsStr.split('|').map(opt => opt.trim())
-                }
-              }
-
-              // Create the question
-              const response = await fetch("/api/admin/question-groups", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  reference: question.Reference?.trim(),
-                  title: question.Title?.trim(),
-                  type: questionType,
-                  options: options,
-                  correctAnswer: question["Correct Answer"]?.toString(),
-                  explanation: question.Explanation?.trim() || "",
-                  difficulty: question.Difficulty?.toUpperCase() || "MEDIUM",
-                  groupId: selectedQuestionGroup
-                }),
-              })
-
-              if (!response.ok) {
-                const error = await response.json()
-                throw new Error(error.message || "Failed to create question")
-              }
-
-              return await response.json()
-            } catch (error) {
-              console.error(`Failed to import question ${index + 1}:`, error)
-              throw error
-            }
-          })
-
-          const importedQuestions = await Promise.all(importPromises)
-          
-          // Add imported questions to the quiz
-          const questionIds = importedQuestions.map(q => q.id)
-          const addResponse = await fetch(`/api/admin/quiz/${quizId}/questions`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ questionIds }),
-          })
-
-          if (addResponse.ok) {
-            toast.success(`Successfully imported ${importedQuestions.length} questions and added to quiz`)
-            setIsImportSheetOpen(false)
-            setImportFile(null)
-            setSelectedQuestionGroup("")
-            fetchQuestions()
-            fetchAvailableQuestions()
-            setIsImporting(false)
-          } else {
-            toast.error("Questions were imported but failed to enroll to quiz")
-            setIsImporting(false)
-          }
-
-        } catch (error) {
-          console.error("Import error:", error)
-          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
-          setIsImporting(false)
-        }
-      },
-      error: (error) => {
-        console.error("CSV parsing error:", error)
-        toast.error("Failed to parse CSV file")
-        setIsImporting(false)
-      }
-    })
-  }
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-
-          // Filter out empty rows and validate required fields
-          const validQuestions = results.data.filter((row: any) => {
-            const hasReference = row.Reference && row.Reference.trim() !== ""
-            const hasTitle = row.Title && row.Title.trim() !== ""
-            const hasType = row.Type && row.Type.trim() !== ""
-            const hasOptions = row.Options && row.Options.trim() !== ""
-            const hasCorrectAnswer = row["Correct Answer"] && row["Correct Answer"].trim() !== ""
-
-            return hasReference && hasTitle && hasType && hasOptions && hasCorrectAnswer
-          })
-
-
-          if (validQuestions.length === 0) {
-            toast.error("No valid questions found in CSV file. Please ensure all required fields are filled.")
-            return
-          }
-
-          const importPromises = validQuestions.map(async (question: any, index: number) => {
-            try {
-
-              // Normalize question type
-              let questionType = question.Type?.toString().toUpperCase().trim()
-              if (!Object.values(QuestionType).includes(questionType as QuestionType)) {
-                // Default to MULTIPLE_CHOICE if type is invalid
-                questionType = QuestionType.MULTIPLE_CHOICE
-                console.warn(`Invalid question type "${question.Type}", defaulting to MULTIPLE_CHOICE`)
-              }
-
-              // Parse options with better error handling
-              let options = []
-              if (question.Options) {
-                const optionsStr = question.Options.toString().trim()
-
-                // Try to parse as JSON first (handles ["aa","bb","cc"] format)
-                if (optionsStr.startsWith('[') && optionsStr.endsWith(']')) {
-                  try {
-                    const parsed = JSON.parse(optionsStr)
-                    if (Array.isArray(parsed)) {
-                      options = parsed.map(opt => opt.toString().trim()).filter(opt => opt.length > 0)
-                    }
-                  } catch (e) {
-                    console.warn(`Failed to parse options as JSON for question "${question.Reference}":`, e)
-                  }
-                }
-
-                // If JSON parsing failed or not JSON, try different delimiters
-                if (options.length === 0) {
-                  // Try pipe delimiter first
-                  if (optionsStr.includes('|')) {
-                    options = optionsStr.split('|').map(opt => opt.trim()).filter(opt => opt.length > 0)
-                  }
-                  // Try comma delimiter
-                  else if (optionsStr.includes(',')) {
-                    options = optionsStr.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0)
-                  }
-                  // Try semicolon delimiter
-                  else if (optionsStr.includes(';')) {
-                    options = optionsStr.split(';').map(opt => opt.trim()).filter(opt => opt.length > 0)
-                  }
-                  // Single option as string
-                  else if (optionsStr.length > 0) {
-                    options = [optionsStr]
-                  }
-                }
-              }
-
-
-              // Ensure True/False questions have correct options
-              if (questionType === QuestionType.TRUE_FALSE) {
-                if (options.length !== 2 || !options.includes("True") || !options.includes("False")) {
-                  options = ["True", "False"]
-                }
-              }
-
-              // Validate options for multiple choice
-              if (questionType === QuestionType.MULTIPLE_CHOICE && options.length < 2) {
-                throw new Error(`Multiple choice question "${question.Reference}" must have at least 2 options`)
-              }
-
-              // Normalize correct answer
-              const correctAnswer = question["Correct Answer"]?.toString().trim()
-              if (!correctAnswer) {
-                throw new Error(`Correct answer is required for question "${question.Reference}"`)
-              }
-
-              // Validate that correct answer is in options
-              if (!options.includes(correctAnswer)) {
-                throw new Error(`Correct answer "${correctAnswer}" not found in options for question "${question.Reference}"`)
-              }
-
-              // Normalize difficulty
-              let difficulty = question.Difficulty?.toString().toUpperCase().trim() || DifficultyLevel.MEDIUM
-              if (!Object.values(DifficultyLevel).includes(difficulty as DifficultyLevel)) {
-                difficulty = DifficultyLevel.MEDIUM
-                console.warn(`Invalid difficulty "${question.Difficulty}", defaulting to MEDIUM`)
-              }
-
-              // Parse points
-              const points = parseFloat(question.Points) || 1.0
-              if (isNaN(points) || points <= 0) {
-                throw new Error(`Invalid points value for question "${question.Reference}"`)
-              }
-
-              const questionData = {
-                reference: question.Reference?.toString().trim() || "",
-                title: question.Title?.toString().trim() || "",
-                type: questionType,
-                options: options,
-                correctAnswer: correctAnswer,
-                explanation: question.Explanation?.toString().trim() || "",
-                difficulty: difficulty,
-                points: points
-              }
-
-
-              const response = await fetch(`/api/admin/quiz/${quizId}/questions`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(questionData),
-              })
-
-              if (!response.ok) {
-                const errorData = await response.json()
-                console.error(`API error for question "${questionData.reference}":`, errorData)
-                throw new Error(errorData.message || `Failed to create question "${questionData.reference}"`)
-              }
-
-              const result = await response.json()
-              return result
-            } catch (error) {
-              console.error(`Failed to import question "${question.Reference}":`, error)
-              return {
-                error: true,
-                reference: question.Reference,
-                message: error instanceof Error ? error.message : "Unknown error"
-              }
-            }
-          })
-
-          const importResults = await Promise.all(importPromises)
-          const successfulImports = importResults.filter(result => !result.error)
-          const failedImports = importResults.filter(result => result.error)
-
-
-          if (successfulImports.length > 0) {
-            toast.success(`Successfully imported ${successfulImports.length} question(s)`)
-            fetchQuestions()
-            fetchAvailableQuestions()
-          }
-
-          if (failedImports.length > 0) {
-            const errorMessages = failedImports.map(failure =>
-              `"${failure.reference}": ${failure.message}`
-            ).join('\n')
-            console.error("Failed imports:", errorMessages)
-            toast.error(`Failed to import ${failedImports.length} question(s):\n${errorMessages}`)
-          }
-        } catch (error) {
-          console.error("Import error:", error)
-          toast.error(`Failed to import questions: ${error instanceof Error ? error.message : "Unknown error"}`)
-        }
-      },
-      error: (error) => {
-        console.error("CSV parsing error:", error)
-        toast.error(`Failed to parse CSV file: ${error.message}`)
-      }
-    })
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
-
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = question.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       question.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -960,19 +575,8 @@ export default function QuizQuestionsPage() {
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm" onClick={handleExportQuestions}>
                 <FileDown className="h-4 w-4 mr-2" />
-                Export
+                Download
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsImportSheetOpen(true)}>
-                <FileUp className="h-4 w-4 mr-2" />
-                Import
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="hidden"
-              />
             </div>
           </div>
         </CardHeader>
@@ -1314,118 +918,6 @@ export default function QuizQuestionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Import Questions Sheet */}
-      <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
-        <SheetContent className=" sm:w-[90vw] min-h-[100vh]">
-          <SheetHeader>
-            <SheetTitle>Import Questions</SheetTitle>
-            <SheetDescription>
-              Import questions from a CSV file and add & eroll them to a question group
-            </SheetDescription>
-          </SheetHeader>
-          
-          <div className="mt-6 space-y-6 px-4">
-            {/* Question Group Selection */}
-            <div className="space-y-2 w-full">
-              <Label htmlFor="questionGroup">Question Group *</Label>
-              <Select value={selectedQuestionGroup} onValueChange={setSelectedQuestionGroup}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a question group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {questionGroups.filter(group => group.isActive).map(group => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.name} ({group._count.questions} questions)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* File Upload Area */}
-            <div className="space-y-2">
-              <Label>CSV File *</Label>
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  isDragOver
-                    ? "border-primary bg-primary/5"
-                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {importFile ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center space-x-2">
-                      <FileUp className="h-8 w-8 text-primary" />
-                      <div className="text-left">
-                        <p className="font-medium">{importFile.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {(importFile.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveFile}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Drag and drop another file or click to select
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex justify-center">
-                      <FileUp className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-medium">Drop your CSV file here</p>
-                      <p className="text-sm text-muted-foreground">
-                        or click to browse files
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="mx-auto"
-                    >
-                      Select File
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <SheetFooter className="mt-8">
-            <Button variant="outline" onClick={() => setIsImportSheetOpen(false)}>
-              Cancel
-            </Button>
-            <LoadingButton
-              onClick={handleImportWithGroup}
-              disabled={!selectedQuestionGroup || !importFile}
-              isLoading={isImporting}
-              loadingText="Importing..."
-            >
-              Import Questions
-            </LoadingButton>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </div>
   )
 }

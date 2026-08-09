@@ -1148,14 +1148,14 @@ export default function CampusPage() {
 
       {/* Create Campus Dialog */}
       <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Create New Campus</SheetTitle>
             <SheetDescription>
               Add a new campus to the system
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleCreateSubmit} className="space-y-4 mt-6">
+          <form id="create-campus-form" onSubmit={handleCreateSubmit} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Campus Name</Label>
@@ -1274,32 +1274,38 @@ export default function CampusPage() {
               </div>
             </div>
 
-            <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsAddDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <LoadingButton isLoading={submitLoading} type="submit">
-                Create Campus
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="create-campus-form"
+              isLoading={submitLoading}
+              className="w-full"
+            >
+              Create Campus
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
       {/* Edit Campus Dialog */}
       <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Edit Campus</SheetTitle>
             <SheetDescription>
               Update campus information
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 mt-6">
+          <form id="edit-campus-form" onSubmit={handleEditSubmit} className="space-y-4 px-4 py-4 flex-1 min-h-0 overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-name">Campus Name</Label>
@@ -1418,19 +1424,25 @@ export default function CampusPage() {
               </div>
             </div>
 
-            <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <LoadingButton isLoading={submitLoading} type="submit">
-                Update Campus
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="edit-campus-form"
+              isLoading={submitLoading}
+              className="w-full"
+            >
+              Update Campus
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 

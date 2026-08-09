@@ -67,6 +67,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import HexagonLoader from "@/components/Loader/Loading"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { formatDateDDMMYYYY } from "@/lib/date-utils"
+import { ImportUsersDialog } from "./import-users-dialog"
 
 // Debounce hook to prevent too many API calls
 function useDebounce<T>(value: T, delay: number): T {
@@ -145,8 +146,7 @@ export default function UsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({})
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false)
   const [tableKey, setTableKey] = useState(0)
-  const [importLoading, setImportLoading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   // Student deletion tracking state
   const [deleteInfo, setDeleteInfo] = useState<{
@@ -837,76 +837,6 @@ export default function UsersPage() {
     }
   }
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Reset the input so the same file can be selected again
-    event.target.value = ""
-
-    if (!file.name.endsWith('.json')) {
-      toasts.error("Please select a JSON file")
-      return
-    }
-
-    setImportLoading(true)
-    try {
-      const text = await file.text()
-      let parsedData: unknown
-      try {
-        parsedData = JSON.parse(text)
-      } catch {
-        toasts.error("Invalid JSON file. Please check the file format.")
-        return
-      }
-
-      // Support both a raw array and an object with an `importData`/`users` array
-      let importArray: any[] = []
-      if (Array.isArray(parsedData)) {
-        importArray = parsedData
-      } else if (parsedData && typeof parsedData === 'object') {
-        const obj = parsedData as Record<string, unknown>
-        if (Array.isArray(obj.importData)) {
-          importArray = obj.importData as any[]
-        } else if (Array.isArray(obj.users)) {
-          importArray = obj.users as any[]
-        }
-      }
-
-      if (importArray.length === 0) {
-        toasts.error("No user records found in the JSON file")
-        return
-      }
-
-      const response = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ importData: importArray }),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        toasts.success(result.message || `Import completed: ${result.successCount} successful, ${result.failureCount} failed`)
-        await fetchUsers()
-      } else if (response.status === 401) {
-        toasts.error("Session expired. Please log in again.")
-        router.push('/')
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        toasts.error(errorData.message || "Failed to import users")
-      }
-    } catch (error) {
-      console.error("Error importing users:", error)
-      toasts.networkError()
-    } finally {
-      setImportLoading(false)
-    }
-  }
-
   useEffect(() => {
     const loadData = async () => {
       if (isAuthenticated && isAdmin) {
@@ -937,23 +867,11 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="hidden"
-            onChange={handleImportJSON}
-          />
           <Button
             variant="outline"
-            onClick={handleImportClick}
-            disabled={importLoading}
+            onClick={() => setImportDialogOpen(true)}
           >
-            {importLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="mr-2 h-4 w-4" />
-            )}
+            <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
           <Button
@@ -1157,15 +1075,14 @@ export default function UsersPage() {
 
       {/* Add User Sheet */}
       <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Add New User</SheetTitle>
             <SheetDescription>
               Create a new user account with the specified details.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid flex-1 auto-rows-min gap-6 px-4">
+          <form id="add-user-form" onSubmit={handleSubmit} className="grid flex-1 auto-rows-min gap-6 px-4 py-4 min-h-0 overflow-y-auto">
               <div className="grid gap-3">
                 <Label htmlFor="add-name">Name</Label>
                 <Input
@@ -1315,34 +1232,39 @@ export default function UsersPage() {
                   <Label htmlFor="add-active">Active</Label>
                 </div>
               </div>
-            </div>
-            <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Cancel
-              </Button>
-              <LoadingButton
-                type="submit"
-                isLoading={submitLoading}
-                loadingText="Creating..."
-              >
-                Create User
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="add-user-form"
+              isLoading={submitLoading}
+              loadingText="Creating..."
+              className="w-full"
+            >
+              Create User
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
       {/* Edit User Sheet */}
       <Sheet open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="px-4 py-4 border-b shrink-0">
             <SheetTitle>Edit User</SheetTitle>
             <SheetDescription>
               Update user account details.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid flex-1 auto-rows-min gap-6 px-4">
+          <form id="edit-user-form" onSubmit={handleSubmit} className="grid flex-1 auto-rows-min gap-6 px-4 py-4 min-h-0 overflow-y-auto">
               <div className="grid gap-3">
                 <Label htmlFor="edit-name">Name</Label>
                 <Input
@@ -1451,20 +1373,26 @@ export default function UsersPage() {
                   <Label htmlFor="edit-active">Active</Label>
                 </div>
               </div>
-            </div>
-            <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <LoadingButton
-                type="submit"
-                isLoading={submitLoading}
-                loadingText="Updating..."
-              >
-                Update User
-              </LoadingButton>
-            </SheetFooter>
           </form>
+          <SheetFooter className="grid grid-cols-[3fr_7fr] gap-3 px-4 py-4 mt-0 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              form="edit-user-form"
+              isLoading={submitLoading}
+              loadingText="Updating..."
+              className="w-full"
+            >
+              Update User
+            </LoadingButton>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
@@ -1587,6 +1515,13 @@ export default function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Users Wizard */}
+      <ImportUsersDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={fetchUsers}
+      />
     </div>
   )
 }
