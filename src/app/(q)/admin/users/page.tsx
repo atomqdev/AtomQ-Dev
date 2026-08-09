@@ -930,16 +930,11 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-            <p className="text-muted-foreground">
-              Manage user accounts and permissions
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <p className="text-muted-foreground">
+            Manage user accounts and permissions
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input
@@ -980,6 +975,9 @@ export default function UsersPage() {
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add User
+          </Button>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
       </div>

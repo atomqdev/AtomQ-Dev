@@ -89,7 +89,7 @@ export async function GET(
     })
 
     // Format the response to match the expected interface
-    const showAnswers = attempt.quiz.showAnswers
+    const checkAnswerEnabled = attempt.quiz.checkAnswerEnabled
 
     const result = {
       id: attempt.id,
@@ -97,7 +97,7 @@ export async function GET(
         title: attempt.quiz.title,
         description: attempt.quiz.description,
         timeLimit: attempt.quiz.timeLimit,
-        showAnswers,
+        checkAnswerEnabled,
       },
       score: attempt.score || 0,
       totalPoints: attempt.totalPoints || 0,
@@ -106,14 +106,14 @@ export async function GET(
       answers: results.map(r => ({
         questionId: r.questionId,
         userAnswer: r.userAnswer || "",
-        isCorrect: showAnswers ? r.isCorrect : null,
+        isCorrect: checkAnswerEnabled ? r.isCorrect : null,
         pointsEarned: r.pointsEarned,
         question: {
           reference: r.question.reference,
           title: r.question.title,
           type: r.question.type,
-          correctAnswer: showAnswers ? r.question.correctAnswer : "",
-          explanation: showAnswers ? r.question.explanation : null,
+          correctAnswer: checkAnswerEnabled ? r.question.correctAnswer : "",
+          explanation: checkAnswerEnabled ? r.question.explanation : null,
           difficulty: r.question.difficulty,
           options: r.question.options ? JSON.parse(r.question.options) : []
         }

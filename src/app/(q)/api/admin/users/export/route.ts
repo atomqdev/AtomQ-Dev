@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
 
     // Build where clause for filtering (same as main users endpoint)
-    const whereClause: any = {}
+    // Root admin is always hidden from exports
+    const whereClause: any = { isRoot: { not: true } }
 
     if (search && search.trim()) {
       whereClause.OR = [

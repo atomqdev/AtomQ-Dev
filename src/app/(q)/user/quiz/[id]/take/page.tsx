@@ -55,7 +55,6 @@ interface Quiz {
   title: string
   description: string
   timeLimit: number
-  showAnswers: boolean
   checkAnswerEnabled: boolean
   questions: Question[]
 }
@@ -75,7 +74,6 @@ export default function QuizTakingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showAnswer, setShowAnswer] = useState<string | null>(null)
-  const [canShowAnswers, setCanShowAnswers] = useState(false)
   const [checkedAnswers, setCheckedAnswers] = useState<Set<string>>(new Set())
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [questionsLoaded, setQuestionsLoaded] = useState<Set<number>>(new Set())
@@ -127,7 +125,6 @@ export default function QuizTakingPage() {
         setAnswers(existingProgress.answers)
         setMultiSelectAnswers(existingProgress.multiSelectAnswers)
         setTimeRemaining(existingProgress.timeRemaining)
-        setCanShowAnswers(existingProgress.quizData.showAnswers || false)
         
         // Restore loaded questions
         const loadedSet = new Set<number>()
@@ -189,7 +186,6 @@ export default function QuizTakingPage() {
         setQuiz(data.quiz)
         setAttemptId(data.attemptId)
         setTimeRemaining(data.timeRemaining || 0)
-        setCanShowAnswers(data.quiz.showAnswers || false)
         
         // Preload first few questions for better performance
         const initialQuestionsToLoad = Math.min(5, data.quiz.questions.length)
@@ -1009,81 +1005,6 @@ export default function QuizTakingPage() {
             </Card>
           </motion.div>
         </AnimatePresence>
-
-        {/* Check Answer Section */}
-        {canShowAnswers && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-4 p-4 bg-muted/50 rounded-lg"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium flex items-center space-x-2">
-                <HelpCircle className="h-4 w-4" />
-                <span>Need Help?</span>
-              </h4>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleCheckAnswer(currentQuestion.id)}
-                className="flex items-center space-x-2"
-              >
-                {showAnswer === currentQuestion.id ? (
-                  <>
-                    <EyeOff className="h-4 w-4" />
-                    <span>Hide Answer</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    <span>Show Answer</span>
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <AnimatePresence>
-              {showAnswer === currentQuestion.id && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3"
-                >
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-start space-x-2">
-                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-green-800 dark:text-green-200">
-                          Correct Answer:
-                        </p>
-                        <p className="text-green-700 dark:text-green-300">
-                          {currentQuestion.type === QuestionType.MULTI_SELECT 
-                            ? parseMultiSelectAnswers(currentQuestion.correctAnswer).join(', ')
-                            : currentQuestion.type === QuestionType.FILL_IN_BLANK
-                            ? currentQuestion.correctAnswer
-                            : currentQuestion.options[parseInt(currentQuestion.correctAnswer)]
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {currentQuestion.explanation && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
-                        Explanation:
-                      </p>
-                      <div className="text-blue-700 dark:text-blue-300">
-                        <RichTextDisplay content={currentQuestion.explanation} />
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
 
         {/* Navigation */}
         <motion.div

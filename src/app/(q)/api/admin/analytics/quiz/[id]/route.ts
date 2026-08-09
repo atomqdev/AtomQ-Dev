@@ -31,6 +31,13 @@ export async function GET(
                 id: true,
                 name: true,
                 email: true,
+                section: true,
+                campusId: true,
+                campus: { select: { id: true, name: true, shortName: true } },
+                departmentId: true,
+                department: { select: { id: true, name: true } },
+                batchId: true,
+                batch: { select: { id: true, name: true } },
               },
             },
             answers: true,
@@ -129,6 +136,40 @@ export async function GET(
       if (range) range.count++;
     });
 
+    // All attempts (for leaderboard + all-users tabs) — sorted by score desc by default
+    const allAttempts = [...submittedAttempts]
+      .sort((a, b) => {
+        const aPct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
+        const bPct = b.totalPoints && b.totalPoints > 0 ? ((b.score || 0) / b.totalPoints) * 100 : (b.score || 0);
+        return bPct - aPct;
+      })
+      .map(attempt => ({
+        id: attempt.id,
+        status: attempt.status,
+        score: attempt.totalPoints && attempt.totalPoints > 0
+          ? ((attempt.score || 0) / attempt.totalPoints) * 100
+          : (attempt.score || 0),
+        rawScore: attempt.score || 0,
+        totalPoints: attempt.totalPoints || 0,
+        timeTaken: attempt.timeTaken || 0,
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+        isAutoSubmitted: attempt.isAutoSubmitted,
+        user: {
+          id: attempt.user.id,
+          name: attempt.user.name,
+          email: attempt.user.email,
+          section: attempt.user.section,
+          campusId: attempt.user.campusId,
+          campusName: attempt.user.campus?.name || null,
+          campusShortName: attempt.user.campus?.shortName || null,
+          departmentId: attempt.user.departmentId,
+          departmentName: attempt.user.department?.name || null,
+          batchId: attempt.user.batchId,
+          batchName: attempt.user.batch?.name || null,
+        },
+      }));
+
     return NextResponse.json({
       quiz: {
         id: quiz.id,
@@ -142,6 +183,7 @@ export async function GET(
       questionStats,
       topPerformers,
       timeAnalysis: timeRanges,
+      allAttempts,
     });
   } catch (error) {
     console.error("Error fetching quiz analytics:", error);

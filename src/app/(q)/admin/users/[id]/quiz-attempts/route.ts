@@ -25,7 +25,9 @@ export async function DELETE(
       where: { id },
       select: {
         id: true,
-        name: true
+        name: true,
+        role: true,
+        isRoot: true
       }
     })
 
@@ -33,6 +35,13 @@ export async function DELETE(
       return NextResponse.json(
         { error: "User not found" },
         { status: 404 }
+      )
+    }
+
+    if (user.role === UserRole.ADMIN || user.isRoot) {
+      return NextResponse.json(
+        { error: "Cannot delete admin user quiz attempts" },
+        { status: 400 }
       )
     }
 

@@ -164,25 +164,25 @@ export default function CampusAnalysisPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">{campus.name}</h1>
+          <p className="text-muted-foreground mt-1 flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            {campus.shortName} • {campus.location}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={fetchCampusData} variant="outline">
+            <Clock className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             onClick={() => router.back()}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{campus.name}</h1>
-            <p className="text-muted-foreground mt-1 flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              {campus.shortName} • {campus.location}
-            </p>
-          </div>
         </div>
-        <Button onClick={fetchCampusData} variant="outline">
-          <Clock className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
       </div>
 
       {/* Overview Cards */}

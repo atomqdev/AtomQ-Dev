@@ -26,7 +26,8 @@ export async function DELETE(
       select: {
         id: true,
         name: true,
-        role: true
+        role: true,
+        isRoot: true
       }
     })
 
@@ -37,7 +38,7 @@ export async function DELETE(
       )
     }
 
-    if (user.role === UserRole.ADMIN) {
+    if (user.role === UserRole.ADMIN || user.isRoot) {
       return NextResponse.json(
         { error: "Cannot delete admin user enrollments" },
         { status: 400 }

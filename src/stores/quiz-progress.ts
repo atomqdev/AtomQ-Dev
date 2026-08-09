@@ -26,7 +26,6 @@ interface QuizProgress {
     title: string
     description: string
     timeLimit: number
-    showAnswers: boolean
     checkAnswerEnabled: boolean
     questions: QuizQuestion[]
   }
@@ -73,7 +72,6 @@ export const useQuizProgressStore = create<QuizProgressState>()(
             title: quizData.title,
             description: quizData.description,
             timeLimit: quizData.timeLimit,
-            showAnswers: quizData.showAnswers,
             checkAnswerEnabled: quizData.checkAnswerEnabled,
             questions: quizData.questions
           },

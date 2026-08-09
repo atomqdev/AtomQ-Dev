@@ -30,6 +30,18 @@ export async function PUT(
       )
     }
 
+    // Guard: root admin account cannot be edited by anyone (protects role/email/password/isActive)
+    const targetUser = await db.user.findUnique({
+      where: { id },
+      select: { isRoot: true }
+    })
+    if (targetUser?.isRoot) {
+      return NextResponse.json(
+        { message: "Root admin account cannot be modified" },
+        { status: 403 }
+      )
+    }
+
     // Convert isActive to boolean if it's a string or keep it as is if already boolean
     let isActiveBoolean: boolean | undefined
     if (typeof isActive === 'boolean') {
@@ -157,7 +169,7 @@ export async function DELETE(
       )
     }
 
-    if (user.role === UserRole.ADMIN) {
+    if (user.role === UserRole.ADMIN || user.isRoot) {
       return NextResponse.json(
         { message: "Cannot delete admin users" },
         { status: 400 }

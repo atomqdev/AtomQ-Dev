@@ -35,7 +35,8 @@ export async function GET(
 
     const users = await db.user.findMany({
       where: {
-        campusId: id
+        campusId: id,
+        isRoot: { not: true }
       },
       include: {
         campus: {

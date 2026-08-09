@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       activeUsers,
       campuses,
     ] = await Promise.all([
-      db.user.count({ where: { isActive: true } }),
+      db.user.count({ where: { isActive: true, isRoot: { not: true } } }),
       db.quiz.count(),
       db.assessment.count(),
       db.quizAttempt.count(),
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       db.user.count({
         where: {
           quizAttempts: { some: {} },
+          isRoot: { not: true },
         },
       }),
       db.campus.findMany({

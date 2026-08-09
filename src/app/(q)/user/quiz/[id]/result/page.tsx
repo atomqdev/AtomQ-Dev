@@ -34,7 +34,7 @@ interface QuizResult {
     title: string
     description?: string
     timeLimit?: number
-    showAnswers: boolean
+    checkAnswerEnabled: boolean
   }
   score: number
   totalPoints: number
@@ -149,7 +149,7 @@ export default function QuizResultPage() {
     return <div className="flex items-center justify-center h-64">Result not found</div>
   }
 
-  const showAnswers = result.quiz.showAnswers
+  const checkAnswerEnabled = result.quiz.checkAnswerEnabled
   const scorePercentage = getScorePercentage()
   const correctAnswers = getCorrectAnswersCount()
   const totalQuestions = result.answers.length
@@ -196,8 +196,8 @@ export default function QuizResultPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Show Answers Disabled Banner */}
-        {!showAnswers && (
+        {/* Check Answer Disabled Banner */}
+        {!checkAnswerEnabled && (
           <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -207,7 +207,7 @@ export default function QuizResultPage() {
                     Answer details are hidden
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    The quiz administrator has disabled answer visibility. You can view your score and submitted answers, but correct answers and explanations are not shown.
+                    The quiz administrator has disabled the check-answer feature. You can view your score and submitted answers, but correct answers and explanations are not shown.
                   </p>
                 </div>
               </div>
@@ -238,7 +238,7 @@ export default function QuizResultPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Correct</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {showAnswers ? `${correctAnswers}/${totalQuestions}` : `—/${totalQuestions}`}
+                    {checkAnswerEnabled ? `${correctAnswers}/${totalQuestions}` : `—/${totalQuestions}`}
                   </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-600" />
@@ -275,9 +275,9 @@ export default function QuizResultPage() {
           </Card>
         </div>
 
-        {/* Tabs for Filtering - only show Success/Failed tabs when showAnswers is enabled */}
+        {/* Tabs for Filtering - only show Success/Failed tabs when checkAnswerEnabled is enabled */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {showAnswers ? (
+          {checkAnswerEnabled ? (
             <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="all" className="flex items-center gap-2">
                 <List className="h-4 w-4" />
@@ -308,7 +308,7 @@ export default function QuizResultPage() {
                   key={answer.questionId} 
                   answer={answer} 
                   index={index} 
-                  showAnswers={showAnswers}
+                  checkAnswerEnabled={checkAnswerEnabled}
                   expandedExplanation={expandedExplanation}
                   setExpandedExplanation={setExpandedExplanation}
                 />
@@ -316,7 +316,7 @@ export default function QuizResultPage() {
             </div>
           </TabsContent>
 
-          {showAnswers && (
+          {checkAnswerEnabled && (
             <>
               <TabsContent value="success" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -325,7 +325,7 @@ export default function QuizResultPage() {
                       key={answer.questionId} 
                       answer={answer} 
                       index={index} 
-                      showAnswers={showAnswers}
+                      checkAnswerEnabled={checkAnswerEnabled}
                       expandedExplanation={expandedExplanation}
                       setExpandedExplanation={setExpandedExplanation}
                     />
@@ -340,7 +340,7 @@ export default function QuizResultPage() {
                       key={answer.questionId} 
                       answer={answer} 
                       index={index} 
-                      showAnswers={showAnswers}
+                      checkAnswerEnabled={checkAnswerEnabled}
                       expandedExplanation={expandedExplanation}
                       setExpandedExplanation={setExpandedExplanation}
                     />
@@ -366,13 +366,13 @@ export default function QuizResultPage() {
 function QuestionCard({ 
   answer, 
   index, 
-  showAnswers,
+  checkAnswerEnabled,
   expandedExplanation,
   setExpandedExplanation 
 }: { 
   answer: QuizResult["answers"][0]; 
   index: number;
-  showAnswers: boolean;
+  checkAnswerEnabled: boolean;
   expandedExplanation: string | null;
   setExpandedExplanation: (value: string | null) => void;
 }) {
@@ -386,9 +386,9 @@ function QuestionCard({
     }
   };
 
-  // Determine card styling based on showAnswers setting
+  // Determine card styling based on checkAnswerEnabled setting
   const getCardStyling = () => {
-    if (!showAnswers) {
+    if (!checkAnswerEnabled) {
       return "border-border bg-card"
     }
     return answer.isCorrect 
@@ -409,7 +409,7 @@ function QuestionCard({
               } className="text-xs">
                 {answer.question.difficulty}
               </Badge>
-              {showAnswers && (
+              {checkAnswerEnabled && (
                 <Badge variant="outline" className="text-xs">
                   {answer.pointsEarned}/{answer.pointsEarned + (answer.isCorrect ? 0 : 1)} pts
                 </Badge>
@@ -417,7 +417,7 @@ function QuestionCard({
             </div>
           </div>
           <div className="flex items-center gap-2 ml-2">
-            {showAnswers ? (
+            {checkAnswerEnabled ? (
               answer.isCorrect ? (
                 <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
               ) : (
@@ -434,7 +434,7 @@ function QuestionCard({
         {/* Question Content */}
         <div className="text-sm text-muted-foreground">
           <RichTextDisplay content={answer.question.title} />
-          {answer.question.type === 'MULTI_SELECT' && showAnswers && (() => {
+          {answer.question.type === 'MULTI_SELECT' && checkAnswerEnabled && (() => {
             const selectCount = getMultiSelectCount(answer.question.correctAnswer)
             return (
               <span className="inline-flex items-center ml-2 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -449,7 +449,7 @@ function QuestionCard({
           <div className="flex items-start gap-2">
             <span className="text-xs font-medium text-muted-foreground min-w-fit">Your Answer:</span>
             <span className={`text-xs break-words ${
-              showAnswers 
+              checkAnswerEnabled 
                 ? (answer.isCorrect ? 'text-green-600 font-medium' : 'text-red-600')
                 : 'text-foreground'
             }`}>
@@ -457,7 +457,7 @@ function QuestionCard({
             </span>
           </div>
 
-          {showAnswers && !answer.isCorrect && answer.question.correctAnswer && (
+          {checkAnswerEnabled && !answer.isCorrect && answer.question.correctAnswer && (
             <div className="flex items-start gap-2">
               <span className="text-xs font-medium text-muted-foreground min-w-fit">Correct Answer:</span>
               <span className="text-xs text-green-600 break-words">
@@ -467,8 +467,8 @@ function QuestionCard({
           )}
         </div>
 
-        {/* Explanation - only show when showAnswers is enabled */}
-        {showAnswers && answer.question.explanation && (
+        {/* Explanation - only show when checkAnswerEnabled is enabled */}
+        {checkAnswerEnabled && answer.question.explanation && (
           <div className="pt-2">
             <div className="w-full">
               <button

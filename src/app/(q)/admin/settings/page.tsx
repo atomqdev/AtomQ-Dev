@@ -325,17 +325,15 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground">
-              Manage your application settings and preferences
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your application settings and preferences
+          </p>
         </div>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Error display */}

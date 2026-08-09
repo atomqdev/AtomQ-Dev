@@ -113,7 +113,8 @@ export async function DELETE(
       // to prevent cross-campus data corruption
       const userIds = await db.user.findMany({
         where: {
-          campusId: id
+          campusId: id,
+          isRoot: { not: true }
         },
         select: {
           id: true

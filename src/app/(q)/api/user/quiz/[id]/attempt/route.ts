@@ -27,6 +27,15 @@ export async function GET(
     response.headers.set('Pragma', 'no-cache')
     response.headers.set('Expires', '0')
 
+    // Peek at the quiz's checkAnswerEnabled flag first so we can conditionally
+    // include correctAnswer + explanation in the question payload. When the
+    // flag is off, those fields are stripped to prevent cheating via DevTools.
+    const quizMeta = await db.quiz.findUnique({
+      where: { id },
+      select: { checkAnswerEnabled: true }
+    })
+    const checkAnswerEnabled = !!quizMeta?.checkAnswerEnabled
+
     // Find the active attempt with optimized query
     const attempt = await db.quizAttempt.findFirst({
       where: {
@@ -46,9 +55,12 @@ export async function GET(
                     title: true,
                     type: true,
                     options: true,
-                    difficulty: true
-                    // correctAnswer and explanation are NOT included during active attempt
-                    // to prevent cheating via DevTools network inspection
+                    difficulty: true,
+                    // correctAnswer + explanation are only sent when the quiz
+                    // allows in-quiz answer checking. Otherwise they are stripped.
+                    ...(checkAnswerEnabled
+                      ? { correctAnswer: true, explanation: true }
+                      : {})
                   }
                 }
               },
@@ -129,7 +141,10 @@ export async function GET(
             title: qq.question.title || `Question ${index + 1}`,
             type: qq.question.type,
             options: options,
-            // correctAnswer and explanation are NOT sent during active attempt
+            // correctAnswer + explanation are only present when checkAnswerEnabled
+            // is true (conditionally selected above); otherwise undefined.
+            correctAnswer: (qq.question as any).correctAnswer ?? "",
+            explanation: (qq.question as any).explanation ?? "",
             difficulty: qq.question.difficulty,
             order: qq.order,
             points: qq.points
@@ -157,7 +172,6 @@ export async function GET(
       title: attempt.quiz.title,
       description: attempt.quiz.description,
       timeLimit: attempt.quiz.timeLimit,
-      showAnswers: attempt.quiz.showAnswers || false,
       checkAnswerEnabled: attempt.quiz.checkAnswerEnabled || false,
       questions: questions
     }

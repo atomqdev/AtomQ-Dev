@@ -77,6 +77,7 @@ model User {
   registrationCodeId    String?
   registrationCode     RegistrationCode? @relation(fields: [registrationCodeId], references: [id], onDelete: SetNull)
   isActive             Boolean            @default(true)
+  isRoot               Boolean            @default(false)
   createdAt            DateTime           @default(now()) @db.Timestamptz(6)
   updatedAt            DateTime           @updatedAt @db.Timestamptz(6)
   quizAttempts         QuizAttempt[]
@@ -94,6 +95,7 @@ model User {
   @@index([email])
   @@index([uoid])
   @@index([isActive])
+  @@index([isRoot])
   @@index([campusId, departmentId, batchId])
   @@index([role, isActive])
   @@map("users")
@@ -179,7 +181,6 @@ model Quiz {
   negativePoints     Float?
   randomOrder        Boolean         @default(false)
   maxAttempts        Int?
-  showAnswers        Boolean         @default(false)
   startDate          DateTime?       @db.Timestamptz(6)
   endDate            DateTime?       @db.Timestamptz(6)
   creatorId          String

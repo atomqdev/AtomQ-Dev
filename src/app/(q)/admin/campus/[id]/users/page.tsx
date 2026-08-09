@@ -162,24 +162,24 @@ export default function CampusUsersPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Campus Users</h1>
+          <p className="text-muted-foreground">
+            {campus ? `Manage users for ${campus.name}` : 'Loading...'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-lg px-4 py-2">
+            <Users className="mr-2 h-4 w-4" />
+            {filteredUsers.length} Users
+          </Badge>
           <Button
             variant="outline"
             onClick={() => router.back()}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Campus Users</h1>
-            <p className="text-muted-foreground">
-              {campus ? `Manage users for ${campus.name}` : 'Loading...'}
-            </p>
-          </div>
         </div>
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          <Users className="mr-2 h-4 w-4" />
-          {filteredUsers.length} Users
-        </Badge>
       </div>
 
       <Card>

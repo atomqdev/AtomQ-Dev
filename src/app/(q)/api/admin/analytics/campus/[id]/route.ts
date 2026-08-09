@@ -90,6 +90,7 @@ export async function GET(
     const topPerformers = await db.user.findMany({
       where: {
         campusId: id,
+        isRoot: { not: true },
         quizAttempts: {
           some: {
             status: "SUBMITTED",

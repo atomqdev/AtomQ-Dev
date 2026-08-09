@@ -40,6 +40,13 @@ export async function GET(
       )
     }
 
+    if (user.role === UserRole.ADMIN || user.isRoot) {
+      return NextResponse.json(
+        { error: "Cannot delete admin users through this endpoint" },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,

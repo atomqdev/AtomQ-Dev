@@ -67,7 +67,6 @@ export async function PUT(
       negativePoints,
       randomOrder,
       maxAttempts,
-      showAnswers,
       checkAnswerEnabled,
       startDate,
       endDate
@@ -86,7 +85,6 @@ export async function PUT(
     if (negativePoints !== undefined) data.negativePoints = negativePoints != null && negativePoints !== "" ? parseFloat(String(negativePoints)) : 0.5
     if (randomOrder !== undefined) data.randomOrder = randomOrder === true || randomOrder === "true"
     if (maxAttempts !== undefined) data.maxAttempts = maxAttempts != null && maxAttempts !== "" ? parseInt(String(maxAttempts)) : null
-    if (showAnswers !== undefined) data.showAnswers = showAnswers
     if (checkAnswerEnabled !== undefined) data.checkAnswerEnabled = checkAnswerEnabled
     if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null

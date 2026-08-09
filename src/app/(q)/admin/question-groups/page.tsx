@@ -515,21 +515,19 @@ export default function QuestionGroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Question Groups</h1>
-            <p className="text-muted-foreground">
-              Manage question groups and organize your questions
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Question Groups</h1>
+          <p className="text-muted-foreground">
+            Manage question groups and organize your questions
+          </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Question Group
+          </Button>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
       </div>

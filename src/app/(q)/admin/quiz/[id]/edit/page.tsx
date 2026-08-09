@@ -21,8 +21,6 @@ import {
   Clock, 
   Users, 
   Settings,
-  Eye,
-  EyeOff,
   Plus,
   Minus,
   Check,
@@ -45,7 +43,6 @@ interface Quiz {
   negativePoints?: number
   randomOrder: boolean
   maxAttempts?: number
-  showAnswers: boolean
   checkAnswerEnabled: boolean
   startTime?: string
   endTime?: string
@@ -134,22 +131,22 @@ export default function EditQuizPage() {
       className="space-y-6"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+        <div>
+          <h1 className="text-2xl font-bold">Edit Quiz</h1>
+          <p className="text-muted-foreground">Modify quiz settings and configuration</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => router.back()}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Edit Quiz</h1>
-            <p className="text-muted-foreground">Modify quiz settings and configuration</p>
-          </div>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
       </div>
 
       <div className="grid gap-6">
@@ -249,28 +246,6 @@ export default function EditQuizPage() {
             <CardDescription>Configure quiz behavior and features</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-sm font-medium">Show Answers During Quiz</Label>
-                <p className="text-sm text-muted-foreground">
-                  Allow students to check answers while taking the quiz
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                {quiz.showAnswers ? (
-                  <Eye className="h-4 w-4 text-green-600" />
-                ) : (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
-                )}
-                <Switch
-                  checked={quiz.showAnswers}
-                  onCheckedChange={(checked) => updateQuiz("showAnswers", checked)}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <Label className="text-sm font-medium">Instant Answer Check</Label>

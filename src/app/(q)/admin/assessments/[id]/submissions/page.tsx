@@ -186,19 +186,19 @@ export default function AssessmentSubmissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Assessment Submissions</h1>
           <p className="text-muted-foreground">
             View submissions for "{assessment?.title}"
           </p>
         </div>
+        <Button
+          variant="outline"
+          onClick={() => router.back()}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
       </div>
 
       <Card>

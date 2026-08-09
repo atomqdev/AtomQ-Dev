@@ -788,12 +788,6 @@ export default function AssessmentGroupDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <FileCheck className="h-6 w-6 text-muted-foreground" />
@@ -811,10 +805,18 @@ export default function AssessmentGroupDetailPage({
             in this group
           </p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Assessment
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Assessment
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Card>

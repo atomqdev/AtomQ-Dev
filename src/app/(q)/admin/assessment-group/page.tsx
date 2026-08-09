@@ -529,27 +529,27 @@ export default function AssessmentGroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Assessment Groups</h1>
+          <p className="text-muted-foreground">
+            Organize your assessments into groups
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              resetForm()
+              setSelectedGroup(null)
+              setIsAddDialogOpen(true)
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Assessment Group
+          </Button>
           <Button variant="outline" onClick={() => router.back()}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Assessment Groups</h1>
-            <p className="text-muted-foreground">
-              Organize your assessments into groups
-            </p>
-          </div>
         </div>
-        <Button
-          onClick={() => {
-            resetForm()
-            setSelectedGroup(null)
-            setIsAddDialogOpen(true)
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Assessment Group
-        </Button>
       </div>
 
       <Card>

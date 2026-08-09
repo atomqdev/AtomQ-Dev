@@ -85,7 +85,6 @@ interface Quiz {
   randomOrder?: boolean
   maxAttempts?: number | null
   checkAnswerEnabled?: boolean
-  showAnswers?: boolean
   startDate?: string | null
   endDate?: string | null
   createdAt: string
@@ -124,7 +123,6 @@ interface CreateFormData {
   startDate: string
   endDate: string
   checkAnswerEnabled: boolean
-  showAnswers: boolean
 }
 
 export default function QuizGroupDetailPage({
@@ -180,7 +178,6 @@ export default function QuizGroupDetailPage({
     startDate: "",
     endDate: "",
     checkAnswerEnabled: false,
-    showAnswers: false,
   })
 
   const resetFormData = () => {
@@ -197,7 +194,6 @@ export default function QuizGroupDetailPage({
       startDate: "",
       endDate: "",
       checkAnswerEnabled: false,
-      showAnswers: false,
     })
   }
 
@@ -214,7 +210,6 @@ export default function QuizGroupDetailPage({
     startDate: "",
     endDate: "",
     checkAnswerEnabled: false,
-    showAnswers: false,
   })
 
   const resetEditFormData = () => {
@@ -231,7 +226,6 @@ export default function QuizGroupDetailPage({
       startDate: "",
       endDate: "",
       checkAnswerEnabled: false,
-      showAnswers: false,
     })
   }
 
@@ -260,7 +254,6 @@ export default function QuizGroupDetailPage({
       startDate: formatDateForInput(quiz.startDate),
       endDate: formatDateForInput(quiz.endDate),
       checkAnswerEnabled: quiz.checkAnswerEnabled ?? false,
-      showAnswers: quiz.showAnswers ?? false,
     })
     setIsEditDialogOpen(true)
   }
@@ -917,12 +910,6 @@ export default function QuizGroupDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <BookOpen className="h-6 w-6 text-muted-foreground" />
@@ -978,6 +965,12 @@ export default function QuizGroupDetailPage({
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Quiz
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -1182,18 +1175,6 @@ export default function QuizGroupDetailPage({
                 }
               />
             </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="create-show-answers">
-                Show Answers
-              </Label>
-              <Switch
-                id="create-show-answers"
-                checked={formData.showAnswers}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, showAnswers: checked })
-                }
-              />
-            </div>
             <SheetFooter>
               <LoadingButton
                 type="submit"
@@ -1358,14 +1339,6 @@ export default function QuizGroupDetailPage({
                 id="edit-check-answer-enabled"
                 checked={editFormData.checkAnswerEnabled}
                 onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, checkAnswerEnabled: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-show-answers">Show Answers</Label>
-              <Switch
-                id="edit-show-answers"
-                checked={editFormData.showAnswers}
-                onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, showAnswers: checked }))}
               />
             </div>
             <SheetFooter className="flex-row gap-2">

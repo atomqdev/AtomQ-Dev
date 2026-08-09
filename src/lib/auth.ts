@@ -139,7 +139,8 @@ export const authOptions: NextAuthOptions = {
               phone: true,
               uoid: true,
               password: true,
-              isActive: true
+              isActive: true,
+              isRoot: true
             }
           })
 
@@ -162,8 +163,9 @@ export const authOptions: NextAuthOptions = {
           // If user is ADMIN, they must verify OTP before login completes.
           // We send the OTP and throw a special error that the frontend
           // will catch to show the OTP input form.
+          // ROOT ADMIN (isRoot) bypasses OTP entirely.
           // ============================================================
-          if (user.role === 'ADMIN') {
+          if (user.role === 'ADMIN' && !user.isRoot) {
             // Create and send OTP
             const { otp, isNew } = createOtp(credentials.email, {
               id: user.id,
@@ -189,7 +191,7 @@ export const authOptions: NextAuthOptions = {
             throw new Error('ADMIN_OTP_REQUIRED')
           }
 
-          // Clear successful login attempts (for non-admin users)
+          // Clear successful login attempts (for non-admin users and root admin)
           clearLoginAttempts(credentials.email)
 
           return {
@@ -200,6 +202,7 @@ export const authOptions: NextAuthOptions = {
             avatar: user.avatar,
             phone: user.phone,
             uoid: user.uoid,
+            isRoot: user.isRoot,
           }
         } catch (error) {
           if (error instanceof Error) {
@@ -226,6 +229,7 @@ export const authOptions: NextAuthOptions = {
         token.avatar = user.avatar
         token.phone = user.phone
         token.uoid = user.uoid
+        token.isRoot = user.isRoot
         
         // Update client-side store
         if (typeof window !== 'undefined') {
@@ -250,6 +254,7 @@ export const authOptions: NextAuthOptions = {
         session.user.avatar = token.avatar as string
         session.user.phone = token.phone as string
         session.user.uoid = token.uoid as string
+        session.user.isRoot = token.isRoot as boolean | undefined
         
         // Update client-side store
         if (typeof window !== 'undefined') {

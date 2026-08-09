@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
 
     // Build where clause for filtering
-    const whereClause: any = {}
+    // Root admin is always hidden from the user list
+    const whereClause: any = { isRoot: { not: true } }
 
     // Add search functionality for name, email, or uoid
     // Note: SQLite doesn't support mode: 'insensitive' in the same way as PostgreSQL

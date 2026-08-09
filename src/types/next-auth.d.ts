@@ -11,6 +11,7 @@ declare module "next-auth" {
       avatar?: string | null
       phone?: string | null
       uoid?: string
+      isRoot?: boolean
     }
   }
 
@@ -22,6 +23,7 @@ declare module "next-auth" {
     avatar?: string | null
     phone?: string | null
     uoid?: string
+    isRoot?: boolean
   }
 }
 
@@ -33,5 +35,6 @@ declare module "next-auth/jwt" {
     avatar?: string | null
     phone?: string | null
     uoid?: string
+    isRoot?: boolean
   }
 }

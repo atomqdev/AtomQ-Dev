@@ -606,7 +606,6 @@ async function main() {
         negativePoints: 0,
         randomOrder: false,
         maxAttempts: null, // Unlimited
-        showAnswers: false,
         startDate: quizStartDate,
         endDate: quizEndDate,
         creatorId: creator.id,
