@@ -115,33 +115,11 @@ export async function POST(
         throw new Error("ALREADY_SUBMITTED")
       }
 
-      // Save answers using createMany for atomicity (all-or-nothing)
-      const answerEntries = Object.entries(answers) as [string, string][]
-
-      if (isAssessment) {
-        await tx.assessmentAnswer.createMany({
-          data: answerEntries.map(([questionId, userAnswer]) => ({
-            attemptId,
-            questionId,
-            userAnswer,
-          })),
-          skipDuplicates: true,
-        })
-      } else {
-        await (tx as any).quizAnswer.createMany({
-          data: answerEntries.map(([questionId, userAnswer]) => ({
-            attemptId,
-            questionId,
-            userAnswer,
-          })),
-          skipDuplicates: true,
-        })
-      }
-
-      // Calculate score
+      // Calculate score and save answers with isCorrect/pointsEarned
       let correctCount = 0
       let totalPointsEarned = 0
       let questions
+      const answerEntries = Object.entries(answers) as [string, string][]
 
       if (isAssessment) {
         questions = await tx.assessmentQuestion.findMany({
@@ -165,15 +143,41 @@ export async function POST(
           } else if (aq.question.type === QuestionType.FILL_IN_BLANK) {
             isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           } else {
-            isCorrect = userAnswer === aq.question.correctAnswer
+            // MULTIPLE_CHOICE, TRUE_FALSE: case-insensitive comparison
+            isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           }
 
+          // Calculate points earned per answer
+          let pointsEarned: number
           if (isCorrect) {
             correctCount++
-            totalPointsEarned += aq.points || 1
+            pointsEarned = aq.points || 1
+            totalPointsEarned += pointsEarned
           } else if (assessmentConfig?.negativeMarking && assessmentConfig?.negativePoints) {
+            pointsEarned = -assessmentConfig.negativePoints
             totalPointsEarned -= assessmentConfig.negativePoints
+          } else {
+            pointsEarned = 0
           }
+
+          // Save answer with isCorrect and pointsEarned
+          await tx.assessmentAnswer.upsert({
+            where: {
+              attemptId_questionId: { attemptId, questionId: aq.questionId }
+            },
+            update: {
+              userAnswer: userAnswer || '',
+              isCorrect,
+              pointsEarned,
+            },
+            create: {
+              attemptId,
+              questionId: aq.questionId,
+              userAnswer: userAnswer || '',
+              isCorrect,
+              pointsEarned,
+            },
+          })
         }
       } else {
         questions = await (tx as any).quizQuestion.findMany({
@@ -197,27 +201,55 @@ export async function POST(
           } else if (aq.question.type === QuestionType.FILL_IN_BLANK) {
             isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           } else {
-            isCorrect = userAnswer === aq.question.correctAnswer
+            // MULTIPLE_CHOICE, TRUE_FALSE: case-insensitive comparison
+            isCorrect = (userAnswer || '').trim().toLowerCase() === (aq.question.correctAnswer || '').trim().toLowerCase()
           }
 
+          // Calculate points earned per answer
+          let pointsEarned: number
           if (isCorrect) {
             correctCount++
-            totalPointsEarned += aq.points || 1
+            pointsEarned = aq.points || 1
+            totalPointsEarned += pointsEarned
           } else if (assessmentConfig?.negativeMarking && assessmentConfig?.negativePoints) {
+            pointsEarned = -assessmentConfig.negativePoints
             totalPointsEarned -= assessmentConfig.negativePoints
+          } else {
+            pointsEarned = 0
           }
+
+          // Save answer with isCorrect and pointsEarned
+          await (tx as any).quizAnswer.upsert({
+            where: {
+              attemptId_questionId: { attemptId, questionId: aq.questionId }
+            },
+            update: {
+              userAnswer: userAnswer || '',
+              isCorrect,
+              pointsEarned,
+            },
+            create: {
+              attemptId,
+              questionId: aq.questionId,
+              userAnswer: userAnswer || '',
+              isCorrect,
+              pointsEarned,
+            },
+          })
         }
       }
 
       const totalPoints = questions.reduce((sum: number, aq: any) => sum + (aq.points || 1), 0)
-      const score = totalPoints > 0 ? (totalPointsEarned / totalPoints) * 100 : 0
+      // Store score as raw points earned (not percentage) to be consistent with quiz submit
+      // Percentage is computed at display time as (score / totalPoints) * 100
+      const scorePercentage = totalPoints > 0 ? (totalPointsEarned / totalPoints) * 100 : 0
 
-      // Update attempt with score
+      // Update attempt with score (raw points, not percentage)
       if (isAssessment) {
         await tx.assessmentAttempt.update({
           where: { id: attemptId },
           data: {
-            score: Math.round(score),
+            score: totalPointsEarned,
             totalPoints,
             startedAt: assessmentAttempt?.startedAt || new Date(),
           },
@@ -226,7 +258,7 @@ export async function POST(
         await (tx as any).quizAttempt.update({
           where: { id: attemptId },
           data: {
-            score: Math.round(score),
+            score: totalPointsEarned,
             totalPoints,
             startedAt: quizAttempt?.startedAt || new Date(),
           },
@@ -234,7 +266,9 @@ export async function POST(
       }
 
       return {
-        score: Math.round(score),
+        score: totalPointsEarned,
+        totalPoints,
+        scorePercentage: Math.round(scorePercentage),
         correctCount,
         totalCount: questions.length,
         answerCount: answerEntries.length,
@@ -245,6 +279,8 @@ export async function POST(
       message: "Assessment submitted successfully",
       attemptId,
       score: result.score,
+      totalPoints: result.totalPoints,
+      scorePercentage: result.scorePercentage,
       correctCount: result.correctCount,
       totalCount: result.totalCount,
       answers: result.answerCount,

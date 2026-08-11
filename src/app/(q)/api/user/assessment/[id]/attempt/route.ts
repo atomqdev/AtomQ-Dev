@@ -7,6 +7,110 @@ import { UserRole, AttemptStatus, QuestionType } from "@prisma/client"
 // Time window for starting assessment (in minutes)
 const TIME_WINDOW_MINUTES = 15
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session || session.user.role !== UserRole.USER) {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const { id: assessmentId } = await params
+    const userId = session.user.id
+
+    // Check for submitted assessment attempt
+    let assessmentAttempt = await db.assessmentAttempt.findFirst({
+      where: {
+        assessmentId,
+        userId,
+        status: AttemptStatus.SUBMITTED,
+      },
+      orderBy: { submittedAt: 'desc' },
+    })
+
+    // If no assessment attempt, check for quiz attempt
+    let quizAttempt = null
+    let isAssessment = true
+
+    if (!assessmentAttempt) {
+      quizAttempt = await db.quizAttempt.findFirst({
+        where: {
+          quizId: assessmentId,
+          userId,
+          status: AttemptStatus.SUBMITTED,
+        },
+        orderBy: { submittedAt: 'desc' },
+      })
+
+      if (quizAttempt) {
+        isAssessment = false
+      }
+    }
+
+    const attempt = isAssessment ? assessmentAttempt : quizAttempt
+
+    if (!attempt) {
+      // Check for in-progress attempt
+      const inProgressAssessment = await db.assessmentAttempt.findFirst({
+        where: {
+          assessmentId,
+          userId,
+          status: AttemptStatus.IN_PROGRESS,
+        },
+      })
+
+      if (inProgressAssessment) {
+        return NextResponse.json({
+          attemptId: inProgressAssessment.id,
+          status: 'IN_PROGRESS',
+        })
+      }
+
+      const inProgressQuiz = await db.quizAttempt.findFirst({
+        where: {
+          quizId: assessmentId,
+          userId,
+          status: AttemptStatus.IN_PROGRESS,
+        },
+      })
+
+      if (inProgressQuiz) {
+        return NextResponse.json({
+          attemptId: inProgressQuiz.id,
+          status: 'IN_PROGRESS',
+        })
+      }
+
+      return NextResponse.json(
+        { message: "No attempt found" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      attemptId: attempt.id,
+      status: 'SUBMITTED',
+      score: attempt.score || 0,
+      totalPoints: attempt.totalPoints || 0,
+      timeTaken: attempt.timeTaken,
+      isAutoSubmitted: attempt.isAutoSubmitted,
+      submittedAt: attempt.submittedAt,
+    })
+  } catch (error) {
+    console.error("Error fetching attempt result:", error)
+    return NextResponse.json(
+      { message: "Failed to fetch attempt" },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

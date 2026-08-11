@@ -239,7 +239,7 @@ export default function LeaderboardPage() {
               </TableHeader>
               <TableBody>
                 {leaderboard.map((entry) => {
-                  const percentage = Math.round((entry.score / entry.totalPoints) * 100)
+                  const percentage = Math.round(Math.min((entry.score / entry.totalPoints) * 100, 100))
                   return (
                     <TableRow key={entry.id}>
                       <TableCell>
@@ -333,7 +333,7 @@ export default function LeaderboardPage() {
                   <span className="font-medium">{leaderboard[0].user.name || 'Anonymous'}</span>
                 </div>
                 <div className="text-2xl font-bold">
-                  {Math.round((leaderboard[0].score / leaderboard[0].totalPoints) * 100)}%
+                  {Math.round(Math.min((leaderboard[0].score / leaderboard[0].totalPoints) * 100, 100))}%
                 </div>
               </>
             )}

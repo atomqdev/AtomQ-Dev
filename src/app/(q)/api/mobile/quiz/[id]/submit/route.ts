@@ -93,11 +93,11 @@ export async function POST(
       let isCorrect = false
       let pointsEarned = 0
 
-      // Check answer based on question type
+      // Check answer based on question type (case-insensitive for TRUE_FALSE & MULTIPLE_CHOICE)
       if (questionType === QuestionType.TRUE_FALSE) {
-        isCorrect = userAnswer === correctAnswer
+        isCorrect = (userAnswer || '').trim().toLowerCase() === (correctAnswer || '').trim().toLowerCase()
       } else if (questionType === QuestionType.MULTIPLE_CHOICE) {
-        isCorrect = userAnswer === correctAnswer
+        isCorrect = (userAnswer || '').trim().toLowerCase() === (correctAnswer || '').trim().toLowerCase()
       } else if (questionType === QuestionType.MULTI_SELECT) {
         // For multi-select, check if arrays match
         const userArr = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer
@@ -145,8 +145,8 @@ export async function POST(
       })
     }
 
-    // Calculate final score as percentage
-    const finalScore = totalPoints > 0 ? (totalScore / totalPoints) * 100 : 0
+    // Store score as raw points earned (not percentage) for consistency
+    // Percentage is computed at display time as (score / totalPoints) * 100
 
     // Update attempt
     const timeTaken = attempt.startedAt
@@ -157,7 +157,7 @@ export async function POST(
       where: { id: attempt.id },
       data: {
         status: AttemptStatus.SUBMITTED,
-        score: finalScore,
+        score: totalScore,
         totalPoints: totalPoints,
         timeTaken,
         submittedAt: new Date()

@@ -1372,7 +1372,14 @@ export default function AssessmentTakingPage() {
                 <AlertDialogDescription>
                   Are you sure you want to submit your assessment? This action cannot be undone.
                   <br />
-                  <span className="font-semibold">Questions answered: {Object.keys(answers).length} / {questions.length}</span>
+                  <span className="font-semibold">Questions answered: {(() => {
+                    // Count all answered questions including multi-select with partial selections
+                    const answeredIds = new Set(Object.keys(answers))
+                    Object.entries(multiSelectAnswers).forEach(([qId, selected]) => {
+                      if (selected && selected.length > 0) answeredIds.add(qId)
+                    })
+                    return answeredIds.size
+                  })()} / {questions.length}</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="mt-4 space-y-2">

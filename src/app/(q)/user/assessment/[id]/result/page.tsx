@@ -11,8 +11,8 @@ import HexagonLoader from "@/components/Loader/Loading"
 
 interface AttemptResult {
   score: number
-  correctCount: number
-  totalCount: number
+  totalPoints: number
+  scorePercentage: number
 }
 
 export default function AssessmentResultPage() {
@@ -55,10 +55,13 @@ export default function AssessmentResultPage() {
           return
         }
 
+        const rawScore = data.score || 0
+        const totalPts = data.totalPoints || 0
+        const pct = totalPts > 0 ? Math.round((rawScore / totalPts) * 100) : 0
         setResult({
-          score: data.score || 0,
-          correctCount: 0,
-          totalCount: 0
+          score: rawScore,
+          totalPoints: totalPts,
+          scorePercentage: Math.min(pct, 100), // Cap at 100%
         })
         setAssessmentTitle('Assessment')
       } catch (error) {
@@ -140,18 +143,18 @@ export default function AssessmentResultPage() {
               <div className="text-center space-y-8">
                 {/* Score Icon */}
                 <div className="flex justify-center">
-                  <div className={`h-24 w-24 rounded-full flex items-center justify-center ${getScoreColor(result.score)}`}>
-                    {getScoreIcon(result.score)}
+                  <div className={`h-24 w-24 rounded-full flex items-center justify-center ${getScoreColor(result.scorePercentage)}`}>
+                    {getScoreIcon(result.scorePercentage)}
                   </div>
                 </div>
 
                 {/* Score Display */}
                 <div className="space-y-2">
                   <h2 className="text-3xl font-bold">
-                    {result.score}%
+                    {result.scorePercentage}%
                   </h2>
                   <p className="text-muted-foreground">
-                    Assessment Completed
+                    {result.totalPoints > 0 ? `${result.score}/${result.totalPoints} points` : 'Assessment Completed'}
                   </p>
                 </div>
 

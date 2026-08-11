@@ -61,7 +61,7 @@ export async function GET(
         : "0.0",
       avgScore: submittedAttempts.length > 0
         ? submittedAttempts.reduce((sum, a) => {
-            const pct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
+            const pct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
             return sum + pct;
           }, 0) / submittedAttempts.length
         : 0,
@@ -84,7 +84,7 @@ export async function GET(
 
     submittedAttempts.forEach(attempt => {
       const percentage = attempt.totalPoints && attempt.totalPoints > 0
-        ? ((attempt.score || 0) / attempt.totalPoints) * 100
+        ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
         : 0;
       const range = scoreRanges.find(r => percentage > r.min && percentage <= r.max);
       if (range) range.count++;
@@ -114,15 +114,15 @@ export async function GET(
     // Top performers
     const topPerformers = [...submittedAttempts]
       .sort((a, b) => {
-        const aPct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
-        const bPct = b.totalPoints && b.totalPoints > 0 ? ((b.score || 0) / b.totalPoints) * 100 : (b.score || 0);
+        const aPct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
+        const bPct = b.totalPoints && b.totalPoints > 0 ? Math.min(((b.score || 0) / b.totalPoints) * 100, 100) : (b.score || 0);
         return bPct - aPct;
       })
       .slice(0, 10)
       .map(attempt => ({
         ...attempt,
         score: attempt.totalPoints && attempt.totalPoints > 0
-          ? ((attempt.score || 0) / attempt.totalPoints) * 100
+          ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
           : (attempt.score || 0),
       }));
 
@@ -156,15 +156,15 @@ export async function GET(
     // All attempts (for leaderboard + all-users tabs) — sorted by score desc by default
     const allAttempts = [...submittedAttempts]
       .sort((a, b) => {
-        const aPct = a.totalPoints && a.totalPoints > 0 ? ((a.score || 0) / a.totalPoints) * 100 : (a.score || 0);
-        const bPct = b.totalPoints && b.totalPoints > 0 ? ((b.score || 0) / b.totalPoints) * 100 : (b.score || 0);
+        const aPct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
+        const bPct = b.totalPoints && b.totalPoints > 0 ? Math.min(((b.score || 0) / b.totalPoints) * 100, 100) : (b.score || 0);
         return bPct - aPct;
       })
       .map(attempt => ({
         id: attempt.id,
         status: attempt.status,
         score: attempt.totalPoints && attempt.totalPoints > 0
-          ? ((attempt.score || 0) / attempt.totalPoints) * 100
+          ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
           : (attempt.score || 0),
         rawScore: attempt.score || 0,
         totalPoints: attempt.totalPoints || 0,

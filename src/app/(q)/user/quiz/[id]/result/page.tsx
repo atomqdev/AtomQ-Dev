@@ -105,7 +105,7 @@ export default function QuizResultPage() {
 
   const getScorePercentage = () => {
     if (!result) return 0
-    return Math.round((result.score / result.totalPoints) * 100)
+    return Math.round(Math.min((result.score / result.totalPoints) * 100, 100))
   }
 
   const getScoreColor = (percentage: number) => {

@@ -120,7 +120,7 @@ export default function AssessmentSubmissionsPage() {
         submission.score?.toString() || "",
         submission.totalPoints?.toString() || "",
         submission.score && submission.totalPoints
-          ? `${((submission.score / submission.totalPoints) * 100).toFixed(1)}%`
+          ? `${Math.min((submission.score / submission.totalPoints) * 100, 100).toFixed(1)}%`
           : "",
         submission.timeTaken ? `${Math.round(submission.timeTaken / 60)}` : "",
         submission.startedAt ? new Date(submission.startedAt).toLocaleString('en-IN', { hour12: true }) : "",
@@ -164,7 +164,7 @@ export default function AssessmentSubmissionsPage() {
   const getScoreColor = (score?: number, totalPoints?: number) => {
     if (!score || !totalPoints) return "outline"
     
-    const percentage = (score / totalPoints) * 100
+    const percentage = Math.min((score / totalPoints) * 100, 100)
     if (percentage >= 80) return "default"
     if (percentage >= 60) return "secondary"
     return "destructive"
@@ -315,7 +315,7 @@ export default function AssessmentSubmissionsPage() {
                             {submission.score}/{submission.totalPoints}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            ({((submission.score / submission.totalPoints) * 100).toFixed(1)}%)
+                            ({Math.min((submission.score / submission.totalPoints) * 100, 100).toFixed(1)}%)
                           </span>
                         </div>
                       ) : (

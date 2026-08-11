@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       const score = attempt.score || 0
       const totalPoints = attempt.totalPoints || 0
 
-      const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0
+      const percentage = totalPoints > 0 ? Math.min((score / totalPoints) * 100, 100) : 0
       totalScorePercentage += percentage
 
       if (percentage > bestScore) {
