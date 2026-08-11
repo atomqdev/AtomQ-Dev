@@ -1385,7 +1385,6 @@ export default function AssessmentTakingPage() {
                   onChange={(e) => setSubmitConfirmation(e.target.value)}
                   placeholder="CONFIRM SUBMIT"
                   autoComplete="off"
-                  className="uppercase"
                 />
               </div>
               <AlertDialogFooter>
