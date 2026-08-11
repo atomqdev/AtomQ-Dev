@@ -1447,7 +1447,7 @@ export default function AssessmentGroupDetailPage({
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
               placeholder="CONFIRM DELETE"
-              autoComplete="off"
+              autoComplete="off" 
             />
           </div>
 

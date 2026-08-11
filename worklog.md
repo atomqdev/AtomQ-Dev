@@ -1,5 +1,5 @@
 # AtomQ-Dev Worklog
-
+  
 ---
 Task ID: 1
 Agent: main
@@ -439,7 +439,7 @@ Work Log:
     - Overview tab: all original sections visible (Score Distribution, Time Analysis, Question Performance, Top 10 Performers).
     - Leaderboard tab: 4 rows sorted by score (Rank 1: ashwini 40%, then descending), 3 filter dropdowns populated with real data (Batches: 2024-2028, Departments: IT, Sections: A), Export CSV button present and functional (verified by intercepting Blob creation + download attribute — filename: quiz-leaderboard-cmsklks710001ju04ljsw38mc.csv).
     - All Users tab: 4 rows sorted alphabetically by name, columns include Raw Score (2/5, 1/5), Status (SUBMITTED), Campus (SRI ESHWAR), 3 filters, Export CSV button.
-    - Filter test: selected batch filter "2024 - 2028" on Leaderboard — count updated correctly to "4 entries" (all attempts in same batch).
+    - Filter test: selected batch filter "2024-2028" on Leaderboard — count updated correctly to "4 entries" (all attempts in same batch).
   - Assessment analysis (/admin/analysis/assessment/cmskqg6mt0001l904yb2qaswa — demo with 1 attempt):
     - Header + Security Settings card (Access Key Active, Max Tabs 1, Start Time set) + 5 stats cards + all visible above tabs.
     - 3 tabs render correctly.

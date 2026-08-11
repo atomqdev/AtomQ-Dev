@@ -1479,6 +1479,7 @@ export default function UsersPage() {
                 onChange={(e) => setDeleteConfirmation(e.target.value)}
                 placeholder="CONFIRM DELETE"
                 autoComplete="off"
+                className="uppercase"
               />
             </div>
           )}

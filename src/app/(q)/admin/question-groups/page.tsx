@@ -770,7 +770,7 @@ export default function QuestionGroupsPage() {
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
               placeholder="CONFIRM DELETE"
-              autoComplete="off"
+              autoComplete="off" 
             />
           </div>
 

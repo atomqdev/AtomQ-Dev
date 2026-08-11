@@ -1,4 +1,4 @@
-import { Metadata } from "next"
+import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Atom Q",
@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Atom Q",
     description: "Knowledge testing portal powered by Atom Labs",
-    url: "https://atom-q.atomapps.space/",
+    url: "https://atom-q.dev/",
     siteName: "Atom Q",
   },
   twitter: {
@@ -15,16 +15,19 @@ export const metadata: Metadata = {
     title: "Atom Q",
     description: "Knowledge testing portal powered by Atom Labs",
   },
-}
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>{children}</body>
     </html>
-  )
+  );
 }

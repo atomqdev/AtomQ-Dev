@@ -1397,7 +1397,7 @@ export default function QuizzesPage() {
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
               placeholder="CONFIRM DELETE"
-              autoComplete="off"
+              autoComplete="off" 
             />
           </div>
 
