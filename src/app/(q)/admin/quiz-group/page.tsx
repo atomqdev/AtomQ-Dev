@@ -881,7 +881,6 @@ export default function QuizGroupsPage() {
               onChange={(e) => setDeleteConfirmation(e.target.value)}
               placeholder="CONFIRM DELETE"
               autoComplete="off"
-              className="uppercase"
             />
           </div>
 
