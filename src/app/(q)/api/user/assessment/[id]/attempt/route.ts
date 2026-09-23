@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole, AttemptStatus, QuestionType } from "@prisma/client"
+import { applyRandomQuestionOrder } from "@/lib/random-order"
 
 // Time window for starting assessment (in minutes)
 const TIME_WINDOW_MINUTES = 15
@@ -298,6 +299,12 @@ export async function POST(
         )
       }
 
+      // Apply random question order when enabled. Seeded by the attempt ID so
+      // the resumed attempt keeps the same order the user already saw.
+      const orderedQuestions = assessment.randomOrder
+        ? applyRandomQuestionOrder(validQuestions, existingAttempt.id)
+        : validQuestions
+
       // Calculate time remaining for existing attempt
       const timeLimit = (assessment.timeLimit || 0) * 60
       const timeElapsed = Math.floor((new Date().getTime() - new Date(existingAttempt.startedAt || existingAttempt.createdAt).getTime()) / 1000)
@@ -332,7 +339,7 @@ export async function POST(
       return NextResponse.json({
         attemptId: existingAttempt.id,
         assessment: assessmentData,
-        questions: validQuestions,
+        questions: orderedQuestions,
         timeRemaining,
         tabSwitches: tabSwitchCount,
         switchesRemaining,
@@ -433,13 +440,21 @@ export async function POST(
       : assessment.quizQuestions.map((aq, index) => formatQuizQuestion(aq, index, false))
 
     const validQuestions = questions.filter(q => q !== null)
-    
+
     if (validQuestions.length === 0) {
       return NextResponse.json(
         { message: "No valid questions found" },
         { status: 400 }
       )
     }
+
+    // Apply random question order when enabled. Seeded by the attempt ID so
+    // the order is stable across refreshes within this attempt, but differs
+    // between attempts. Answers are keyed by question ID and compared as
+    // option text server-side, so this is scoring-safe.
+    const orderedQuestions = assessment.randomOrder
+      ? applyRandomQuestionOrder(validQuestions, attempt.id)
+      : validQuestions
 
     // Calculate time remaining
     const timeLimit = (assessment.timeLimit || 0) * 60
@@ -461,7 +476,7 @@ export async function POST(
     const responseData = {
       attemptId: attempt.id,
       assessment: assessmentData,
-      questions: validQuestions,
+      questions: orderedQuestions,
       timeRemaining
     }
 

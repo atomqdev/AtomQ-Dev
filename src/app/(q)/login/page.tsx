@@ -32,10 +32,20 @@ function LoginPage() {
         if (response.ok) {
           const data = await response.json()
           setIsMaintenanceMode(data.maintenanceMode || false)
-          setAllowRegistration(data.allowRegistration !== undefined ? data.allowRegistration : true)
         }
       } catch (error) {
         console.error('Failed to fetch login settings:', error)
+      }
+
+      try {
+        // Registration toggle comes from the registration-settings API (same as the register page)
+        const response = await fetch('/api/public/registration-settings')
+        if (response.ok) {
+          const data = await response.json()
+          setAllowRegistration(data.allowRegistration ?? true)
+        }
+      } catch (error) {
+        console.error('Failed to fetch registration settings:', error)
       }
     }
 

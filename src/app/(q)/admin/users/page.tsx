@@ -1314,7 +1314,7 @@ export default function UsersPage() {
               <div className="grid gap-3">
                 <Label htmlFor="edit-campus">Campus</Label>
                 <Select value={formData.campus} onValueChange={(value) => {
-                  setFormData({ ...formData, campus: value, department: "" })
+                  setFormData({ ...formData, campus: value, department: "", batch: "" })
                 }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select campus" />

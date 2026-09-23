@@ -137,30 +137,6 @@ export default function QuestionGroupsPage() {
       ),
     },
     {
-      accessorKey: "_count.questions",
-      header: "Questions",
-      cell: ({ row }) => {
-        const group = row.original
-        return group._count?.questions || 0
-      },
-    },
-    {
-      accessorKey: "_count.reportedQuestions",
-      header: "Reported",
-      cell: ({ row }) => {
-        const group = row.original
-        const reportedCount = group._count?.reportedQuestions || 0
-        return (
-          <div className="flex items-center gap-2">
-            <span>{reportedCount}</span>
-            {reportedCount > 0 && (
-              <TriangleAlert className="h-4 w-4 text-yellow-600" />
-            )}
-          </div>
-        )
-      },
-    },
-    {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
@@ -209,11 +185,14 @@ export default function QuestionGroupsPage() {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/question-groups/${group.id}/questions`)}
               >
                 <Eye className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {group._count?.questions || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Manage Questions</TooltipContent>
@@ -232,11 +211,14 @@ export default function QuestionGroupsPage() {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/question-groups/${group.id}/reported-questions`)}
               >
                 <TriangleAlert className="h-4 w-4 text-yellow-600" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {group._count?.reportedQuestions || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Reported Questions</TooltipContent>

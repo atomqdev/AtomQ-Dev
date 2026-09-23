@@ -4,6 +4,10 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { UserRole } from "@prisma/client";
 
+// DELETE /api/admin/assessments/[id]/unenroll-users
+// Body (optional): { userIds: string[] }
+//   - When userIds is provided, removes only those user enrollments from the assessment (bulk unenroll)
+//   - When no body is provided, removes ALL user enrollments from the assessment (legacy behavior)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,14 +36,29 @@ export async function DELETE(
       );
     }
 
+    // Parse optional body for selective bulk unenrollment
+    let userIds: string[] | null = null;
+    try {
+      const body = await request.json();
+      if (body?.userIds && Array.isArray(body.userIds) && body.userIds.length > 0) {
+        userIds = body.userIds;
+      }
+    } catch {
+      // No body or invalid JSON -> fall back to removing all user enrollments
+    }
+
+    const where = userIds
+      ? { assessmentId: id, userId: { in: userIds } }
+      : { assessmentId: id };
+
     // Count assessment users before deletion
     const assessmentUsersCount = await db.assessmentUser.count({
-      where: { assessmentId: id }
+      where,
     });
 
     // Delete assessment users (this will remove user enrollments from the assessment)
     await db.assessmentUser.deleteMany({
-      where: { assessmentId: id }
+      where,
     });
 
     return NextResponse.json({

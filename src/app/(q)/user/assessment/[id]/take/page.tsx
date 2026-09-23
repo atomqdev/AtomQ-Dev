@@ -211,7 +211,7 @@ export default function AssessmentTakingPage() {
       setHasExistingAttempt(data.hasExistingAttempt)
 
       // Always require access key if assessment has one, even for continuing attempts
-      if (data.assessment.accessKey) {
+      if (data.requiresAccessKey) {
         setShowAccessKeyDialog(true)
         setLoading(false)
       } else if (data.hasExistingAttempt) {
@@ -601,7 +601,9 @@ export default function AssessmentTakingPage() {
 
   // Use a separate effect for timer expiry to avoid side effects in state updater
   useEffect(() => {
-    if (timeRemaining <= 0 && !timeExpiredRef.current && assessmentAttemptIdRef.current && !isSubmittingRef.current && !isAutoSubmittingRef.current) {
+    // Only auto-submit on expiry when the assessment actually has a time limit
+    // (with no timeLimit, timeRemaining stays 0 and must not trigger auto-submit)
+    if (assessmentRef.current?.timeLimit && timeRemaining <= 0 && !timeExpiredRef.current && assessmentAttemptIdRef.current && !isSubmittingRef.current && !isAutoSubmittingRef.current) {
       timeExpiredRef.current = true
       setIsAutoSubmitting(true)
       isAutoSubmittingRef.current = true
@@ -1010,9 +1012,25 @@ export default function AssessmentTakingPage() {
   }
 
   if (!assessment || questions.length === 0) {
+    // Loading finished without usable data - show an error state instead of an eternal loader
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <HexagonLoader size={80} />
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <div className="flex items-center gap-3 text-red-600">
+              <XCircle className="h-8 w-8" />
+              <CardTitle className="text-2xl">Unable to Load Assessment</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This assessment is not available. It may have been removed, or it has no questions assigned yet.
+            </p>
+            <Button onClick={() => router.push('/user/assessment')} className="w-full">
+              Back to Assessments
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -1119,6 +1137,10 @@ export default function AssessmentTakingPage() {
                         return 'Multiple Choice'
                       case QuestionType.MULTI_SELECT: {
                         const selectCount = getMultiSelectCount(currentQuestion.correctAnswer)
+                        // correctAnswer is never sent to the client, so a 0 count means unknown
+                        if (selectCount === 0) {
+                          return 'Select all that apply'
+                        }
                         return `Select ${selectCount} option${selectCount !== 1 ? 's' : ''}`
                       }
                       case QuestionType.TRUE_FALSE:

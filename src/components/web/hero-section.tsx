@@ -61,12 +61,12 @@ export function HeroSection() {
         </h2>
 
         <p className="mt-12 max-w-md font-mono text-sm text-muted-foreground leading-relaxed">
-          Streamline your certification training programs. Comprehensive assessments for AWS, GCP, Azure, Oracle Cloud, and Power BI certifications. Scale your workforce upskilling with enterprise-grade analytics.
+          Streamline your certification training programs. Comprehensive assessments for AWS, GCP, Azure, Oracle Cloud, Snowflake, MongoDB, and Power BI certifications. Scale your workforce upskilling with enterprise-grade analytics.
         </p>
 
         <div className="mt-16 flex items-center gap-8">
           <Link
-            href="/login"
+            href="/register"
             className="group inline-flex items-center gap-3 border border-foreground/20 px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
           >
             <ScrambleTextOnHover text="Get Started" as="span" duration={0.6} />

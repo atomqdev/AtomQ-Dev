@@ -33,6 +33,16 @@ const signals = [
     title: "Oracle Cloud",
  note: "OCI Foundations and Associate level certification assessments.",
   },
+  {
+    date: "2024.12.28",
+    title: "Snowflake SnowPro",
+    note: "SnowPro Core and Advanced certification practice exams for data warehouse professionals.",
+  },
+  {
+    date: "2024.12.22",
+    title: "MongoDB Associate",
+    note: "Developer and DBA certification assessments for document database workloads.",
+  },
 ]
 
 export function SignalsSection() {

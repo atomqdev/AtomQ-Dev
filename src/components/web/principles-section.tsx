@@ -46,7 +46,7 @@ export function PrinciplesSection() {
         { text: "MULTI ", highlight: false },
         { text: "PLATFORM", highlight: true },
       ],
-      description: "One platform for all your cloud certification training needs. AWS, Azure, GCP, Oracle, and Power BI.",
+      description: "One platform for all your cloud certification training needs. AWS, Azure, GCP, Oracle, Snowflake, MongoDB, and Power BI.",
       align: "right",
     },
   ]

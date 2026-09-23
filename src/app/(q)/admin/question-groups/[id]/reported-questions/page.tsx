@@ -80,7 +80,8 @@ export default function ReportedQuestionsPage() {
 
   const columns: ColumnDef<ReportedQuestion>[] = [
     {
-      accessorKey: "questionTitle",
+      id: "questionTitle",
+      accessorFn: (row) => row.question?.title ?? "",
       header: ({ column }) => {
         return (
           <Button
@@ -103,7 +104,8 @@ export default function ReportedQuestionsPage() {
       },
     },
     {
-      accessorKey: "questionType",
+      id: "questionType",
+      accessorFn: (row) => row.question?.type ?? "",
       header: "Type",
       cell: ({ row }) => {
         const type = row.original.question.type
@@ -117,7 +119,8 @@ export default function ReportedQuestionsPage() {
       },
     },
     {
-      accessorKey: "questionDifficulty",
+      id: "questionDifficulty",
+      accessorFn: (row) => row.question?.difficulty ?? "",
       header: "Difficulty",
       cell: ({ row }) => {
         const difficulty = row.original.question.difficulty
@@ -134,7 +137,8 @@ export default function ReportedQuestionsPage() {
       },
     },
     {
-      accessorKey: "userName",
+      id: "userName",
+      accessorFn: (row) => row.user?.name ?? "",
       header: "Reported By",
       cell: ({ row }) => {
         const report = row.original

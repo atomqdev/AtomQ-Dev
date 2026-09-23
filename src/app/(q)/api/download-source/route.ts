@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
           entry.name === "dist" ||
           entry.name === "build" ||
           entry.name === ".env.local" ||
+          entry.name === ".env" ||
           entry.name.startsWith(".env.") ||
           entry.name.endsWith(".log") ||
           entry.name.endsWith(".lock") ||

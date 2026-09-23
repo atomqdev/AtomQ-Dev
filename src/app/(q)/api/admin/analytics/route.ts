@@ -132,6 +132,32 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Per-campus breakdowns: department user distribution + activity counts
+    // (attempts tied to campus-owned quizzes/assessments)
+    const campusIds = campuses.map((c) => c.id);
+    const [allDepartments, campusQuizzes, campusAssessments] = await Promise.all([
+      db.department.findMany({
+        select: {
+          id: true,
+          name: true,
+          campusId: true,
+          _count: { select: { users: { where: { role: UserRole.USER } } } },
+        },
+        orderBy: { name: "asc" },
+      }),
+      db.quiz.findMany({
+        where: { campusId: { in: campusIds } },
+        select: { campusId: true, _count: { select: { quizAttempts: true } } },
+      }),
+      db.assessment.findMany({
+        where: { campusId: { in: campusIds } },
+        select: {
+          campusId: true,
+          _count: { select: { assessmentAttempts: true } },
+        },
+      }),
+    ]);
+
     return NextResponse.json({
       overview: {
         totalUsers,
@@ -143,15 +169,26 @@ export async function GET(request: NextRequest) {
         avgQuizScore: avgQuizScore._avg.score?.toFixed(2) || 0,
         avgAssessmentScore: avgAssessmentScore._avg.score?.toFixed(2) || 0,
       },
-      campuses: campuses.map(campus => ({
-        ...campus,
-        _count: {
-          ...campus._count,
-          // Calculate attempts for this campus
-          quizAttempts: 0,
-          assessmentAttempts: 0,
-        },
-      })),
+      campuses: campuses.map((campus) => {
+        const departments = allDepartments
+          .filter((d) => d.campusId === campus.id)
+          .map((d) => ({ id: d.id, name: d.name, users: d._count.users }));
+        const quizAttempts = campusQuizzes
+          .filter((q) => q.campusId === campus.id)
+          .reduce((sum, q) => sum + q._count.quizAttempts, 0);
+        const assessmentAttempts = campusAssessments
+          .filter((a) => a.campusId === campus.id)
+          .reduce((sum, a) => sum + a._count.assessmentAttempts, 0);
+
+        return {
+          id: campus.id,
+          name: campus.name,
+          shortName: campus.shortName,
+          _count: campus._count,
+          departments,
+          activities: { quizAttempts, assessmentAttempts },
+        };
+      }),
       recentActivity: {
         quizAttempts: recentQuizAttempts,
         assessmentAttempts: recentAssessmentAttempts,

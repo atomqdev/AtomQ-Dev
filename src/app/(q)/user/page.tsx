@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import {
   BookOpen,
   Trophy,
@@ -23,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQuizCacheStore } from "@/stores/quiz-cache"
 import HexagonLoader from "@/components/Loader/Loading"
 import { formatDateDDMMYYYY } from "@/lib/date-utils"
+import { ActivityHeatmap } from "@/components/user/activity-heatmap"
 
 interface UserStats {
   totalQuizzes: number
@@ -40,6 +40,11 @@ interface RecentActivity {
   submittedAt: string
 }
 
+interface ActivityCalendarData {
+  total: number
+  days: Array<{ date: string; count: number }>
+}
+
 export default function UserDashboard() {
   const { data: session } = useSession()
   const {
@@ -53,6 +58,8 @@ export default function UserDashboard() {
 
   const [loading, setLoading] = useState(false)
   const [campusName, setCampusName] = useState<string>("")
+  const [activityCalendar, setActivityCalendar] = useState<ActivityCalendarData | null>(null)
+  const [calendarLoading, setCalendarLoading] = useState(true)
 
   // Fetch campus name
   useEffect(() => {
@@ -120,6 +127,25 @@ export default function UserDashboard() {
     fetchData()
   }, [])
 
+  useEffect(() => {
+    const fetchActivityCalendar = async () => {
+      try {
+        const tz = new Date().getTimezoneOffset()
+        const response = await fetch(`/api/user/activity-calendar?tz=${tz}`)
+        if (response.ok) {
+          const data = await response.json()
+          setActivityCalendar(data)
+        }
+      } catch (error) {
+        console.error("Error fetching activity calendar:", error)
+      } finally {
+        setCalendarLoading(false)
+      }
+    }
+
+    fetchActivityCalendar()
+  }, [])
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
@@ -133,45 +159,6 @@ export default function UserDashboard() {
       return `${secs}s`
     }
   }
-
-  // Generate weekly progress data from recent activity
-  const getWeeklyProgressData = () => {
-    if (!recentActivity || recentActivity.length === 0) {
-      return []
-    }
-
-    const last7Days: Array<{day: string, date: string, score: number, count: number}> = []
-    const today = new Date()
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - i)
-      last7Days.push({
-        day: date.toLocaleDateString('en', { weekday: 'short' }),
-        date: date.toDateString(),
-        score: 0,
-        count: 0
-      })
-    }
-
-    // Calculate average score for each day
-    recentActivity.forEach(activity => {
-      const activityDate = new Date(activity.submittedAt).toDateString()
-      const dayData = last7Days.find(day => day.date === activityDate)
-      if (dayData) {
-        const score = activity.score // Score is already a percentage (0-100)
-        dayData.score = (dayData.score * dayData.count + score) / (dayData.count + 1)
-        dayData.count += 1
-      }
-    })
-
-    return last7Days.map(day => ({
-      day: day.day,
-      score: Math.round(day.score)
-    }))
-  }
-
-  const weeklyProgressData = getWeeklyProgressData()
 
   if (loading && !userStats) {
     return <div className="flex items-center justify-center h-[80vh] "><HexagonLoader size={80} /></div>
@@ -289,40 +276,42 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Progress Overview */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Progress</CardTitle>
+      {/* Activity Map (GitHub-style contributions) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Map</CardTitle>
+          {calendarLoading ? (
+            <CardDescription>Loading activity…</CardDescription>
+          ) : (
             <CardDescription>
-              Your performance over the past week
+              <span className="font-semibold text-foreground">{activityCalendar?.total ?? 0}</span>{" "}
+              submission{(activityCalendar?.total ?? 0) === 1 ? "" : "s"} in the last year
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {weeklyProgressData.length > 0 ? (
-              <div className="space-y-4">
-                {weeklyProgressData.map((day, index) => (
-                  <div key={day.day} className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{day.day}</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={day.score} className="w-20" />
-                      <span className="text-sm text-muted-foreground">{day.score}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-                <h4 className="font-medium mb-2">No progress data</h4>
-                <p className="text-sm text-muted-foreground">
-                  Complete some quizzes to see your weekly progress
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </CardHeader>
+        <CardContent>
+          {calendarLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-[96px] w-full" />
+              <Skeleton className="ml-auto h-3 w-32" />
+            </div>
+          ) : activityCalendar && activityCalendar.total > 0 ? (
+            <ActivityHeatmap days={activityCalendar.days} />
+          ) : (
+            <div className="text-center py-8">
+              <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+              <h4 className="font-medium mb-2">No activity yet</h4>
+              <p className="text-sm text-muted-foreground">
+                Complete some quizzes or assessments to see your activity map
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
+      {/* Recent quizzes and activity */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recent Quizzes</CardTitle>
@@ -380,59 +369,59 @@ export default function UserDashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            Your latest quiz attempts and results
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentActivity && recentActivity.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{activity.quizTitle}</h3>
-                      <Badge variant={
-                        activity.score >= 80 ? "default" :
-                        activity.score >= 60 ? "secondary" : "destructive"
-                      }>
-                        {activity.score}%
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Target className="h-4 w-4" />
-                        {activity.score}%
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>
+              Your latest quiz attempts and results
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentActivity && recentActivity.length > 0 ? (
+              <div className="max-h-96 space-y-4 overflow-y-auto pr-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar]:w-1.5">
+                {recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{activity.quizTitle}</h3>
+                        <Badge variant={
+                          activity.score >= 80 ? "default" :
+                          activity.score >= 60 ? "secondary" : "destructive"
+                        }>
+                          {activity.score}%
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {formatDateDDMMYYYY(activity.submittedAt)}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Target className="h-4 w-4" />
+                          {activity.score}%
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {formatDateDDMMYYYY(activity.submittedAt)}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No activity yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Start taking quizzes to see your activity here
-              </p>
-              <Button onClick={() => window.location.href = "/user/quiz"}>
-                Browse Quizzes
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No activity yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start taking quizzes to see your activity here
+                </p>
+                <Button onClick={() => window.location.href = "/user/quiz"}>
+                  Browse Quizzes
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

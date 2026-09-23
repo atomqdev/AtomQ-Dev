@@ -44,6 +44,18 @@ const experiments = [
     description: "Multi-tenant management for training companies, educational institutions, and enterprise L&D teams.",
     span: "col-span-1 row-span-1",
   },
+  {
+    title: "Snowflake SnowPro",
+    medium: "Data Warehousing",
+    description: "SnowPro Core and Advanced certification assessments covering data warehousing, SnowSQL, and performance optimization.",
+    span: "col-span-2 row-span-1",
+  },
+  {
+    title: "MongoDB Certifications",
+    medium: "NoSQL Database",
+    description: "Associate Developer and Associate DBA practice exams covering data modeling, aggregation, and cluster administration.",
+    span: "col-span-2 row-span-1",
+  },
 ]
 
 export function WorkSection() {

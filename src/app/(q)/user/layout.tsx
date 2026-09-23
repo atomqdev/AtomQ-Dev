@@ -57,7 +57,7 @@ export default function UserLayout({
     <SidebarProvider>
       <div className="flex h-screen w-full">
         {!isTakingAssessmentOrQuiz && <AppSidebar open={open} onOpenChange={setOpen} />}
-        <SidebarInset className="flex-1">
+        <SidebarInset className="min-w-0 flex-1">
           <main className="flex-1 overflow-y-auto p-6">
             {children}
           </main>

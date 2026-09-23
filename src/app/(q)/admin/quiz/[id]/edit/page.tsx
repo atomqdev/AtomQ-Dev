@@ -44,8 +44,8 @@ interface Quiz {
   randomOrder: boolean
   maxAttempts?: number
   checkAnswerEnabled: boolean
-  startTime?: string
-  endTime?: string
+  startDate?: string
+  endDate?: string
 }
 
 export default function EditQuizPage() {
@@ -332,17 +332,17 @@ export default function EditQuizPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <DateTimePicker
-                  id="startTime"
-                  value={quiz.startTime || ""}
-                  onChange={(value) => updateQuiz("startTime", value || null)}
+                  id="startDate"
+                  value={quiz.startDate || ""}
+                  onChange={(value) => updateQuiz("startDate", value || null)}
                   label="Start Time"
                 />
               </div>
               <div className="space-y-2">
                 <DateTimePicker
-                  id="endTime"
-                  value={quiz.endTime || ""}
-                  onChange={(value) => updateQuiz("endTime", value || null)}
+                  id="endDate"
+                  value={quiz.endDate || ""}
+                  onChange={(value) => updateQuiz("endDate", value || null)}
                   label="End Time"
                 />
               </div>

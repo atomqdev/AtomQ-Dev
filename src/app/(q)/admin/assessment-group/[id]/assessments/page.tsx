@@ -567,22 +567,6 @@ export default function AssessmentGroupDetailPage({
       },
     },
     {
-      accessorKey: "_count.assessmentQuestions",
-      header: "Questions",
-      cell: ({ row }) => {
-        const assessment = row.original
-        return assessment._count?.assessmentQuestions || 0
-      },
-    },
-    {
-      accessorKey: "_count.assessmentUsers",
-      header: "Enrolled",
-      cell: ({ row }) => {
-        const assessment = row.original
-        return assessment._count?.assessmentUsers || 0
-      },
-    },
-    {
       id: "manageQuestions",
       header: "Questions",
       enableHiding: false,
@@ -593,11 +577,14 @@ export default function AssessmentGroupDetailPage({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/assessments/${assessment.id}/questions`)}
               >
                 <FileQuestion className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {assessment._count?.assessmentQuestions || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Manage Questions</TooltipContent>
@@ -616,11 +603,14 @@ export default function AssessmentGroupDetailPage({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/assessments/${assessment.id}/enrollments`)}
               >
                 <Users className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {assessment._count?.assessmentUsers || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Manage Users</TooltipContent>

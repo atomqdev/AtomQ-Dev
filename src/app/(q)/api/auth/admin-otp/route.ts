@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { createOtp, getResendCooldown, hasValidOtp } from '@/lib/otp-store'
 import { sendOtpEmail } from '@/lib/email'
+import { checkRateLimit, clearLoginAttempts } from '@/lib/rate-limit'
 
 /**
  * POST /api/auth/admin-otp
@@ -22,6 +23,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
+      )
+    }
+
+    // Check rate limiting (same lockout scheme as the login flow in src/lib/auth.ts)
+    const rateLimitResult = checkRateLimit(email)
+    if (!rateLimitResult.allowed) {
+      if (rateLimitResult.lockedUntil) {
+        const lockTimeRemaining = Math.ceil((rateLimitResult.lockedUntil - Date.now()) / 60000)
+        return NextResponse.json(
+          { error: `Too many login attempts. Account locked for ${lockTimeRemaining} minutes.` },
+          { status: 429 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429 }
       )
     }
 
@@ -66,6 +83,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Credentials verified - clear failed login attempts (mirrors successful login in auth.ts)
+    clearLoginAttempts(email)
 
     // Check resend cooldown
     const cooldown = getResendCooldown(email)

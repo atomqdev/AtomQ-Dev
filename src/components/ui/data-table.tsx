@@ -138,9 +138,20 @@ export function DataTable<TData, TValue>({
                 <Select
                   value={displayValue}
                   onValueChange={(value) => {
-                    // Convert back to original type for boolean filters
+                    // "all" (from the built-in "All {label}" item or page-provided options) clears the filter
+                    if (value === "all") {
+                      table.getColumn(filter.key)?.setFilterValue(undefined)
+                      return
+                    }
                     const originalOption = filter.options.find(opt => String(opt.value) === value)
-                    table.getColumn(filter.key)?.setFilterValue(originalOption ? originalOption.value : "")
+                    let filterValue: any = originalOption ? originalOption.value : ""
+                    // Convert boolean-ish strings to real booleans when the column holds booleans
+                    // (TanStack's auto filterFn uses strict equals for boolean columns)
+                    const firstRowValue = table.getCoreRowModel().rows[0]?.getValue(filter.key)
+                    if (typeof firstRowValue === "boolean" && (filterValue === "true" || filterValue === "false")) {
+                      filterValue = filterValue === "true"
+                    }
+                    table.getColumn(filter.key)?.setFilterValue(filterValue)
                   }}
                 >
                   <SelectTrigger className="w-[140px]">
@@ -148,14 +159,16 @@ export function DataTable<TData, TValue>({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All {filter.label}</SelectItem>
-                    {filter.options.map((option) => (
-                      <SelectItem
-                        key={String(option.value)}
-                        value={String(option.value)}
-                      >
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    {filter.options
+                      .filter((option) => String(option.value) !== "all")
+                      .map((option) => (
+                        <SelectItem
+                          key={String(option.value)}
+                          value={String(option.value)}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {currentValue && (
@@ -239,7 +252,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={table.getVisibleLeafColumns().length}
                   className="h-24 text-center"
                 >
                   No results.

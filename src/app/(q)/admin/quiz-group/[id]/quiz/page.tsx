@@ -536,22 +536,6 @@ export default function QuizGroupDetailPage({
       },
     },
     {
-      accessorKey: "_count.quizQuestions",
-      header: "Questions",
-      cell: ({ row }) => {
-        const quiz = row.original
-        return quiz._count?.quizQuestions || 0
-      },
-    },
-    {
-      accessorKey: "_count.quizUsers",
-      header: "Users",
-      cell: ({ row }) => {
-        const quiz = row.original
-        return quiz._count?.quizUsers || 0
-      },
-    },
-    {
       accessorKey: "maxAttempts",
       header: "Attempts",
       cell: ({ row }) => {
@@ -591,11 +575,14 @@ export default function QuizGroupDetailPage({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/quiz/${quiz.id}/questions`)}
               >
                 <FileQuestion className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {quiz._count?.quizQuestions || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Manage Questions</TooltipContent>
@@ -614,11 +601,14 @@ export default function QuizGroupDetailPage({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/quiz/${quiz.id}/users`)}
               >
                 <Users className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {quiz._count?.quizUsers || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Manage Users</TooltipContent>

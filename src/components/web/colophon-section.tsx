@@ -126,67 +126,26 @@ export function ColophonSection() {
           </ul>
         </div>
 
-        {/* Resources */}
+        {/* Snowflake */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Resources</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Snowflake</h4>
           <ul className="space-y-2">
-            <li>
-              <a
-                href="/MOBILE_API.md"
-                target="_blank"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                API Documentation
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                Integration Guide
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                Case Studies
-              </a>
-            </li>
+            <li className="font-mono text-xs text-foreground/80">SnowPro Core</li>
+            <li className="font-mono text-xs text-foreground/80">Advanced: Architect</li>
+            <li className="font-mono text-xs text-foreground/80">Advanced: Data Engineer</li>
+            <li className="font-mono text-xs text-foreground/80">Advanced: Administrator</li>
+            <li className="font-mono text-xs text-foreground/80">Advanced: Data Scientist</li>
           </ul>
         </div>
 
-        {/* Contact */}
+        {/* MongoDB */}
         <div className="col-span-1">
-          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Enterprise Sales</h4>
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">MongoDB</h4>
           <ul className="space-y-2">
-            <li>
-              <a
-                href="mailto:enterprise@atomq.com"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                Contact Sales
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                Request Demo
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://atomlabs.in"
-                target="_blank"
-                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
-              >
-                GitHub
-              </a>
-            </li>
+            <li className="font-mono text-xs text-foreground/80">Associate Developer</li>
+            <li className="font-mono text-xs text-foreground/80">Associate DBA</li>
+            <li className="font-mono text-xs text-foreground/80">Application Developer</li>
+            <li className="font-mono text-xs text-foreground/80">Database Administrator</li>
           </ul>
         </div>
       </div>

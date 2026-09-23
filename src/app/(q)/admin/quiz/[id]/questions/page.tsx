@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -120,16 +120,31 @@ interface QuestionGroup {
   }
 }
 
+// Options are stored as a JSON string in the DB; parse defensively for display
+function parseOptions(options: unknown): string[] {
+  if (Array.isArray(options)) return options
+  try {
+    const parsed = JSON.parse(options as string)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 function SortableQuestion({
   question,
   onEdit,
   onDelete,
-  onView
+  onView,
+  isSelected,
+  onToggleSelect
 }: {
   question: Question
   onEdit: (question: Question) => void
   onDelete: (questionId: string) => void
   onView: (question: Question) => void
+  isSelected: boolean
+  onToggleSelect: (questionId: string) => void
 }) {
   const {
     attributes,
@@ -147,7 +162,16 @@ function SortableQuestion({
   }
 
   return (
-    <TableRow ref={setNodeRef} style={style} {...attributes}>
+    <TableRow ref={setNodeRef} style={style} {...attributes} className={isSelected ? "bg-primary/5" : ""}>
+      <TableCell className="w-[40px]">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelect(question.id)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select question ${question.reference}`}
+          className="h-4 w-4"
+        />
+      </TableCell>
       <TableCell>
         <div {...listeners} className="cursor-grab">
           <GripVertical className="h-4 w-4" />
@@ -247,6 +271,8 @@ export default function QuizQuestionsPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [quizTitle, setQuizTitle] = useState("")
   const [selectedQuestionsToAdd, setSelectedQuestionsToAdd] = useState<string[]>([])
+  const [selectedQuestionsToRemove, setSelectedQuestionsToRemove] = useState<string[]>([])
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false)
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -361,6 +387,7 @@ export default function QuizQuestionsPage() {
 
       if (response.ok) {
         setQuestions(questions.filter(q => q.id !== questionId))
+        setSelectedQuestionsToRemove(prev => prev.filter(id => id !== questionId))
         toast.success("Question removed from quiz")
         setDeleteQuestionId(null)
       } else {
@@ -368,6 +395,34 @@ export default function QuizQuestionsPage() {
       }
     } catch (error) {
       toast.error("Failed to remove question")
+    }
+  }
+
+  const handleBulkRemoveQuestions = async () => {
+    if (selectedQuestionsToRemove.length === 0) return
+    setIsBulkRemoving(true)
+    try {
+      const response = await fetch(`/api/admin/quiz/${quizId}/unenroll-questions`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ questionIds: selectedQuestionsToRemove }),
+      })
+
+      if (response.ok) {
+        const removedCount = selectedQuestionsToRemove.length
+        setQuestions(questions.filter(q => !selectedQuestionsToRemove.includes(q.id)))
+        setSelectedQuestionsToRemove([])
+        toast.success(`${removedCount} question${removedCount === 1 ? "" : "s"} removed from quiz`)
+        fetchAvailableQuestions()
+      } else {
+        toast.error("Failed to remove selected questions")
+      }
+    } catch (error) {
+      toast.error("Failed to remove selected questions")
+    } finally {
+      setIsBulkRemoving(false)
     }
   }
 
@@ -493,6 +548,36 @@ export default function QuizQuestionsPage() {
     setSelectedQuestionsToAdd([])
   }
 
+  const toggleQuestionToAdd = (questionId: string) => {
+    setSelectedQuestionsToAdd((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    )
+  }
+
+  const toggleQuestionToRemove = (questionId: string) => {
+    setSelectedQuestionsToRemove((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    )
+  }
+
+  // Prune removal selection when the visible (filtered) question list changes
+  // This ensures selected items are only those currently visible in the table
+  useEffect(() => {
+    if (selectedQuestionsToRemove.length > 0) {
+      const visibleQuestionIds = filteredQuestions.map(q => q.id)
+      const prunedSelection = selectedQuestionsToRemove.filter(id =>
+        visibleQuestionIds.includes(id)
+      )
+      if (prunedSelection.length !== selectedQuestionsToRemove.length) {
+        setSelectedQuestionsToRemove(prunedSelection)
+      }
+    }
+  }, [searchTerm, difficultyFilter, groupFilter])
+
   // Effect to update selection when filters change
   // This ensures selected items are only those visible in current filter
   useEffect(() => {
@@ -513,6 +598,26 @@ export default function QuizQuestionsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{quizTitle || "Manage Questions"}</h1>
+          <p className="text-sm text-muted-foreground">{filteredQuestions.length} questions</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Enroll Questions
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <div className="relative">
@@ -550,36 +655,38 @@ export default function QuizQuestionsPage() {
           </Select>
         </div>
         <div className="flex items-center space-x-2">
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Enroll Questions
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.back()}
-          >
-            <ChevronLeft className="h-4 w-4" />
+          {selectedQuestionsToRemove.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isBulkRemoving}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {isBulkRemoving ? "Removing..." : `Remove Selected (${selectedQuestionsToRemove.length})`}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove Selected Questions</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to remove {selectedQuestionsToRemove.length} selected question{selectedQuestionsToRemove.length === 1 ? "" : "s"} from the quiz? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleBulkRemoveQuestions}>
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportQuestions}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Download
           </Button>
         </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Quiz Questions ({filteredQuestions.length})</CardTitle>
-              <CardDescription>
-                Questions currently assigned to this quiz. Drag to reorder.
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={handleExportQuestions}>
-                <FileDown className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
         <CardContent>
           <DndContext
             sensors={sensors}
@@ -589,6 +696,26 @@ export default function QuizQuestionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={
+                        filteredQuestions.length > 0 && selectedQuestionsToRemove.length === filteredQuestions.length
+                          ? true
+                          : selectedQuestionsToRemove.length > 0
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked === true) {
+                          setSelectedQuestionsToRemove(filteredQuestions.map(q => q.id))
+                        } else {
+                          setSelectedQuestionsToRemove([])
+                        }
+                      }}
+                      aria-label="Select all questions"
+                      className="h-4 w-4"
+                    />
+                  </TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                   <TableHead className="w-[80px]">Order</TableHead>
                   <TableHead>Question</TableHead>
@@ -607,6 +734,8 @@ export default function QuizQuestionsPage() {
                     <SortableQuestion
                       key={question.id}
                       question={question}
+                      isSelected={selectedQuestionsToRemove.includes(question.id)}
+                      onToggleSelect={toggleQuestionToRemove}
                       onEdit={(question) => {
                         setSelectedQuestion(question)
                         setIsViewDialogOpen(true)
@@ -619,6 +748,13 @@ export default function QuizQuestionsPage() {
                     />
                   ))}
                 </SortableContext>
+                {filteredQuestions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                      No questions enrolled yet
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </DndContext>
@@ -627,7 +763,7 @@ export default function QuizQuestionsPage() {
 
       {/* Enroll Questions Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] min-w-[70vw] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="h-[100dvh] max-w-none! sm:max-w-none! grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto] overflow-hidden">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -638,7 +774,7 @@ export default function QuizQuestionsPage() {
               </div>
         </div>
           </DialogHeader>
-          <div className="grid flex-1 auto-rows-min gap-6 px-4">
+          <div className="flex min-h-0 flex-col gap-6 px-4">
             {/* Search and Filter Controls */}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row gap-3">
@@ -735,25 +871,26 @@ export default function QuizQuestionsPage() {
               </div>
             </div>
             
-            <div className="grid gap-3">
-              <div className="max-h-96 overflow-y-auto border rounded-md">
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
                 {popupFilteredQuestions.length > 0 ? (
                   popupFilteredQuestions.map((question) => (
-                    <div key={question.id} className="flex items-center gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0">
-                      <input
-                        type="checkbox"
-                        id={`question-${question.id}`}
+                    <div
+                      key={question.id}
+                      onClick={() => toggleQuestionToAdd(question.id)}
+                      className={`flex items-center gap-3 p-3 cursor-pointer border-b last:border-b-0 transition-colors ${
+                        selectedQuestionsToAdd.includes(question.id)
+                          ? "bg-primary/10"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <Checkbox
                         checked={selectedQuestionsToAdd.includes(question.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedQuestionsToAdd([...selectedQuestionsToAdd, question.id])
-                          } else {
-                            setSelectedQuestionsToAdd(selectedQuestionsToAdd.filter(id => id !== question.id))
-                          }
-                        }}
+                        onCheckedChange={() => toggleQuestionToAdd(question.id)}
+                        onClick={(e) => e.stopPropagation()}
                         className="h-4 w-4"
                       />
-                      <label htmlFor={`question-${question.id}`} className="flex-1 cursor-pointer">
+                      <div className="flex-1">
                         <div className="font-medium">{question.reference}</div>
                         {/* <div className="text-sm text-muted-foreground">{question.title}</div> */}
                         <div className="flex gap-2 mt-1">
@@ -780,7 +917,7 @@ export default function QuizQuestionsPage() {
                             </Badge>
                           )}
                         </div>
-                      </label>
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -852,35 +989,29 @@ export default function QuizQuestionsPage() {
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Options</Label>
                   <div className="space-y-1">
-                    {Array.isArray(selectedQuestion.options) ? (
-                      selectedQuestion.options.map((option, index) => (
-                        <div key={index} className="text-sm p-2 bg-muted rounded flex items-center gap-2">
-                          {selectedQuestion.type === QuestionType.MULTI_SELECT && (
-                            <Checkbox
-                              checked={parseMultiSelectAnswers(selectedQuestion.correctAnswer).includes(option)}
-                              disabled
-                            />
-                          )}
-                          {selectedQuestion.type === QuestionType.TRUE_FALSE && (
-                            <Checkbox
-                              checked={selectedQuestion.correctAnswer === option}
-                              disabled
-                            />
-                          )}
-                          {selectedQuestion.type === QuestionType.MULTIPLE_CHOICE && (
-                            <Checkbox
-                              checked={selectedQuestion.correctAnswer === option}
-                              disabled
-                            />
-                          )}
-                          {option}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm p-2 bg-muted rounded">
-                        {selectedQuestion.options}
+                    {parseOptions(selectedQuestion.options).map((option, index) => (
+                      <div key={index} className="text-sm p-2 bg-muted rounded flex items-center gap-2">
+                        {selectedQuestion.type === QuestionType.MULTI_SELECT && (
+                          <Checkbox
+                            checked={parseMultiSelectAnswers(selectedQuestion.correctAnswer).includes(option)}
+                            disabled
+                          />
+                        )}
+                        {selectedQuestion.type === QuestionType.TRUE_FALSE && (
+                          <Checkbox
+                            checked={selectedQuestion.correctAnswer === option}
+                            disabled
+                          />
+                        )}
+                        {selectedQuestion.type === QuestionType.MULTIPLE_CHOICE && (
+                          <Checkbox
+                            checked={selectedQuestion.correctAnswer === option}
+                            disabled
+                          />
+                        )}
+                        {option}
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
                 <div>

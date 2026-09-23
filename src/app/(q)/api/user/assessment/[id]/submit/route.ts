@@ -244,6 +244,12 @@ export async function POST(
       // Percentage is computed at display time as (score / totalPoints) * 100
       const scorePercentage = totalPoints > 0 ? (totalPointsEarned / totalPoints) * 100 : 0
 
+      // Compute time taken in seconds (same unit as the quiz submit route), guarded against null startedAt
+      const attemptStartedAt = (isAssessment ? assessmentAttempt?.startedAt : quizAttempt?.startedAt) || null
+      const timeTaken = attemptStartedAt
+        ? Math.max(0, Math.floor((Date.now() - new Date(attemptStartedAt).getTime()) / 1000))
+        : null
+
       // Update attempt with score (raw points, not percentage)
       if (isAssessment) {
         await tx.assessmentAttempt.update({
@@ -252,6 +258,7 @@ export async function POST(
             score: totalPointsEarned,
             totalPoints,
             startedAt: assessmentAttempt?.startedAt || new Date(),
+            timeTaken,
           },
         })
       } else {
@@ -261,6 +268,7 @@ export async function POST(
             score: totalPointsEarned,
             totalPoints,
             startedAt: quizAttempt?.startedAt || new Date(),
+            timeTaken,
           },
         })
       }

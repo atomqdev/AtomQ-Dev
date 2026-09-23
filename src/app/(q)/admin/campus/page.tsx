@@ -912,7 +912,7 @@ export default function CampusPage() {
                 {filteredCampuses.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={2 +
+                      colSpan={3 +
                         (columnVisibility.logo ? 1 : 0) +
                         (columnVisibility.shortName ? 1 : 0) +
                         (columnVisibility.departments ? 1 : 0) +
@@ -1032,7 +1032,7 @@ export default function CampusPage() {
                           <TableRow className="bg-muted/20">
                             <TableCell></TableCell>
                             <TableCell
-                              colSpan={1 +
+                              colSpan={2 +
                                 (columnVisibility.logo ? 1 : 0) +
                                 (columnVisibility.shortName ? 1 : 0) +
                                 (columnVisibility.departments ? 1 : 0) +
@@ -1079,14 +1079,13 @@ export default function CampusPage() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell></TableCell>
                           </TableRow>
 
                           {/* Batches Row */}
                           <TableRow className="bg-muted/20">
                             <TableCell></TableCell>
                             <TableCell
-                              colSpan={1 +
+                              colSpan={2 +
                                 (columnVisibility.logo ? 1 : 0) +
                                 (columnVisibility.shortName ? 1 : 0) +
                                 (columnVisibility.departments ? 1 : 0) +
@@ -1133,7 +1132,6 @@ export default function CampusPage() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell></TableCell>
                           </TableRow>
                         </>
                       )}

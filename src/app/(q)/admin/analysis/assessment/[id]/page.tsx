@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
 import { toasts } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 
 interface QuestionStats {
   id: string
@@ -177,6 +178,7 @@ export default function AssessmentAnalysisPage() {
   const router = useRouter()
   const [data, setData] = useState<AssessmentAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
 
   // Leaderboard filters
@@ -193,15 +195,21 @@ export default function AssessmentAnalysisPage() {
     fetchAssessmentData()
   }, [params.id])
 
-  const fetchAssessmentData = async () => {
+  const fetchAssessmentData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
-      const res = await fetch(`/api/admin/analytics/assessment/${params.id}`)
+      const res = await fetch(`/api/admin/analytics/assessment/${params.id}`, {
+        cache: "no-store",
+      })
       if (!res.ok) throw new Error("Failed to fetch assessment data")
       setData(await res.json())
     } catch (error) {
-      toasts.error("Failed to load assessment analytics")
+      toasts.error(
+        isRefresh ? "Refresh failed" : "Failed to load assessment analytics"
+      )
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -333,7 +341,12 @@ export default function AssessmentAnalysisPage() {
   } = data
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn(
+        "space-y-6 transition-opacity duration-300",
+        refreshing && "opacity-60 pointer-events-none"
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -346,9 +359,15 @@ export default function AssessmentAnalysisPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchAssessmentData} variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+          <Button
+            onClick={() => fetchAssessmentData(true)}
+            variant="outline"
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")}
+            />
+            {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <Button
             variant="outline"

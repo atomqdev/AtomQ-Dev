@@ -101,15 +101,6 @@ export async function GET(request: NextRequest) {
         endDateTimestamp = dateObj.getTime()
       }
 
-      // Debug logging
-      console.log(`Quiz "${quiz.title}" Status Check:`, {
-        startDate: quiz.startDate,
-        startDateTimestamp,
-        endDate: quiz.endDate,
-        endDateTimestamp,
-        nowTimestamp
-      })
-
       // Check time constraints using timestamp comparison
       if (startDateTimestamp && startDateTimestamp > nowTimestamp) {
         canAttempt = false

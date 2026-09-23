@@ -323,16 +323,6 @@ export default function AssessmentGroupsPage() {
       ),
     },
     {
-      accessorKey: "_count.assessments",
-      header: "Assessments",
-      cell: ({ row }) => {
-        const group = row.original
-        return (
-          <Badge variant="secondary">{group._count?.assessments || 0}</Badge>
-        )
-      },
-    },
-    {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
@@ -381,11 +371,14 @@ export default function AssessmentGroupsPage() {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/assessment-group/${group.id}/assessments`)}
               >
                 <Eye className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {group._count?.assessments || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>View Assessments</TooltipContent>

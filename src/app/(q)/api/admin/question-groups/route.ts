@@ -18,7 +18,6 @@ export async function GET(
     }
 
     const questionGroups = await db.questionGroup.findMany({
-      where: { isActive: true },
       include: {
         creator: {
           select: {

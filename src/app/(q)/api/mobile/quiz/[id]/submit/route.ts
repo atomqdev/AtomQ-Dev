@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { verifyToken } from "@/lib/mobile-auth"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 import { AttemptStatus, QuestionType } from "@prisma/client"
 
 export async function POST(
@@ -99,15 +100,12 @@ export async function POST(
       } else if (questionType === QuestionType.MULTIPLE_CHOICE) {
         isCorrect = (userAnswer || '').trim().toLowerCase() === (correctAnswer || '').trim().toLowerCase()
       } else if (questionType === QuestionType.MULTI_SELECT) {
-        // For multi-select, check if arrays match
-        const userArr = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer
-        const correctArr = typeof correctAnswer === 'string' ? JSON.parse(correctAnswer) : correctAnswer
-
-        if (Array.isArray(userArr) && Array.isArray(correctArr)) {
-          const userSorted = [...userArr].sort()
-          const correctSorted = [...correctArr].sort()
-          isCorrect = JSON.stringify(userSorted) === JSON.stringify(correctSorted)
-        }
+        // For multi-select, parse both answers (JSON array or pipe-delimited) and compare as sorted lists
+        // (raw JSON.parse throws on pipe-delimited values like 'A|B', so use parseMultiSelectAnswers like the web submit route)
+        const userValue = Array.isArray(userAnswer) ? userAnswer.join('|') : String(userAnswer || '')
+        const userSelections = parseMultiSelectAnswers(userValue).sort()
+        const correctSelections = parseMultiSelectAnswers(String(correctAnswer || '')).sort()
+        isCorrect = JSON.stringify(userSelections) === JSON.stringify(correctSelections)
       } else if (questionType === QuestionType.FILL_IN_BLANK) {
         // Case-insensitive comparison for fill in the blank
         isCorrect = userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim()

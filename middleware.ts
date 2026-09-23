@@ -48,6 +48,10 @@ export default withAuth(
         if (pathname === '/' || pathname === '/login' || pathname === '/register') {
           return true
         }
+        // Admin pages additionally require the ADMIN role (JWT is enriched with role in auth.ts)
+        if (pathname.startsWith('/admin')) {
+          return !!token && token.role === "ADMIN"
+        }
         // Require authentication for all other pages
         return !!token
       }

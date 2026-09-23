@@ -131,16 +131,6 @@ export default function QuizGroupsPage() {
       ),
     },
     {
-      accessorKey: "_count.quizzes",
-      header: "Quizzes",
-      cell: ({ row }) => {
-        const group = row.original
-        return (
-          <Badge variant="secondary">{group._count?.quizzes || 0}</Badge>
-        )
-      },
-    },
-    {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
@@ -189,11 +179,14 @@ export default function QuizGroupsPage() {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/quiz-group/${group.id}/quiz`)}
               >
                 <Eye className="h-4 w-4" />
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                  {group._count?.quizzes || 0}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>View Quizzes</TooltipContent>

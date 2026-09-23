@@ -65,6 +65,7 @@ export default function CampusUsersPage({ params }: { params: Promise<{ id: stri
   const { session, status, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
   const [users, setUsers] = useState<User[]>([])
   const [campus, setCampus] = useState<Campus | null>(null)
+  const [campusError, setCampusError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
@@ -84,13 +85,19 @@ export default function CampusUsersPage({ params }: { params: Promise<{ id: stri
         const data = await response.json()
         setCampus(data)
       } else if (response.status === 404) {
+        setCampusError(true)
         toasts.error("Campus not found")
         router.push('/admin/campus')
       } else if (response.status === 401) {
+        setCampusError(true)
         toasts.error("Session expired. Please log in again.")
         router.push('/')
+      } else {
+        setCampusError(true)
+        toasts.error("Failed to fetch campus")
       }
     } catch (error) {
+      setCampusError(true)
       toasts.error("Failed to fetch campus")
     }
   }
@@ -165,7 +172,7 @@ export default function CampusUsersPage({ params }: { params: Promise<{ id: stri
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Campus Users</h1>
           <p className="text-muted-foreground">
-            {campus ? `Manage users for ${campus.name}` : 'Loading...'}
+            {campus ? `Manage users for ${campus.name}` : campusError ? 'Campus not found' : 'Loading...'}
           </p>
         </div>
         <div className="flex items-center gap-2">

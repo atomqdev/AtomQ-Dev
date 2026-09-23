@@ -25,8 +25,8 @@ interface Quiz {
   timeLimit: number | null
   difficulty: string
   maxAttempts: number | null
-  startTime: string | null
-  endTime: string | null
+  startDate: string | null
+  endDate: string | null
   questionCount: number
   attempts: number
   bestScore: number | null
@@ -276,11 +276,11 @@ export default function UserQuizPage() {
                 {quiz.bestScore !== null && (
                   <div className="flex items-center text-xs">
                     <Trophy className="w-3.5 h-3.5 mr-1 text-yellow-500" />
-                    Best Score: {quiz.questionCount > 0 ? Math.round((quiz.bestScore / quiz.questionCount) * 100) : Math.round(quiz.bestScore)}%
+                    Best Score: {quiz.questionCount > 0 ? Math.max(0, Math.min(100, Math.round((quiz.bestScore / quiz.questionCount) * 100))) : Math.round(quiz.bestScore)}%
                   </div>
                 )}
 
-                {quiz.startTime && new Date(quiz.startTime) > new Date() && (
+                {quiz.startDate && new Date(quiz.startDate) > new Date() && (
                   <Alert className="border-yellow-200 bg-yellow-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
                     <AlertDescription className="text-yellow-800 text-xs leading-tight">
@@ -289,7 +289,7 @@ export default function UserQuizPage() {
                   </Alert>
                 )}
 
-                {quiz.endTime && new Date(quiz.endTime) < new Date() && (
+                {quiz.endDate && new Date(quiz.endDate) < new Date() && (
                   <Alert className="border-red-200 bg-red-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-red-600" />
                     <AlertDescription className="text-red-800 text-xs leading-tight">
@@ -298,7 +298,7 @@ export default function UserQuizPage() {
                   </Alert>
                 )}
 
-                {quiz.startTime && quiz.endTime && new Date(quiz.startTime) <= new Date() && new Date(quiz.endTime) >= new Date() && (
+                {quiz.startDate && quiz.endDate && new Date(quiz.startDate) <= new Date() && new Date(quiz.endDate) >= new Date() && (
                   <Alert className="border-green-200 bg-green-50 py-2 px-3">
                     <AlertCircle className="h-3.5 w-3.5 text-green-600" />
                     <AlertDescription className="text-green-800 text-xs leading-tight">

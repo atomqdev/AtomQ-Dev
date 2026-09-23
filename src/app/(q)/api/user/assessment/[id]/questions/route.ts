@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole } from "@prisma/client"
+import { applyRandomQuestionOrder } from "@/lib/random-order"
 
 export async function GET(
   request: NextRequest,
@@ -45,8 +46,23 @@ export async function GET(
       orderBy: { order: 'asc' },
     })
 
+    // Strip answer-key fields from each nested question before sending to the client
+    const safeQuestions = questions.map((aq) => {
+      const { correctAnswer: _ca, explanation: _ex, ...safeQuestion } = aq.question
+      return { ...aq, question: safeQuestion }
+    })
+
+    // Apply random question order when enabled (seeded by attempt ID)
+    const assessmentMeta = await db.assessment.findUnique({
+      where: { id: assessmentId },
+      select: { randomOrder: true },
+    })
+    const orderedQuestions = assessmentMeta?.randomOrder
+      ? applyRandomQuestionOrder(safeQuestions, attempt.id)
+      : safeQuestions
+
     return NextResponse.json({
-      questions,
+      questions: orderedQuestions,
       attemptId: attempt.id,
       status: attempt.status,
       timeRemaining: attempt.timeTaken,

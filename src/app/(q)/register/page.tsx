@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, CheckCircle2, Home } from "lucide-react"
+import { Loader2, CheckCircle2, Home, Lock } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toasts } from "@/lib/toasts"
 import { registerSchema } from "@/schema/auth"
@@ -49,6 +49,22 @@ export default function RegisterPage() {
   const [departmentsBatches, setDepartmentsBatches] = useState<DepartmentsBatches>({ departments: [], batches: [] })
   const router = useRouter()
   const { theme, setTheme } = useTheme()
+
+  // Department/batch locked when the registration code restricts them
+  const deptLocked = Boolean(verifiedCode?.departmentId)
+  const batchLocked = Boolean(verifiedCode?.batchId)
+
+  // Ensure locked values from the registration code always appear in their dropdown,
+  // even if they are missing from the campus-scoped option list
+  const departmentOptions =
+    deptLocked && verifiedCode?.department && !departmentsBatches.departments.some((d) => d.id === verifiedCode.department?.id)
+      ? [verifiedCode.department, ...departmentsBatches.departments]
+      : departmentsBatches.departments
+
+  const batchOptions =
+    batchLocked && verifiedCode?.batch && !departmentsBatches.batches.some((b) => b.id === verifiedCode.batch?.id)
+      ? [verifiedCode.batch, ...departmentsBatches.batches]
+      : departmentsBatches.batches
 
   // Fetch public settings
   useEffect(() => {
@@ -119,13 +135,9 @@ export default function RegisterPage() {
           departments: data.departments || [],
           batches: data.batches || []
         })
-        // Pre-fill department and batch if specified in code
-        if (data.registrationCode.departmentId) {
-          form.setValue("departmentId", data.registrationCode.departmentId)
-        }
-        if (data.registrationCode.batchId) {
-          form.setValue("batchId", data.registrationCode.batchId)
-        }
+        // Pre-fill department and batch if specified in the code (clear stale values otherwise)
+        form.setValue("departmentId", data.registrationCode.departmentId ?? undefined)
+        form.setValue("batchId", data.registrationCode.batchId ?? undefined)
         setStep(2)
         toasts.success("Registration code verified!")
       }
@@ -320,54 +332,66 @@ export default function RegisterPage() {
                     </div>
                   )}
 
-                  {departmentsBatches.departments.length > 0 && (
+                  {(departmentOptions.length > 0 || deptLocked) && (
                     <FormField
                       control={form.control}
                       name="departmentId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
+                          <Select onValueChange={field.onChange} value={field.value ?? ""} disabled={deptLocked}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select department" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {departmentsBatches.departments.map((dept) => (
+                              {departmentOptions.map((dept) => (
                                 <SelectItem key={dept.id} value={dept.id}>
                                   {dept.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          {deptLocked && (
+                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3" aria-hidden="true" />
+                              Locked by registration code
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   )}
 
-                  {departmentsBatches.batches.length > 0 && (
+                  {(batchOptions.length > 0 || batchLocked) && (
                     <FormField
                       control={form.control}
                       name="batchId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Batch</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
+                          <Select onValueChange={field.onChange} value={field.value ?? ""} disabled={batchLocked}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select batch" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {departmentsBatches.batches.map((batch) => (
+                              {batchOptions.map((batch) => (
                                 <SelectItem key={batch.id} value={batch.id}>
                                   {batch.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          {batchLocked && (
+                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3" aria-hidden="true" />
+                              Locked by registration code
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -428,6 +452,12 @@ export default function RegisterPage() {
                       <p className="text-sm font-medium">Code: {verifiedCode.code}</p>
                       {verifiedCode.campus && (
                         <p className="text-sm text-muted-foreground">Campus: {verifiedCode.campus.name}</p>
+                      )}
+                      {verifiedCode.department && (
+                        <p className="text-sm text-muted-foreground">Department: {verifiedCode.department.name}</p>
+                      )}
+                      {verifiedCode.batch && (
+                        <p className="text-sm text-muted-foreground">Batch: {verifiedCode.batch.name}</p>
                       )}
                     </div>
                   )}

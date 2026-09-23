@@ -4,10 +4,10 @@ import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole } from "@prisma/client"
 
-// DELETE /api/admin/quiz/[id]/unenroll-questions
+// DELETE /api/admin/assessment/[id]/unenroll-questions
 // Body (optional): { questionIds: string[] }
-//   - When questionIds is provided, removes only those questions from the quiz (bulk remove)
-//   - When no body is provided, removes ALL questions from the quiz (legacy behavior)
+//   - When questionIds is provided, removes only those questions from the assessment (bulk remove)
+//   - When no body is provided, removes ALL questions from the assessment
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,14 +24,14 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if quiz exists
-    const quiz = await db.quiz.findUnique({
+    // Check if assessment exists
+    const assessment = await db.assessment.findUnique({
       where: { id }
     })
 
-    if (!quiz) {
+    if (!assessment) {
       return NextResponse.json(
-        { message: "Quiz not found" },
+        { message: "Assessment not found" },
         { status: 404 }
       )
     }
@@ -48,23 +48,38 @@ export async function DELETE(
     }
 
     const where = questionIds
-      ? { quizId: id, questionId: { in: questionIds } }
-      : { quizId: id }
+      ? { assessmentId: id, questionId: { in: questionIds } }
+      : { assessmentId: id }
 
-    // Count quiz questions before deletion
-    const quizQuestionsCount = await db.quizQuestion.count({
+    // Count assessment questions before deletion
+    const assessmentQuestionsCount = await db.assessmentQuestion.count({
       where
     })
 
-    // Delete quiz questions (this will remove questions from the quiz)
-    await db.quizQuestion.deleteMany({
+    // Delete assessment questions (this will remove questions from the assessment)
+    await db.assessmentQuestion.deleteMany({
       where
     })
+
+    // Reorder remaining questions (matches single-question delete behavior)
+    const remainingQuestions = await db.assessmentQuestion.findMany({
+      where: { assessmentId: id },
+      orderBy: { order: "asc" }
+    })
+
+    await Promise.all(
+      remainingQuestions.map((q, index) =>
+        db.assessmentQuestion.update({
+          where: { id: q.id },
+          data: { order: index + 1 }
+        })
+      )
+    )
 
     return NextResponse.json({
-      message: "Questions unenrolled from quiz successfully",
+      message: "Questions unenrolled from assessment successfully",
       count: {
-        questions: quizQuestionsCount
+        questions: assessmentQuestionsCount
       }
     })
   } catch (error) {

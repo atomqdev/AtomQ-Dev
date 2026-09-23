@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole } from "@prisma/client"
+import { applyRandomQuestionOrder } from "@/lib/random-order"
 
 export async function GET(
   request: NextRequest,
@@ -166,6 +167,15 @@ export async function GET(
       )
     }
 
+    // Apply random question order when enabled on the quiz. The shuffle is
+    // seeded by the attempt ID so the order is stable across refreshes within
+    // the same attempt, but differs between attempts. Answers are keyed by
+    // question ID and compared as option text server-side, so this is
+    // scoring-safe.
+    const orderedQuestions = attempt.quiz.randomOrder
+      ? applyRandomQuestionOrder(questions, attempt.id)
+      : questions
+
     // Format quiz data
     const quizData = {
       id: attempt.quiz.id,
@@ -173,7 +183,7 @@ export async function GET(
       description: attempt.quiz.description,
       timeLimit: attempt.quiz.timeLimit,
       checkAnswerEnabled: attempt.quiz.checkAnswerEnabled || false,
-      questions: questions
+      questions: orderedQuestions
     }
 
     const responseData = {

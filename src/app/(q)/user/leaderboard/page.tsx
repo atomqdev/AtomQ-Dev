@@ -143,6 +143,13 @@ export default function LeaderboardPage() {
     return "text-red-600"
   }
 
+  // Fastest completion = entry with the minimum positive timeTaken (not the top scorer)
+  // Falls back to the first entry when no row has a usable time
+  const fastestEntry = leaderboard.reduce<LeaderboardEntry | null>(
+    (fastest, entry) => (entry.timeTaken > 0 && (!fastest || entry.timeTaken < fastest.timeTaken) ? entry : fastest),
+    null
+  ) ?? leaderboard[0] ?? null
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Loading leaderboard...</div>
   }
@@ -239,7 +246,7 @@ export default function LeaderboardPage() {
               </TableHeader>
               <TableBody>
                 {leaderboard.map((entry) => {
-                  const percentage = Math.round(Math.min((entry.score / entry.totalPoints) * 100, 100))
+                  const percentage = Math.max(0, Math.min(100, Math.round((entry.score / entry.totalPoints) * 100)))
                   return (
                     <TableRow key={entry.id}>
                       <TableCell>
@@ -333,7 +340,7 @@ export default function LeaderboardPage() {
                   <span className="font-medium">{leaderboard[0].user.name || 'Anonymous'}</span>
                 </div>
                 <div className="text-2xl font-bold">
-                  {Math.round(Math.min((leaderboard[0].score / leaderboard[0].totalPoints) * 100, 100))}%
+                  {Math.max(0, Math.min(100, Math.round((leaderboard[0].score / leaderboard[0].totalPoints) * 100)))}%
                 </div>
               </>
             )}
@@ -346,19 +353,19 @@ export default function LeaderboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {leaderboard.length > 0 && (
+            {fastestEntry && (
               <>
                 <div className="flex items-center gap-2 mb-2">
                   <Avatar className="h-6 w-6">
-                    <AvatarImage src={leaderboard[0].user.avatar} />
+                    <AvatarImage src={fastestEntry.user.avatar} />
                     <AvatarFallback>
-                      {leaderboard[0].user.name?.charAt(0) || leaderboard[0].user.email.charAt(0)}
+                      {fastestEntry.user.name?.charAt(0) || fastestEntry.user.email.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="font-medium">{leaderboard[0].user.name || 'Anonymous'}</span>
+                  <span className="font-medium">{fastestEntry.user.name || 'Anonymous'}</span>
                 </div>
                 <div className="text-2xl font-bold">
-                  {formatTime(leaderboard[0].timeTaken)}
+                  {formatTime(fastestEntry.timeTaken)}
                 </div>
               </>
             )}

@@ -59,6 +59,7 @@ import {
   ArrowUpDown,
   Loader2,
   CheckCircle2 as CheckCircle,
+  FileCheck,
   ChevronLeft,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
@@ -270,7 +271,12 @@ export default function QuizzesPage() {
       header: "Questions",
       cell: ({ row }) => {
         const quiz = row.original
-        return quiz._count?.quizQuestions || 0
+        return (
+          <div className="flex items-center gap-1.5">
+            <FileQuestion className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm tabular-nums">{quiz._count?.quizQuestions || 0}</span>
+          </div>
+        )
       },
     },
     {
@@ -302,7 +308,12 @@ export default function QuizzesPage() {
       header: "Total Submissions",
       cell: ({ row }) => {
         const quiz = row.original
-        return quiz._count?.quizAttempts || 0
+        return (
+          <div className="flex items-center gap-1.5">
+            <FileCheck className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm tabular-nums">{quiz._count?.quizAttempts || 0}</span>
+          </div>
+        )
       },
     },
     {
@@ -373,7 +384,7 @@ export default function QuizzesPage() {
 
   const fetchQuizzes = async () => {
     try {
-      const response = await fetch("/api/admin/quiz")
+      const response = await fetch("/api/admin/quiz?page=1&pageSize=100")
       if (response.ok) {
         const data = await response.json()
         setQuizzes(data.quizzes || [])

@@ -17,6 +17,10 @@ export async function PUT(request: NextRequest) {
 
     const { name, phone, avatar, departmentId, batchId, section } = await request.json()
 
+    // Normalize empty-string FK values (the settings "None" option sends "") to null - "" violates the FK constraint
+    const normalizedDepartmentId = departmentId === "" ? null : departmentId
+    const normalizedBatchId = batchId === "" ? null : batchId
+
     // Update user profile
     const updatedUser = await db.user.update({
       where: { id: session.user.id },
@@ -24,8 +28,8 @@ export async function PUT(request: NextRequest) {
         ...(name !== undefined && { name }),
         ...(phone !== undefined && { phone }),
         ...(avatar !== undefined && { avatar }),
-        ...(departmentId !== undefined && { departmentId }),
-        ...(batchId !== undefined && { batchId }),
+        ...(departmentId !== undefined && { departmentId: normalizedDepartmentId }),
+        ...(batchId !== undefined && { batchId: normalizedBatchId }),
         ...(section !== undefined && { section }),
       },
       select: {

@@ -77,6 +77,12 @@ export async function GET(
       
       if (isCorrect) correctAnswers++
 
+      // Prefer the stored per-answer pointsEarned (includes negative marking from the submit transaction)
+      const storedPointsEarned = userAnswer?.pointsEarned
+      const pointsEarned = typeof storedPointsEarned === 'number' && Number.isFinite(storedPointsEarned)
+        ? storedPointsEarned
+        : (isCorrect ? quizQuestion.points : 0)
+
       return {
         questionId: quizQuestion.question.id,
         question: quizQuestion.question,
@@ -84,7 +90,7 @@ export async function GET(
         correctAnswer: quizQuestion.question.correctAnswer,
         isCorrect,
         explanation: quizQuestion.question.explanation,
-        pointsEarned: isCorrect ? quizQuestion.points : 0
+        pointsEarned
       }
     })
 
@@ -115,7 +121,15 @@ export async function GET(
           correctAnswer: checkAnswerEnabled ? r.question.correctAnswer : "",
           explanation: checkAnswerEnabled ? r.question.explanation : null,
           difficulty: r.question.difficulty,
-          options: r.question.options ? JSON.parse(r.question.options) : []
+          options: (() => {
+            if (!r.question.options) return []
+            try {
+              const parsed = JSON.parse(r.question.options)
+              return Array.isArray(parsed) ? parsed : []
+            } catch {
+              return []
+            }
+          })()
         }
       }))
     }

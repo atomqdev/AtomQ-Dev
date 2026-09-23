@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { UserRole } from "@prisma/client"
 
-// Public endpoint for registration settings - no authentication required
-// GET: Fetch registration settings
-// PUT: Update registration settings (publicly accessible for demo purposes)
+// Public endpoint for registration settings
+// GET: Fetch registration settings (public - the register page checks it)
+// PUT: Update registration settings (admin only)
 
 export async function GET() {
   try {
@@ -36,6 +39,15 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    // Admin-only mutation (was previously unauthenticated - anyone could toggle registration)
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== UserRole.ADMIN) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { allowRegistration } = body
     

@@ -75,6 +75,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       console.error("Error details:", error.message, error.stack)
     }
-    return NextResponse.json({ error: "Failed to report question", details: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to report question" }, { status: 500 })
   }
 }

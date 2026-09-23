@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from "@/components/ui/sheet"
 import { toasts } from "@/lib/toasts"
-import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Code, Copy, Plus, Trash2, PowerOff, ChevronLeft } from "lucide-react"
+import { Loader2, Save, Settings, CheckCircle, Shield, Server, Info, Code, Copy, Plus, Trash2, PowerOff, ChevronLeft, Eye } from "lucide-react"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useRegistrationSettings } from "@/components/providers/registration-settings-provider"
 import HexagonLoader from "@/components/Loader/Loading"
@@ -324,7 +324,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">
@@ -404,17 +404,17 @@ export default function SettingsPage() {
 
                 {/* Settings Information */}
                 <div className="space-y-4">
-                  <div className="flex justify-between">
+                  <div className="flex flex-wrap justify-between gap-x-4">
                     <span>Settings ID:</span>
-                    <span className="font-mono">{settings?.id || 'N/A'}</span>
+                    <span className="break-all font-mono">{settings?.id || 'N/A'}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-wrap justify-between gap-x-4">
                     <span>Last updated:</span>
-                    <span>{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN', { hour12: true }) : 'Never'}</span>
+                    <span className="text-right">{settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN', { hour12: true }) : 'Never'}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-wrap justify-between gap-x-4">
                     <span>Created:</span>
-                    <span>{settings?.createdAt ? new Date(settings.createdAt).toLocaleString('en-IN', { hour12: true }) : 'Unknown'}</span>
+                    <span className="text-right">{settings?.createdAt ? new Date(settings.createdAt).toLocaleString('en-IN', { hour12: true }) : 'Unknown'}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between">
@@ -434,7 +434,7 @@ export default function SettingsPage() {
             </Card>
 
             {/* Action Buttons - Only show on General & System tab */}
-            <div className="flex items-center justify-between gap-4 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -469,7 +469,7 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 {/* Registration Code Management Section */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                  <div className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="font-semibold">Registration Code Management</h4>
                       <p className="text-sm text-muted-foreground">
@@ -508,7 +508,7 @@ export default function SettingsPage() {
                             Generate registration codes for new user sign-ups
                           </SheetDescription>
                         </SheetHeader>
-                        <div className="py-4 space-y-4 flex-1 overflow-y-auto">
+                        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
                           {/* Registration Code */}
                           <div className="space-y-2">
                             <Label htmlFor="registrationCode">Registration Code</Label>
@@ -648,17 +648,51 @@ export default function SettingsPage() {
                             </div>
                           )}
 
-                          {/* Info Message */}
-                          <Alert>
-                            <AlertDescription>
-                              <strong>How it works:</strong><br />
-                              1. Generate a registration code using the button above<br />
-                              2. Set expiry period and campus/department/batch restrictions<br />
-                              3. Share the code with users who need to register<br />
-                              4. Users can register using this code within the specified time period<br />
-                              <em>Note: Department and Batch are independent filters - you can select any combination.</em>
-                            </AlertDescription>
-                          </Alert>
+                          {/* Selected Config Preview */}
+                          <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
+                            <div className="flex items-center gap-2">
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm font-semibold">Config Preview</p>
+                            </div>
+                            <div className="space-y-2.5">
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="text-xs text-muted-foreground">Registration Code</span>
+                                <span className="font-mono text-sm font-medium break-all text-right">
+                                  {registrationCode || "Not generated yet"}
+                                </span>
+                              </div>
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="text-xs text-muted-foreground">Expiry</span>
+                                <span className="text-sm font-medium">
+                                  {registrationExpiry}
+                                </span>
+                              </div>
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="text-xs text-muted-foreground">Campus</span>
+                                <span className="text-sm font-medium text-right">
+                                  {registrationCampus === "general"
+                                    ? "All Campuses"
+                                    : (campuses.find((c) => c.id === registrationCampus)?.name || "—")}
+                                </span>
+                              </div>
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="text-xs text-muted-foreground">Department</span>
+                                <span className="text-sm font-medium text-right">
+                                  {registrationDepartment === "all"
+                                    ? "All Departments"
+                                    : (departments.find((d) => d.id === registrationDepartment)?.name || "—")}
+                                </span>
+                              </div>
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="text-xs text-muted-foreground">Batch</span>
+                                <span className="text-sm font-medium text-right">
+                                  {registrationBatch === "all"
+                                    ? "All Batches"
+                                    : (batches.find((b) => b.id === registrationBatch)?.name || "—")}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <SheetFooter className="flex gap-2 justify-between">

@@ -9,10 +9,15 @@ export function usePersistentSidebar(defaultOpen = false) {
   // Only run on client side
   useEffect(() => {
     setMounted(true)
-    // Get saved state from localStorage
-    const saved = localStorage.getItem('sidebar-open')
-    if (saved !== null) {
-      setOpen(JSON.parse(saved))
+    // Get saved state from localStorage (guard against corrupted values)
+    try {
+      const saved = localStorage.getItem('sidebar-open')
+      if (saved !== null) {
+        setOpen(JSON.parse(saved))
+      }
+    } catch (error) {
+      // Corrupted value - fall back to the default open state
+      setOpen(defaultOpen)
     }
   }, [])
 

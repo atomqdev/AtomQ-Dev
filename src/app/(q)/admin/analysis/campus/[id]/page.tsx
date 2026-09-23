@@ -38,10 +38,11 @@ import {
   Briefcase,
   BarChart3,
   ArrowRight,
-  Clock,
+  RefreshCw,
 } from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
 import { toasts } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 
 interface Quiz {
   id: string
@@ -122,20 +123,27 @@ export default function CampusAnalysisPage() {
   const router = useRouter()
   const [data, setData] = useState<CampusData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchCampusData()
   }, [params.id])
 
-  const fetchCampusData = async () => {
+  const fetchCampusData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
-      const res = await fetch(`/api/admin/analytics/campus/${params.id}`)
+      const res = await fetch(`/api/admin/analytics/campus/${params.id}`, {
+        cache: "no-store",
+      })
       if (!res.ok) throw new Error("Failed to fetch campus data")
       setData(await res.json())
     } catch (error) {
-      toasts.error("Failed to load campus analytics")
+      toasts.error(
+        isRefresh ? "Refresh failed" : "Failed to load campus analytics"
+      )
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -161,7 +169,12 @@ export default function CampusAnalysisPage() {
   const { campus, users, batches, departments, quizzes, assessments, topPerformers, metrics } = data
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn(
+        "space-y-6 transition-opacity duration-300",
+        refreshing && "opacity-60 pointer-events-none"
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -172,9 +185,15 @@ export default function CampusAnalysisPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchCampusData} variant="outline">
-            <Clock className="mr-2 h-4 w-4" />
-            Refresh
+          <Button
+            onClick={() => fetchCampusData(true)}
+            variant="outline"
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")}
+            />
+            {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <Button
             variant="outline"

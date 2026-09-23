@@ -256,6 +256,9 @@ export async function GET(
     // Initialize seeded random generator for consistent randomization
     const random = new SeededRandom(attemptId)
 
+    // Answer keys are only sent when the quiz allows checking answers
+    const checkAnswerEnabled = attempt.quiz.checkAnswerEnabled || false
+
     // Format questions with optional randomization
     let quizQuestions = attempt.quiz.quizQuestions
       .filter(qq => qq.question)
@@ -289,8 +292,8 @@ export async function GET(
           title: qq.question.title || `Question ${originalIndex + 1}`,
           type: qq.question.type,
           options: Array.isArray(options) ? options : [],
-          correctAnswer: correctAnswer,
-          explanation: qq.question.explanation || '',
+          correctAnswer: checkAnswerEnabled ? correctAnswer : '',
+          explanation: checkAnswerEnabled ? (qq.question.explanation || '') : '',
           difficulty: qq.question.difficulty,
           order: qq.order,
           points: qq.points

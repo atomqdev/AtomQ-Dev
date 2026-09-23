@@ -55,6 +55,7 @@ interface Submission {
   isAutoSubmitted?: boolean
   _count: {
     answers: number
+    tabSwitches: number
   }
 }
 
@@ -100,7 +101,7 @@ export default function AssessmentSubmissionsPage() {
       const response = await fetch(`/api/admin/assessments/${assessmentId}/submissions`)
       if (response.ok) {
         const data = await response.json()
-        setSubmissions(data)
+        setSubmissions(data.submissions || [])
       }
     } catch (error) {
       toast.error("Failed to fetch submissions")
@@ -275,14 +276,10 @@ export default function AssessmentSubmissionsPage() {
                   <TableHead>Campus</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Score</TableHead>
-                  <TableHead>Time Taken</TableHead>
-                  <TableHead>Started At</TableHead>
-                  <TableHead>Submitted At</TableHead>
                   <TableHead className="w-24">Tab Switches</TableHead>
                   <TableHead>Time Taken</TableHead>
                   <TableHead>Started At</TableHead>
                   <TableHead>Submitted At</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -325,7 +322,7 @@ export default function AssessmentSubmissionsPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Shield className="h-4 w-4 text-orange-600" />
-                        <span>{submission.tabSwitches || 0}</span>
+                        <span>{submission._count?.tabSwitches || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -354,15 +351,6 @@ export default function AssessmentSubmissionsPage() {
                       ) : (
                         <span className="text-muted-foreground">Not submitted</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/admin/assessments/${assessmentId}/submissions/${submission.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

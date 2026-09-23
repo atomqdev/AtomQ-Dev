@@ -136,6 +136,14 @@ export async function POST(request: NextRequest) {
       userData.batchId = validatedFields.data.batchId
     }
 
+    // Registration code restrictions always take precedence over form values
+    if (validRegistrationCode?.departmentId) {
+      userData.departmentId = validRegistrationCode.departmentId
+    }
+    if (validRegistrationCode?.batchId) {
+      userData.batchId = validRegistrationCode.batchId
+    }
+
     await db.user.create({
       data: userData
     })

@@ -187,17 +187,20 @@ export async function GET(
       existingTabSwitches = 0
     }
 
+    const requiresAccessKey = !!assessment.accessKey
+
+    // Strip the actual access key from the nested assessment before sending to the client
+    const { accessKey: _leaked, ...safeAssessment } = assessment
+
     return NextResponse.json({
       assessment: {
-        ...assessment,
+        ...safeAssessment,
         // Map quizQuestions to assessmentQuestions for consistency
         _count: {
           assessmentQuestions: assessment._count?.assessmentQuestions || assessment._count?.quizQuestions || 0
         }
       },
-      requiresAccessKey: !!assessment.accessKey,
-      // Don't send actual access key to client for security
-      accessKey: undefined,
+      requiresAccessKey,
       hasExistingAttempt,
       existingAttemptId,
       existingTabSwitches

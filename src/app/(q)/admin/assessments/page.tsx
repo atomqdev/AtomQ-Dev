@@ -322,7 +322,12 @@ export default function AssessmentsPage() {
       header: "Questions",
       cell: ({ row }) => {
         const assessment = row.original
-        return assessment._count?.assessmentQuestions || 0
+        return (
+          <div className="flex items-center gap-1.5">
+            <FileQuestion className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm tabular-nums">{assessment._count?.assessmentQuestions || 0}</span>
+          </div>
+        )
       },
     },
     {
@@ -426,7 +431,7 @@ export default function AssessmentsPage() {
   useEffect(() => {
     if (status === "loading") return
     if (!session || session.user.role !== "ADMIN") {
-      router.push("/auth/login")
+      router.push("/login")
       return
     }
     fetchAssessments()
@@ -434,12 +439,12 @@ export default function AssessmentsPage() {
 
   const fetchAssessments = async () => {
     try {
-      const response = await fetch("/api/admin/assessments")
+      const response = await fetch("/api/admin/assessments?page=1&limit=100")
       if (response.ok) {
         const data = await response.json()
         setAssessments(data.assessments || data)
       } else if (response.status === 401) {
-        router.push("/auth/login")
+        router.push("/login")
       }
     } catch (error) {
       toasts.networkError()

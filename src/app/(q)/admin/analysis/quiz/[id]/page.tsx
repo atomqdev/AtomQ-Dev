@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
 import { toasts } from "@/lib/toasts"
+import { cn } from "@/lib/utils"
 
 interface QuestionStats {
   id: string
@@ -160,6 +161,7 @@ export default function QuizAnalysisPage() {
   const router = useRouter()
   const [data, setData] = useState<QuizAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
 
   // Leaderboard filters
@@ -176,15 +178,19 @@ export default function QuizAnalysisPage() {
     fetchQuizData()
   }, [params.id])
 
-  const fetchQuizData = async () => {
+  const fetchQuizData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
-      const res = await fetch(`/api/admin/analytics/quiz/${params.id}`)
+      const res = await fetch(`/api/admin/analytics/quiz/${params.id}`, {
+        cache: "no-store",
+      })
       if (!res.ok) throw new Error("Failed to fetch quiz data")
       setData(await res.json())
     } catch (error) {
-      toasts.error("Failed to load quiz analytics")
+      toasts.error(isRefresh ? "Refresh failed" : "Failed to load quiz analytics")
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -307,7 +313,12 @@ export default function QuizAnalysisPage() {
   const { quiz, stats, scoreDistribution, questionStats, topPerformers, timeAnalysis } = data
 
   return (
-    <div className="space-y-6">
+    <div
+      className={cn(
+        "space-y-6 transition-opacity duration-300",
+        refreshing && "opacity-60 pointer-events-none"
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -320,9 +331,15 @@ export default function QuizAnalysisPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchQuizData} variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+          <Button
+            onClick={() => fetchQuizData(true)}
+            variant="outline"
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")}
+            />
+            {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <Button
             variant="outline"
