@@ -1733,3 +1733,63 @@ Stage Summary:
 - Weekly Progress rows replaced by a GitHub-style Activity Map (contribution heatmap) counting quiz+assessment submissions per day over the past year, timezone-aware per user
 - Dashboard layout now: stats cards -> full-width Activity Map -> 2-col Recent Quizzes | Recent Activity (scrollable)
 - Files: new src/app/(q)/api/user/activity-calendar/route.ts + src/components/user/activity-heatmap.tsx; modified src/app/(q)/user/page.tsx + src/app/(q)/user/layout.tsx (SidebarInset min-w-0)
+---
+Task ID: 27
+Agent: main
+Task: Load user-provided .env data and relaunch server (post-reboot)
+
+Work Log:
+- Machine rebooted again: .env reset to scaffold, stale server (PIDs 1050/1053/1068) running against wrong env
+- Rewrote .env with 6 user values + RESEND_FROM_EMAIL=AtomQ <noreply@atomq.dev>; killed stale processes
+- Ran launch-next.sh in foreground -> READY (PID 1270)
+- Verified: 6 env vars in /proc/1270/environ; dev.log Environment Verification block shows all 7 values; routes / /login /register all 200; Neon DB connected (23 users)
+- Confirmed Task 26 output intact (activity-calendar API + ActivityHeatmap component + dashboard card); homepage browser smoke test renders with 0 page errors; cookies cleared, browser closed
+
+Stage Summary:
+- App running on port 3000 (PID 1270) with full env; DB intact; Task 26 GitHub-style heatmap implementation unaffected
+---
+Task ID: 28
+Agent: main
+Task: User dashboard - Activity Map row split 70/30 with GitHub heatmap (70%) + Radar Chart with dots for monthly activity (30%)
+
+Work Log:
+- New component src/components/user/monthly-activity-radar.tsx: recharts RadarChart inside shadcn ChartContainer (aspect-square max-h-280), 12 axes = last 12 calendar months ending current month (client-side aggregation of the same /api/user/activity-calendar days payload the heatmap consumes - no new API), 3-letter month labels on PolarAngleAxis, PolarRadiusAxis domain [0, ceil(max/5)*5] with ticks hidden, orange gradient fill (linearGradient on var(--primary), no blue), dot={{ r: 4, fillOpacity: 1 }} for the "dots" style, ChartTooltip shows "<Month> / Submissions N"
+- user/page.tsx: single full-width Activity Map card replaced by grid grid-cols-1 lg:grid-cols-10 - Activity Map Card min-w-0 lg:col-span-7 (70%), new Monthly Activity Card min-w-0 lg:col-span-3 (30%) with its own skeleton/empty states; min-w-0 on both grid items prevents min-content blowout (Task 26 lesson)
+- Seed for E2E: temp user radar1@test.local (USER role, password login - OTP only applies to ADMIN role per src/lib/auth.ts) + 76 SUBMITTED quiz attempts spread across 6 of last 12 months (Oct25=3, Dec25=5, Feb26=8, May26=30, Jul26=12, Sep26=18)
+- E2E verified via agent-browser: card widths 818px/342px = 70.5%/29.5%; radar rendered with 12 dots; month ticks Oct..Sep chronological; monthly counts match seed exactly (total=76, headline matches); hover tooltip "Oct / Submissions 3" confirmed; desktop 1280 screenshot (tool-results/t28-radar-desktop.png, t28-radar-full.png), mobile 375 stacked layout (t28-radar-mobile.png, t28-radar-mobile-stack.png) with docScrollWidth 375 == viewport (no overflow)
+- 0 console errors, 0 page errors, lint clean, tsc clean; 5 transient "PostgreSQL connection Closed" prisma:error lines in dev.log identified as Neon pooler idle reconnects at server startup (DB healthy after, 23 users)
+- Cleanup: temp user + 76 attempts deleted (cascade), seed script removed, browser cookies cleared + closed
+
+Stage Summary:
+- Activity row is now 70/30: GitHub-style heatmap (70%) + Monthly Activity radar-with-dots (30%), stacking vertically below lg
+- Monthly radar aggregates the same timezone-aware daily data as the heatmap - single API call, consistent numbers everywhere
+- Files: new src/components/user/monthly-activity-radar.tsx; modified src/app/(q)/user/page.tsx
+---
+Task ID: 29
+Agent: main
+Task: Activity Map row too tall - reduce both graph heights, keep 70/30 looking balanced
+
+Work Log:
+- Root cause of excessive height: radar ChartContainer was aspect-square max-h-[280px] making the radar card ~395px tall; grid stretch then pulled the heatmap card to the same height leaving ~130px dead space under the heatmap
+- monthly-activity-radar.tsx: ChartContainer max-h 280->180px, Radar dot r 4->3.5, strokeWidth 2->1.5 (proportional to smaller chart); all 12 month labels still fit and readable
+- user/page.tsx: both activity-row CardContents now `flex flex-1 flex-col justify-center` so any residual stretch distributes evenly instead of pooling under the heatmap; radar skeleton changed to fixed h-[180px] matching the new chart height
+- Result measured in browser at 1280px: both cards exactly 296px (was ~395px row = 25% shorter), radar box 180px, heatmap content vertically centered, Recent Quizzes/Recent Activity now visible on the same screen without scrolling
+- E2E: temp user radar1@test.local re-seeded with same 76 attempts across 6 months; tooltip re-verified ("Oct Submissions 3"); mobile 375 stacked layout clean, docScrollWidth 375 == viewport; 0 console errors, 0 page errors; lint + tsc clean
+- Cleanup: temp user + attempts deleted, seed script removed, cookies cleared, browser closed
+
+Stage Summary:
+- Activity row compact: equal-height 296px cards (heatmap 70% / radar 30%), radar 180px with dots, no dead space, no overflow on mobile
+- Files touched: src/components/user/monthly-activity-radar.tsx, src/app/(q)/user/page.tsx
+---
+Task ID: 30
+Agent: main
+Task: Load .env data and relaunch server (post-reboot)
+
+Work Log:
+- Machine rebooted: .env reset to scaffold (only DATABASE_URL), stale server (PIDs 1031/1049) against wrong env
+- Rewrote .env with the 6 established values + RESEND_FROM_EMAIL=AtomQ <noreply@atomq.dev>; killed stale processes
+- launch-next.sh foreground -> READY (PID 1148)
+- Verified: 6 env vars in /proc/1148/environ; dev.log env block shows all values; routes / /login /register 200; Neon DB connected (23 users); homepage browser render 0 errors; cookies cleared + closed
+
+Stage Summary:
+- App running on port 3000 (PID 1148) with full env; DB intact; dashboard 70/30 activity row (Task 28/29) unaffected

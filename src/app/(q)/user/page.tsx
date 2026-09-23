@@ -23,6 +23,7 @@ import { useQuizCacheStore } from "@/stores/quiz-cache"
 import HexagonLoader from "@/components/Loader/Loading"
 import { formatDateDDMMYYYY } from "@/lib/date-utils"
 import { ActivityHeatmap } from "@/components/user/activity-heatmap"
+import { MonthlyActivityRadar } from "@/components/user/monthly-activity-radar"
 
 interface UserStats {
   totalQuizzes: number
@@ -276,39 +277,69 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Activity Map (GitHub-style contributions) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity Map</CardTitle>
-          {calendarLoading ? (
-            <CardDescription>Loading activity…</CardDescription>
-          ) : (
-            <CardDescription>
-              <span className="font-semibold text-foreground">{activityCalendar?.total ?? 0}</span>{" "}
-              submission{(activityCalendar?.total ?? 0) === 1 ? "" : "s"} in the last year
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          {calendarLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-[96px] w-full" />
-              <Skeleton className="ml-auto h-3 w-32" />
-            </div>
-          ) : activityCalendar && activityCalendar.total > 0 ? (
-            <ActivityHeatmap days={activityCalendar.days} />
-          ) : (
-            <div className="text-center py-8">
-              <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-              <h4 className="font-medium mb-2">No activity yet</h4>
-              <p className="text-sm text-muted-foreground">
-                Complete some quizzes or assessments to see your activity map
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Activity row: GitHub-style heatmap (70%) + monthly radar (30%) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-10">
+        <Card className="min-w-0 lg:col-span-7">
+          <CardHeader>
+            <CardTitle>Activity Map</CardTitle>
+            {calendarLoading ? (
+              <CardDescription>Loading activity…</CardDescription>
+            ) : (
+              <CardDescription>
+                <span className="font-semibold text-foreground">{activityCalendar?.total ?? 0}</span>{" "}
+                submission{(activityCalendar?.total ?? 0) === 1 ? "" : "s"} in the last year
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col justify-center">
+            {calendarLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-[96px] w-full" />
+                <Skeleton className="ml-auto h-3 w-32" />
+              </div>
+            ) : activityCalendar && activityCalendar.total > 0 ? (
+              <ActivityHeatmap days={activityCalendar.days} />
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+                <h4 className="font-medium mb-2">No activity yet</h4>
+                <p className="text-sm text-muted-foreground">
+                  Complete some quizzes or assessments to see your activity map
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0 lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Monthly Activity</CardTitle>
+            {calendarLoading ? (
+              <CardDescription>Loading activity…</CardDescription>
+            ) : (
+              <CardDescription>
+                Submissions over the last 12 months
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col justify-center">
+            {calendarLoading ? (
+              <Skeleton className="h-[180px] w-full" />
+            ) : activityCalendar && activityCalendar.total > 0 ? (
+              <MonthlyActivityRadar days={activityCalendar.days} />
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+                <h4 className="font-medium mb-2">No activity yet</h4>
+                <p className="text-sm text-muted-foreground">
+                  Complete some quizzes or assessments to see your monthly trends
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Recent quizzes and activity */}
       <div className="grid gap-4 md:grid-cols-2">
