@@ -40,6 +40,9 @@ interface QuizResult {
   totalPoints: number
   timeTaken: number
   submittedAt: string
+  // Aggregate correct count from the API (present even when per-question
+  // answer details are hidden).
+  correctCount?: number
   answers: Array<{
     questionId: string
     userAnswer: string
@@ -238,7 +241,7 @@ export default function QuizResultPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Correct</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {checkAnswerEnabled ? `${correctAnswers}/${totalQuestions}` : `—/${totalQuestions}`}
+                    {`${result.correctCount ?? correctAnswers}/${totalQuestions}`}
                   </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-600" />

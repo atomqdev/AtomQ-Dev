@@ -51,6 +51,9 @@ interface Question {
   type: QuestionType
   options: string[]
   correctAnswer: string
+  // Number of expected options for MULTI_SELECT (sent by the server — reveals
+  // the count, never the answers).
+  multiSelectCount?: number
   explanation?: string
   difficulty: DifficultyLevel
   points: number
@@ -513,7 +516,7 @@ export default function AssessmentTakingPage() {
     }
   }, [])
 
-  const recordTabSwitch = useCallback(async () => {
+  const recordTabSwitch = useCallback(async (source: "tab" | "screenshot" = "tab") => {
     if (!assessmentAttemptIdRef.current || isSubmittingRef.current || isAutoSubmittingRef.current) {
       return
     }
@@ -568,7 +571,11 @@ export default function AssessmentTakingPage() {
           if (data.switchesRemaining !== null && data.switchesRemaining <= 1) {
             setShowTabSwitchWarning(true)
           } else {
-            toasts.warning(`Tab switch detected! Violations: ${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}`)
+            toasts.warning(
+              source === "screenshot"
+                ? `Screenshot attempt detected! Violations: ${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}`
+                : `Tab switch detected! Violations: ${data.currentSwitches}/${assessmentRef.current?.maxTabs || 3}`
+            )
           }
         }
       } catch (error) {
@@ -640,12 +647,14 @@ export default function AssessmentTakingPage() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     document.addEventListener('contextmenu', handleContextMenu)
     document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handlePrintScreenKeyUp)
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handlePrintScreenKeyUp)
       
       if (fullscreenExitTimeoutRef.current) {
         clearTimeout(fullscreenExitTimeoutRef.current)
@@ -683,6 +692,12 @@ export default function AssessmentTakingPage() {
     if (specialKeys.includes(key) || key === 'F12') {
       e.preventDefault()
       toasts.warning("This action is not allowed during the assessment")
+      // OS-level screenshots (PrtScr / Win+PrtScr) cannot actually be prevented
+      // by the browser — record them as a violation so they count toward the
+      // assessment's violation limit (same pipeline as tab switches).
+      if (key === 'PrintScreen') {
+        recordTabSwitch("screenshot")
+      }
       return
     }
 
@@ -782,7 +797,17 @@ export default function AssessmentTakingPage() {
     if ((ctrlKey || metaKey) && key.toLowerCase() === 'a') {
       e.preventDefault()
     }
-  }, [assessment])
+  }, [assessment, recordTabSwitch])
+
+  // Some browsers/OS combos (e.g. Win+PrtScr) deliver the PrintScreen key only
+  // on keyup — listen there too. The violation recorder debounces, so the
+  // keydown+keyup pair collapses into a single recorded violation.
+  const handlePrintScreenKeyUp = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'PrintScreen') {
+      e.preventDefault()
+      recordTabSwitch("screenshot")
+    }
+  }, [recordTabSwitch])
 
   const handleCopyPaste = useCallback((e: Event) => {
     // Always block copy/paste/cut on assessment take page
@@ -1136,8 +1161,10 @@ export default function AssessmentTakingPage() {
                       case QuestionType.MULTIPLE_CHOICE:
                         return 'Multiple Choice'
                       case QuestionType.MULTI_SELECT: {
-                        const selectCount = getMultiSelectCount(currentQuestion.correctAnswer)
-                        // correctAnswer is never sent to the client, so a 0 count means unknown
+                        // Prefer the server-provided count: correctAnswer is never sent
+                        // to the client, so computing from it yields 0.
+                        const selectCount = currentQuestion.multiSelectCount ?? getMultiSelectCount(currentQuestion.correctAnswer)
+                        // a 0 count means unknown
                         if (selectCount === 0) {
                           return 'Select all that apply'
                         }

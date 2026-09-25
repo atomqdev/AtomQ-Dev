@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { UserRole, AttemptStatus, QuestionType } from "@prisma/client"
 import { applyRandomQuestionOrder } from "@/lib/random-order"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 
 // Time window for starting assessment (in minutes)
 const TIME_WINDOW_MINUTES = 15
@@ -525,7 +526,12 @@ function formatAssessmentQuestion(aq: any, index: number, showAnswers: boolean =
       options: options,
       difficulty: aq.question.difficulty,
       order: aq.order,
-      points: aq.points
+      points: aq.points,
+      // Number of options a MULTI_SELECT question expects. Reveals only the
+      // count (never which options) so the take page can show "Select 2 options".
+      multiSelectCount: aq.question.type === QuestionType.MULTI_SELECT
+        ? parseMultiSelectAnswers(aq.question.correctAnswer || '').length
+        : undefined
     }
 
     if (showAnswers) {
@@ -578,7 +584,12 @@ function formatQuizQuestion(aq: any, index: number, showAnswers: boolean = false
       options: options,
       difficulty: aq.question.difficulty,
       order: aq.order,
-      points: aq.points
+      points: aq.points,
+      // Number of options a MULTI_SELECT question expects. Reveals only the
+      // count (never which options) so the take page can show "Select 2 options".
+      multiSelectCount: aq.question.type === QuestionType.MULTI_SELECT
+        ? parseMultiSelectAnswers(aq.question.correctAnswer || '').length
+        : undefined
     }
 
     if (showAnswers) {

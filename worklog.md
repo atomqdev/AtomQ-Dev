@@ -1793,3 +1793,83 @@ Work Log:
 
 Stage Summary:
 - App running on port 3000 (PID 1148) with full env; DB intact; dashboard 70/30 activity row (Task 28/29) unaffected
+---
+Task ID: 31
+Agent: main
+Task: Full app scan for possible issues + fixes
+
+Work Log:
+- dev.log: no 5xx, no unhandled exceptions; only expected 401s from pre-auth API calls
+- lint + tsc clean; DB integrity clean (23 users: 3 admins/1 root active, 0 inactive, 0 no-campus, 0 SUBMITTED-without-submittedAt, 0 stale IN_PROGRESS attempts, 0 expired reg codes, 0 empty uoids; FK cascade rules make orphans impossible)
+- Browser scan (desktop 1280 + mobile 375): / /login /register /user /user/quiz /user/leaderboard /user/settings /user/assessment /admin /admin/analysis(+3 drill-downs) /admin/users /admin/settings /admin/quiz /admin/assessments /admin/question-groups /admin/quiz-group /admin/assessment-group /admin/campus -> 0 page errors, 0 console errors, 0 horizontal overflow everywhere
+- API surface scan (all 42 routes unauthenticated): 200 public, 401 protected, 405 wrong-method, ZERO 500s
+- REAL ISSUE FOUND+FIXED: dev server OOM-killed (kernel log: next-server at 2.9GB anon-rss on 4GB sandbox) during rapid full-route compile - launch-next.sh wiped .next on every restart forcing full recompile + no heap cap. Fixes: (1) keep .next dev compile cache between restarts (Next.js self-invalidates), (2) NODE_OPTIONS=--max-old-space-size=2560 exported into the server env. Relaunched (PID 4041), NODE_OPTIONS verified in /proc, server then survived the full 42-route API scan (RSS 2144MB, stable)
+- Non-issues verified: root admin login slow first hit = dev-mode compile; transient empty alert element during login redirect; 401s in log = unauthenticated curls
+- Cleanup: temp user scan1@test.local + 12 attempts deleted, temp seed script removed, browser cookies cleared + closed
+
+Stage Summary:
+- App scanned end-to-end: pages, APIs, DB - no code bugs found
+- Real infrastructure issue fixed: OOM-proofed launch-next.sh (cache reuse + V8 heap cap 2560MB)
+- Server healthy on port 3000 (PID 4041)
+---
+Task ID: 32
+Agent: main
+Task: Load .env + launch; user panel no-quizzes / no-assessments empty states use nodata.svg
+
+Work Log:
+- Machine rebooted: restored .env (6 user values + RESEND_FROM_EMAIL), killed stale server, relaunched via launch-next.sh (PID 1207, env verified in /proc, heap cap active from Task 31)
+- Downloaded nodata.svg from https://raw.githubusercontent.com/atomqdev/AtomQ-Dev/main/public/nodata.svg (2733B unDraw illustration, orange clipboard) to public/nodata.svg
+- New shared component src/components/user/no-data-state.tsx: Card + next/image (240x234, priority + unoptimized since SVG) + title + description
+- quiz/page.tsx and assessment/page.tsx: FileText-icon empty state blocks replaced with <NoDataState title="No Quizzes Available"/"No Assessments Available" description=...> (FileText kept - still used in card bodies)
+- E2E: temp user empty1@test.local (campus-matched, no enrollments) -> /user/quiz and /user/assessment both show illustration (img natural 648x632, display 240), headings + descriptions render; console LCP warning fixed by adding priority prop; fresh-console reload = 0 errors 0 warnings; mobile 375 no overflow
+- lint + tsc clean; cleanup: temp user deleted, browser cookies cleared + closed
+
+Stage Summary:
+- User panel empty states now show the AtomQ nodata.svg illustration on /user/quiz and /user/assessment via shared NoDataState component
+- Files: new public/nodata.svg + src/components/user/no-data-state.tsx; modified src/app/(q)/user/quiz/page.tsx, src/app/(q)/user/assessment/page.tsx
+---
+Task ID: 33
+Agent: main
+Task: Fix glitches from user docx (4 issues) without modifying core flow logic
+
+Work Log:
+- G1 "Select 0 options" on take pages: attempt APIs strip correctAnswer when answer-checking is disabled (anti-cheat), so take-page badges computed getMultiSelectCount(correctAnswer) = 0. Fix: quiz attempt API (src/app/(q)/api/user/quiz/[id]/attempt/route.ts) now ALWAYS selects correctAnswer server-side but still only SENDS it when checkAnswerEnabled; adds derived multiSelectCount for MULTI_SELECT (count only, never which options). Assessment attempt API (src/app/(q)/api/user/assessment/[id]/attempt/route.ts) adds the same multiSelectCount. Both take pages prefer currentQuestion.multiSelectCount with fallback to old computation. Verified E2E: quiz take page + assessment take page show "Select 2 options" with checkAnswerEnabled=false
+- G2 result page "Correct: -/30": result API nulled per-question isCorrect when checkAnswerEnabled=false and page showed em-dash. Fix: result API adds aggregate correctCount (server-computed, reveals nothing beyond the score already shown); result page shows the count unconditionally (result.correctCount ?? client-computed fallback). Verified: "1/3" shown with "Answer details are hidden" banner present
+- G3 Time Taken wrong: (a) server recorded raw Date.now()-startedAt which can exceed the quiz limit (user saw 10m23s on a 10-min quiz) -> submit API now caps timeTaken at timeLimit (min(raw, limit)); single submittedAt timestamp shared for both fields; DB-verified: raw 61-63s stored 60s. (b) client countdown decremented per setInterval tick -> drifts under lag/background throttling (user's timer disagreed with server) -> quiz take page now anchors an absolute deadline (deadlineRef) at load/restore and recomputes remaining from Date.now() each tick; browser-verified drift-free (42->24 remaining over 19s wall clock, +-1s rounding)
+- G4 PrintScreen not flagged in assessment: keydown handler toasted but recorded nothing (and preventDefault cannot stop OS screenshots). Fix: assessment take page recordTabSwitch(source) parametrized ("tab"|"screenshot") with distinct toast "Screenshot attempt detected! Violations: N/M"; PrintScreen keydown records violation; added keyup listener (some OS combos deliver PrintScreen only on keyup) - debouncer collapses keydown+keyup into one violation. Verified E2E: Violations header 0 -> 1/3, toasts shown, AssessmentTabSwitch row in DB; reuses existing violation pipeline (threshold auto-submit unchanged)
+- Non-changes (core flow preserved): localStorage progress-restore semantics, per-question answer-detail hiding, auto-submit thresholds, quiz/assessment start/resume flows all untouched
+- Infra: server OOM-killed again mid-verification (3.03GB RSS; 2560MB V8 cap + process overhead still too high with Chromium running) -> launch-next.sh cap lowered 2560MB -> 2048MB; relaunched PID 4863
+- Cleanup: GLITCHFIX quiz/assessment/questions/group + temp user deleted (DB verified 0 left), seed script removed, browser cookies cleared + closed; lint clean, tsc clean, 0 page errors
+
+Stage Summary:
+- All 4 reported glitches fixed and browser-verified: take-page "Select N options" (quiz+assessment), result "Correct N/M" always visible, timeTaken capped at limit + drift-free client timer, PrintScreen records violation via existing pipeline
+- Files: src/app/(q)/api/user/quiz/[id]/attempt/route.ts, .../assessment/[id]/attempt/route.ts, .../quiz/[id]/result/route.ts, .../quiz/[id]/submit/route.ts, src/app/(q)/user/quiz/[id]/take/page.tsx, src/app/(q)/user/quiz/[id]/result/page.tsx, src/app/(q)/user/assessment/[id]/take/page.tsx, launch-next.sh (cap 2048MB)
+
+---
+Task ID: 34
+Agent: Z.ai Code (main)
+Task: test the flow — end-to-end user flow test (login → dashboard → quiz attempt → assessment attempt → logout)
+
+Work Log:
+- Machine-restart recovery: .env was wiped (only DATABASE_URL) and running server had empty NEXTAUTH_SECRET etc. → restored full 7-value .env, relaunched via launch-next.sh (PID 1246), verified env in /proc/PID/environ (NEXTAUTH_SECRET 43 chars, HTTP 200)
+- Verified launch-next.sh Task 31 fixes intact (cache kept, NODE_OPTIONS heap cap)
+- DB recon: 27 users, 3 quizzes, 5 assessments; identified expired windows (quiz endDate 2026-09-11, assessment endtime 2026-08-12 vs today 2026-09-25)
+- Created temp E2E user flowtest1@test.local (bcrypt Test@1234, USER role, campus cmsom6qmw0001trvtlkddv42s), enrolled in quiz cmsom6yem0053trvt38pyomj2 + assessment cmsom6vjv002rtrvtvk4dxre8
+- Temp data-only window widening (restored after): quiz endDate + assessment endtime → 2026-10-02, assessment startTime → now
+- agent-browser E2E: landing (/) renders → SIGN IN → /login → filled credentials → redirected /user (PASS)
+- Dashboard: welcome message, campus heading, 4 stat cards zeroed, Activity Map + Monthly Activity 70/30 empty states, no console errors (PASS)
+- Quiz flow: /user/quiz shows Monthly Test Quiz "Available until 02/10/2026" → Start Quiz → "Preparing your quiz" loader → attempt page (15 Q) with attempt id in URL → answered 11 radio-type questions (7 MCQ + 4 TRUE_FALSE; 2 MULTI_SELECT + 2 FILL_IN_BLANK not automatable in harness) → Submit → result page 6/15 40%, 1m 46s; DB: SUBMITTED, score 6/15, submittedAt set (PASS)
+- Verified by design: answers held client-side, bulk-written on submit (transaction + scoring + negative marking in /api/user/quiz/[id]/submit) — 0 pre-submit rows is correct
+- Assessment flow: list card shows limits (1h, max 10 tab switches, no copy/paste) → Start → **Access Key gate** (button disabled until key entered) → entered 3NOFRV → attempt page (20 Q) → answered all 20 → Submit → CONFIRM SUBMIT modal (anti-accidental-submit) → result 40% 8/20; DB: SUBMITTED, answers 20/20, timeTaken 55s (PASS)
+- Encountered by-design gate: assessment join blocked outside startTime+15min (TIME_WINDOW_MINUTES=15 in attempt route) — documented as UX observation (list shows "Available until endtime" while join window is 15 min after startTime), NOT modified per no-core-logic-change constraint
+- Dashboard after submissions: recent quiz + radar chart month labels rendered
+- Logout: avatar menu → Sign out → redirected /login, session-token cookie removed (PASS)
+- dev.log: all 200s, correct 401s for admin APIs when unauthenticated, no 500s/⨯; console only pre-existing tiptap duplicate-extension warnings
+- Cleanup: restored original quiz/assessment windows, deleted flowtest1 user (cascade verified 0 orphans), closed browser
+
+Stage Summary:
+- ALL core flows PASS: landing → login → dashboard → quiz attempt/submit/result → assessment access-key/attempt/submit/result → logout
+- No code modified (test-only session); two data-only temp changes made and fully reverted
+- UX observation (not fixed): assessment list card shows "Available until {endtime}" but join API only permits startTime ≤ now ≤ startTime+15min — potential user confusion for scheduled assessments
+- Harness note: 11/15 quiz answers because 2 MULTI_SELECT + 2 FILL_IN_BLANK need checkbox/text interaction; app scoring handled submitted answers correctly
+- Post-test server: HTTP 200, RSS ~2592MB (under 2560 heap cap + overhead, no OOM), .env restored

@@ -132,7 +132,15 @@ export async function POST(
 
       const totalScore = finalAnswers.reduce((sum, a) => sum + (a.pointsEarned || 0), 0)
       const totalPoints = attempt.quiz.quizQuestions.reduce((sum, qq) => sum + qq.points, 0)
-      const timeTaken = attempt.startedAt ? Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000) : 0
+      // Single timestamp for both fields so they can never disagree.
+      const submittedAt = new Date()
+      const rawTimeTaken = attempt.startedAt
+        ? Math.floor((submittedAt.getTime() - new Date(attempt.startedAt).getTime()) / 1000)
+        : 0
+      // For timed quizzes the recorded time can never exceed the official
+      // duration — late network/processing must not show "10m 23s" on a 10-min quiz.
+      const timeLimitSeconds = (attempt.quiz.timeLimit || 0) * 60
+      const timeTaken = timeLimitSeconds > 0 ? Math.min(rawTimeTaken, timeLimitSeconds) : rawTimeTaken
 
       // Update the attempt with final scores
       const updatedAttempt = await tx.quizAttempt.update({
@@ -141,7 +149,7 @@ export async function POST(
           score: totalScore,
           totalPoints,
           timeTaken,
-          submittedAt: new Date(),
+          submittedAt,
           isAutoSubmitted: autoSubmit
         },
         include: {

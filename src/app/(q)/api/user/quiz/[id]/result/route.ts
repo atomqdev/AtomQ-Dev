@@ -109,6 +109,9 @@ export async function GET(
       totalPoints: attempt.totalPoints || 0,
       timeTaken: attempt.timeTaken || 0,
       submittedAt: attempt.submittedAt,
+      // Aggregate correct-answer count. Safe to expose even when per-question
+      // answer details are hidden — it adds nothing beyond the score already shown.
+      correctCount: correctAnswers,
       answers: results.map(r => ({
         questionId: r.questionId,
         userAnswer: r.userAnswer || "",

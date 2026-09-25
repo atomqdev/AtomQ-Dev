@@ -47,6 +47,9 @@ interface Question {
   options: string[]
   correctAnswer: string
   explanation: string
+  // Number of expected options for MULTI_SELECT (sent by the server even when
+  // answer-checking is disabled — reveals the count, never the answers).
+  multiSelectCount?: number
   points: number
 }
 
@@ -84,6 +87,10 @@ export default function QuizTakingPage() {
   const paginationContainerRef = useRef<HTMLDivElement>(null)
   const answersRef = useRef<Record<string, string>>(answers)
   const multiSelectAnswersRef = useRef<Record<string, string[]>>(multiSelectAnswers)
+  // Absolute wall-clock deadline (ms) for the countdown. Ticks recompute from
+  // Date.now() instead of decrementing, so the displayed timer cannot drift
+  // from the server-computed time taken (setInterval lag/background throttling).
+  const deadlineRef = useRef<number>(0)
 
   // Update refs when state changes
   useEffect(() => {
@@ -125,6 +132,7 @@ export default function QuizTakingPage() {
         setAnswers(existingProgress.answers)
         setMultiSelectAnswers(existingProgress.multiSelectAnswers)
         setTimeRemaining(existingProgress.timeRemaining)
+        deadlineRef.current = Date.now() + existingProgress.timeRemaining * 1000
         
         // Restore loaded questions
         const loadedSet = new Set<number>()
@@ -186,6 +194,7 @@ export default function QuizTakingPage() {
         setQuiz(data.quiz)
         setAttemptId(data.attemptId)
         setTimeRemaining(data.timeRemaining || 0)
+        deadlineRef.current = Date.now() + (data.timeRemaining || 0) * 1000
         
         // Preload first few questions for better performance
         const initialQuestionsToLoad = Math.min(5, data.quiz.questions.length)
@@ -242,7 +251,10 @@ export default function QuizTakingPage() {
   useEffect(() => {
     if (timeRemaining > 0 && !submitting) {
       const timer = setInterval(() => {
-        const newTime = timeRemaining - 1
+        // Recompute from the wall-clock anchor (immune to setInterval drift and
+        // background-tab throttling — a late tick self-corrects instead of
+        // under-counting elapsed time).
+        const newTime = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
         // Update local state first
         setTimeRemaining(newTime)
 
@@ -775,7 +787,9 @@ export default function QuizTakingPage() {
                 <CardTitle className="text-xl leading-relaxed">
                   <RichTextDisplay content={currentQuestion.title} />
                   {currentQuestion.type === QuestionType.MULTI_SELECT && (() => {
-                    const selectCount = getMultiSelectCount(currentQuestion.correctAnswer)
+                    // Prefer the server-provided count: correctAnswer is stripped by the
+                    // API when answer-checking is disabled (anti-cheat) and would yield 0.
+                    const selectCount = currentQuestion.multiSelectCount ?? getMultiSelectCount(currentQuestion.correctAnswer)
                     return (
                       <span className="inline-flex items-center ml-2 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                         Select {selectCount} option{selectCount !== 1 ? 's' : ''}

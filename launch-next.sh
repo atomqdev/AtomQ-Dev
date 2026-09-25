@@ -13,8 +13,14 @@ pkill -9 -f "next-server" 2>/dev/null
 rm -f "$PIDFILE"
 sleep 2
 
-# Clean .next cache
-rm -rf /home/z/my-project/.next
+# NOTE: .next cache is intentionally KEPT between restarts (dev-mode compile cache).
+# Wiping it forced full recompilation of every route on each launch, which
+# OOM-killed the server on this 4GB sandbox (observed: next-server at 2.9GB).
+# Next.js dev invalidates stale cache on config/deps changes on its own.
+
+# Cap the V8 heap so the kernel OOM-killer never takes down the server or
+# starves other processes (bun, browser). 2048MB leaves headroom on 4GB.
+export NODE_OPTIONS="--max-old-space-size=2048"
 
 # Source .env file and export all variables so they override system env
 if [ -f "$ENVFILE" ]; then
@@ -41,6 +47,7 @@ echo "NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:0:10}..." >> "$LOGFILE"
 echo "OPENAI_API_KEY: ${OPENAI_API_KEY:0:15}..." >> "$LOGFILE"
 echo "RESEND_API_KEY: ${RESEND_API_KEY:0:10}..." >> "$LOGFILE"
 echo "RESEND_FROM_EMAIL: $RESEND_FROM_EMAIL" >> "$LOGFILE"
+echo "NODE_OPTIONS: $NODE_OPTIONS" >> "$LOGFILE"
 echo "================================" >> "$LOGFILE"
 
 # Start the dev server fully detached via setsid + disown
@@ -53,6 +60,7 @@ setsid env -i \
   OPENAI_API_KEY="$OPENAI_API_KEY" \
   RESEND_API_KEY="$RESEND_API_KEY" \
   RESEND_FROM_EMAIL="$RESEND_FROM_EMAIL" \
+  NODE_OPTIONS="$NODE_OPTIONS" \
   PATH="$PATH" \
   HOME="$HOME" \
   bun run dev >> "$LOGFILE" 2>&1 &

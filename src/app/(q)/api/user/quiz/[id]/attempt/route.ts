@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { UserRole } from "@prisma/client"
+import { UserRole, QuestionType } from "@prisma/client"
 import { applyRandomQuestionOrder } from "@/lib/random-order"
+import { parseMultiSelectAnswers } from "@/lib/utils"
 
 export async function GET(
   request: NextRequest,
@@ -57,11 +58,10 @@ export async function GET(
                     type: true,
                     options: true,
                     difficulty: true,
-                    // correctAnswer + explanation are only sent when the quiz
-                    // allows in-quiz answer checking. Otherwise they are stripped.
-                    ...(checkAnswerEnabled
-                      ? { correctAnswer: true, explanation: true }
-                      : {})
+                    // Always fetched server-side; correctAnswer/explanation are only SENT
+                    // when the quiz allows in-quiz answer checking (see mapping below).
+                    correctAnswer: true,
+                    explanation: true
                   }
                 }
               },
@@ -143,9 +143,15 @@ export async function GET(
             type: qq.question.type,
             options: options,
             // correctAnswer + explanation are only present when checkAnswerEnabled
-            // is true (conditionally selected above); otherwise undefined.
-            correctAnswer: (qq.question as any).correctAnswer ?? "",
+            // is true (anti-cheat); otherwise they are stripped.
+            correctAnswer: checkAnswerEnabled ? ((qq.question as any).correctAnswer ?? "") : "",
             explanation: (qq.question as any).explanation ?? "",
+            // Number of options a MULTI_SELECT question expects. Reveals only the
+            // count (never which options) so the take page can show "Select 2 options"
+            // even when answer-checking is disabled.
+            multiSelectCount: qq.question.type === QuestionType.MULTI_SELECT
+              ? parseMultiSelectAnswers((qq.question as any).correctAnswer ?? "").length
+              : undefined,
             difficulty: qq.question.difficulty,
             order: qq.order,
             points: qq.points

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Clock, FileText, AlertCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { NoDataState } from "@/components/user/no-data-state"
 import {
   formatDateDDMMYYYY,
   parseDateWithTimezone
@@ -209,15 +210,10 @@ export default function UserAssessmentsPage() {
       </div>
 
       {assessments.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Assessments Available</h3>
-            <p className="text-muted-foreground text-center max-w-md">
-              There are no assessments assigned to you at the moment. Check back later or contact your administrator.
-            </p>
-          </CardContent>
-        </Card>
+        <NoDataState
+          title="No Assessments Available"
+          description="There are no assessments assigned to you at the moment. Check back later or contact your administrator."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
           {assessments.map((assessment) => (

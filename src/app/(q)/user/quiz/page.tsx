@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingButton } from "@/components/ui/laodaing-button"
 import { Clock, FileText, Trophy, AlertCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react"
+import { NoDataState } from "@/components/user/no-data-state"
 import { toast } from "sonner"
 import {
   formatDateDDMMYYYY,
@@ -221,15 +222,10 @@ export default function UserQuizPage() {
       </div>
 
       {quizzes.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Quizzes Available</h3>
-            <p className="text-muted-foreground text-center max-w-md">
-              There are no quizzes assigned to you at the moment. Check back later or contact your administrator.
-            </p>
-          </CardContent>
-        </Card>
+        <NoDataState
+          title="No Quizzes Available"
+          description="There are no quizzes assigned to you at the moment. Check back later or contact your administrator."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
           {quizzes.map((quiz) => (
