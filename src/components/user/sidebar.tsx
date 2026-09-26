@@ -30,6 +30,7 @@ import {
   Minimize,
   FileText,
   CreditCard,
+  BarChart3,
 } from "lucide-react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { flushSync } from "react-dom"
@@ -51,6 +52,11 @@ const userNavItems = [
     title: "Assessments",
     href: "/user/assessment",
     icon: FileText,
+  },
+  {
+    title: "Analysis",
+    href: "/user/analysis",
+    icon: BarChart3,
   },
   {
     title: "Subscription",

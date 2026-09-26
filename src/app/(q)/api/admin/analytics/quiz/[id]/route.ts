@@ -3,7 +3,20 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { UserRole } from "@prisma/client";
+import {
+  buildCoreAnalytics,
+  pctOf,
+  PASS_MARK_PCT,
+  type AnalyticsAttemptLike,
+} from "@/lib/analytics";
 
+/**
+ * GET /api/admin/analytics/quiz/[id]
+ *
+ * Master-level quiz analytics. All percentages are exact score/totalPoints
+ * ratios; question accuracy uses answered attempts as denominator;
+ * score buckets are half-open [min, max) with 100 inclusive.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,8 +34,10 @@ export async function GET(
       include: {
         quizQuestions: {
           include: {
-            question: true
-          }
+            question: {
+              select: { id: true, title: true, type: true, difficulty: true },
+            },
+          },
         },
         quizAttempts: {
           include: {
@@ -40,7 +55,9 @@ export async function GET(
                 batch: { select: { id: true, name: true } },
               },
             },
-            answers: true,
+            answers: {
+              select: { questionId: true, isCorrect: true, timeSpent: true },
+            },
           },
         },
       },
@@ -50,125 +67,112 @@ export async function GET(
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
     }
 
-    const submittedAttempts = quiz.quizAttempts.filter(a => a.status === "SUBMITTED");
+    // ---- Normalize to the shared analytics shape ----
+    const questions = quiz.quizQuestions.map((qq) => ({
+      id: qq.question.id,
+      title: qq.question.title,
+      type: qq.question.type,
+      difficulty: qq.question.difficulty,
+      points: qq.points,
+    }));
 
-    // Basic stats
-    const stats = {
-      totalAttempts: quiz.quizAttempts.length,
-      submittedAttempts: submittedAttempts.length,
-      completedRate: submittedAttempts.length > 0
-        ? ((submittedAttempts.length / quiz.quizAttempts.length) * 100).toFixed(1)
-        : "0.0",
-      avgScore: submittedAttempts.length > 0
-        ? submittedAttempts.reduce((sum, a) => {
-            const pct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
-            return sum + pct;
-          }, 0) / submittedAttempts.length
-        : 0,
-      avgTimeTaken: submittedAttempts.length > 0
-        ? Math.round(submittedAttempts.reduce((sum, a) => sum + (a.timeTaken || 0), 0) / submittedAttempts.length)
-        : 0,
-    };
+    const attempts: AnalyticsAttemptLike[] = quiz.quizAttempts.map((a) => ({
+      id: a.id,
+      status: a.status,
+      score: a.score,
+      totalPoints: a.totalPoints,
+      timeTaken: a.timeTaken,
+      startedAt: a.startedAt,
+      submittedAt: a.submittedAt,
+      isAutoSubmitted: a.isAutoSubmitted,
+      user: {
+        id: a.user.id,
+        name: a.user.name,
+        email: a.user.email,
+        section: a.user.section,
+        campusId: a.user.campusId,
+        campusName: a.user.campus?.name ?? null,
+        departmentId: a.user.departmentId,
+        departmentName: a.user.department?.name ?? null,
+        batchId: a.user.batchId,
+        batchName: a.user.batch?.name ?? null,
+      },
+      answers: a.answers,
+    }));
 
-    // Score distribution
-    const scoreRanges = [
-      { label: "0-20%", min: 0, max: 20, count: 0 },
-      { label: "21-40%", min: 20, max: 40, count: 0 },
-      { label: "41-60%", min: 40, max: 60, count: 0 },
-      { label: "61-80%", min: 60, max: 80, count: 0 },
-      { label: "81-100%", min: 80, max: 100, count: 0 },
+    const timeBuckets = [
+      { label: "0–2 min", min: 0, max: 120 },
+      { label: "2–5 min", min: 120, max: 300 },
+      { label: "5–10 min", min: 300, max: 600 },
+      { label: "10+ min", min: 600, max: Number.MAX_SAFE_INTEGER },
     ];
 
-    submittedAttempts.forEach(attempt => {
-      const percentage = attempt.totalPoints && attempt.totalPoints > 0
-        ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
-        : 0;
-      const range = scoreRanges.find(r => percentage > r.min && percentage <= r.max);
-      if (range) range.count++;
-    });
+    const core = buildCoreAnalytics(attempts, questions, timeBuckets);
 
-    // Question performance
-    const questionStats = quiz.quizQuestions.map(qq => {
-      const question = qq.question;
-      const totalAttempts = quiz.quizAttempts.length;
-      const correctAnswers = quiz.quizAttempts.filter(attempt =>
-        attempt.answers.find(answer =>
-          answer.questionId === question.id && answer.isCorrect
-        )
-      ).length;
+    const questionIdSet = new Set(questions.map((q) => q.id));
+    const totalQuestions = questionIdSet.size;
 
-      return {
-        id: question.id,
-        title: question.title,
-        type: question.type,
-        difficulty: question.difficulty,
-        totalAttempts,
-        correctAnswers,
-        accuracy: totalAttempts > 0 ? ((correctAnswers / totalAttempts) * 100).toFixed(1) : "0",
-      };
-    }).sort((a, b) => parseFloat(a.accuracy as string) - parseFloat(b.accuracy as string));
+    const statusBreakdown = quiz.quizAttempts.reduce((acc, a) => {
+      acc[a.status] = (acc[a.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-    // Top performers
-    const topPerformers = [...submittedAttempts]
-      .sort((a, b) => {
-        const aPct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
-        const bPct = b.totalPoints && b.totalPoints > 0 ? Math.min(((b.score || 0) / b.totalPoints) * 100, 100) : (b.score || 0);
-        return bPct - aPct;
-      })
-      .slice(0, 10)
-      .map(attempt => ({
-        ...attempt,
-        score: attempt.totalPoints && attempt.totalPoints > 0
-          ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
-          : (attempt.score || 0),
-      }));
-
-    // Time analysis
-    const timeRanges = [
-      { label: "0-2 min", min: 0, max: 120, count: 0 },
-      { label: "2-5 min", min: 120, max: 300, count: 0 },
-      { label: "5-10 min", min: 300, max: 600, count: 0 },
-      { label: "10+ min", min: 600, max: Infinity, count: 0 },
-    ];
-
-    submittedAttempts.forEach(attempt => {
-      const range = timeRanges.find(r => attempt.timeTaken >= r.min && attempt.timeTaken < r.max);
-      if (range) range.count++;
-    });
-
-    // All attempts (for leaderboard + all-users tabs) — sorted by score desc by default
-    const allAttempts = [...submittedAttempts]
-      .sort((a, b) => {
-        const aPct = a.totalPoints && a.totalPoints > 0 ? Math.min(((a.score || 0) / a.totalPoints) * 100, 100) : (a.score || 0);
-        const bPct = b.totalPoints && b.totalPoints > 0 ? Math.min(((b.score || 0) / b.totalPoints) * 100, 100) : (b.score || 0);
-        return bPct - aPct;
-      })
-      .map(attempt => ({
-        id: attempt.id,
-        status: attempt.status,
-        score: attempt.totalPoints && attempt.totalPoints > 0
-          ? Math.min(((attempt.score || 0) / attempt.totalPoints) * 100, 100)
-          : (attempt.score || 0),
-        rawScore: attempt.score || 0,
-        totalPoints: attempt.totalPoints || 0,
-        timeTaken: attempt.timeTaken || 0,
-        startedAt: attempt.startedAt,
-        submittedAt: attempt.submittedAt,
-        isAutoSubmitted: attempt.isAutoSubmitted,
+    // ---- Per-attempt rows for Leaderboard / All Users ----
+    const allAttempts = attempts
+      .map((a) => ({ a, pct: pctOf(a.score, a.totalPoints) }))
+      .sort((x, y) => y.pct - x.pct)
+      .map(({ a, pct }) => ({
+        id: a.id,
+        status: a.status,
+        score: pct,
+        rawScore: a.score ?? 0,
+        totalPoints: a.totalPoints ?? 0,
+        timeTaken: a.timeTaken ?? 0,
+        startedAt: a.startedAt,
+        submittedAt: a.submittedAt,
+        isAutoSubmitted: a.isAutoSubmitted,
+        answeredCount: a.answers.filter((ans) => questionIdSet.has(ans.questionId)).length,
+        correctCount: a.answers.filter(
+          (ans) => questionIdSet.has(ans.questionId) && ans.isCorrect === true
+        ).length,
+        totalQuestions,
         user: {
-          id: attempt.user.id,
-          name: attempt.user.name,
-          email: attempt.user.email,
-          section: attempt.user.section,
-          campusId: attempt.user.campusId,
-          campusName: attempt.user.campus?.name || null,
-          campusShortName: attempt.user.campus?.shortName || null,
-          departmentId: attempt.user.departmentId,
-          departmentName: attempt.user.department?.name || null,
-          batchId: attempt.user.batchId,
-          batchName: attempt.user.batch?.name || null,
+          id: a.user.id,
+          name: a.user.name,
+          email: a.user.email,
+          section: a.user.section,
+          campusId: a.user.campusId,
+          campusName: a.user.campusName,
+          campusShortName: a.user.campusName,
+          departmentId: a.user.departmentId,
+          departmentName: a.user.departmentName,
+          batchId: a.user.batchId,
+          batchName: a.user.batchName,
         },
       }));
+
+    // ---- Top performers (lean shape — no answer payloads) ----
+    const topPerformers = allAttempts.slice(0, 10).map((a) => ({
+      id: a.id,
+      score: a.score,
+      rawScore: a.rawScore,
+      totalPoints: a.totalPoints,
+      timeTaken: a.timeTaken,
+      submittedAt: a.submittedAt,
+      isAutoSubmitted: a.isAutoSubmitted,
+      answeredCount: a.answeredCount,
+      correctCount: a.correctCount,
+      totalQuestions: a.totalQuestions,
+      user: {
+        id: a.user.id,
+        name: a.user.name,
+        email: a.user.email,
+        section: a.user.section,
+        campusName: a.user.campusName,
+        departmentName: a.user.departmentName,
+        batchName: a.user.batchName,
+      },
+    }));
 
     return NextResponse.json({
       quiz: {
@@ -176,13 +180,19 @@ export async function GET(
         title: quiz.title,
         difficulty: quiz.difficulty,
         timeLimit: quiz.timeLimit,
-        questionCount: quiz.quizQuestions.length,
+        questionCount: questions.length,
+        totalPoints: questions.reduce((s, q) => s + q.points, 0),
       },
-      stats,
-      scoreDistribution: scoreRanges,
-      questionStats,
+      stats: core.stats,
+      passMark: PASS_MARK_PCT,
+      scoreDistribution: core.scoreDistribution,
+      questionStats: core.questionStats,
       topPerformers,
-      timeAnalysis: timeRanges,
+      timeAnalysis: core.timeAnalysis,
+      cohortStats: core.cohortStats,
+      scoreTrend: core.scoreTrend,
+      scatterData: core.scatterData,
+      statusBreakdown,
       allAttempts,
     });
   } catch (error) {

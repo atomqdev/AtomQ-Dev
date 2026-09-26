@@ -58,6 +58,7 @@ import {
   UserCheck,
   UserX,
   ChevronLeft,
+  ClipboardList,
 } from "lucide-react"
 import { toasts } from "@/lib/toasts"
 import { UserRole, StudentSection } from "@prisma/client"
@@ -425,6 +426,10 @@ export default function UsersPage() {
               <DropdownMenuItem onClick={() => openEditDialog(user)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/admin/users/${user.id}/responses`)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                View Responses
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => openDeleteDialog(user)}

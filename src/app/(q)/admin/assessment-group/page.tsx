@@ -35,9 +35,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  Eye,
   ArrowUpDown,
   Loader2,
+  BookOpen,
   FileCheck,
   FileQuestion,
   Users,
@@ -362,7 +362,7 @@ export default function AssessmentGroupsPage() {
     },
     {
       id: "viewAssessments",
-      header: "View",
+      header: "Assessments",
       enableHiding: false,
       cell: ({ row }) => {
         const group = row.original
@@ -375,7 +375,7 @@ export default function AssessmentGroupsPage() {
                 className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/assessment-group/${group.id}/assessments`)}
               >
-                <Eye className="h-4 w-4" />
+                <BookOpen className="h-4 w-4" />
                 <span className="text-xs font-medium tabular-nums text-muted-foreground">
                   {group._count?.assessments || 0}
                 </span>

@@ -22,6 +22,31 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import {
+  Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Scatter,
+  ScatterChart,
+  XAxis,
+  YAxis,
+} from "recharts"
+import {
   ClipboardCheck,
   ChevronLeft,
   Target,
@@ -31,6 +56,7 @@ import {
   BarChart3,
   RefreshCw,
   Shield,
+  ShieldAlert,
   Key,
   XCircle,
   CheckCircle2,
@@ -39,8 +65,15 @@ import {
   Trophy,
   Users,
   LayoutDashboard,
+  Eye,
+  Sigma,
+  Gauge,
+  Percent,
+  Activity,
+  MousePointerClick,
 } from "lucide-react"
 import HexagonLoader from "@/components/Loader/Loading"
+import { AttemptViewDialog } from "@/components/analysis/attempt-view-dialog"
 import { toasts } from "@/lib/toasts"
 import { cn } from "@/lib/utils"
 
@@ -49,21 +82,56 @@ interface QuestionStats {
   title: string
   type: string
   difficulty: string
-  totalAttempts: number
-  correctAnswers: number
-  accuracy: string
+  points: number
+  eligibleAttempts: number
+  answeredCount: number
+  correctCount: number
+  incorrectCount: number
+  unansweredCount: number
+  accuracy: number
+  difficultyIndex: number
+  rating: string
+  avgTimeSpent: number | null
 }
 
 interface TopPerformer {
   id: string
   score: number
+  rawScore: number
+  totalPoints: number
   timeTaken: number
-  submittedAt: string
+  submittedAt: string | null
+  isAutoSubmitted: boolean
+  answeredCount: number
+  correctCount: number
+  totalQuestions: number
+  tabSwitches: number
   user: {
     id: string
     name: string | null
     email: string
   }
+}
+
+interface CohortStat {
+  label: string
+  count: number
+  avgPct: number
+  passRate: number
+  topPct: number
+}
+
+interface TrendPoint {
+  date: string
+  label: string
+  avgPct: number
+  attempts: number
+}
+
+interface ScatterPoint {
+  name: string
+  pct: number
+  timeMin: number
 }
 
 interface AttemptUser {
@@ -89,6 +157,11 @@ interface AttemptRecord {
   timeTaken: number
   startedAt: string | null
   submittedAt: string | null
+  isAutoSubmitted: boolean
+  answeredCount: number
+  correctCount: number
+  totalQuestions: number
+  tabSwitches: number
   user: AttemptUser
 }
 
@@ -102,18 +175,28 @@ interface AssessmentAnalyticsData {
     disableCopyPaste: boolean
     hasAccessKey: boolean
     questionCount: number
+    totalPoints: number
     startTime: string | null
   }
   stats: {
     totalAttempts: number
     submittedAttempts: number
-    completedRate: string
+    completedRate: number
     avgScore: number
+    medianScore: number
+    stdDevScore: number
+    highestScore: number
+    lowestScore: number
+    passRate: number
+    passCount: number
+    failCount: number
     avgTimeTaken: number
-    hasAccessKey: boolean
-    maxTabs: number | null
-    disableCopyPaste: boolean
+    medianTimeTaken: number
+    avgTimePerQuestion: number | null
+    autoSubmittedCount: number
+    gradeBreakdown: Record<string, number>
   }
+  passMark: number
   scoreDistribution: Array<{
     label: string
     min: number
@@ -128,9 +211,25 @@ interface AssessmentAnalyticsData {
     max: number
     count: number
   }>
+  cohortStats: {
+    byBatch: CohortStat[]
+    byDepartment: CohortStat[]
+    bySection: CohortStat[]
+    byCampus: CohortStat[]
+  }
+  scoreTrend: TrendPoint[]
+  scatterData: ScatterPoint[]
   securityStats: {
     potentialTimeViolations: number
-    timeViolationsRate: string
+    timeViolationsRate: number
+    autoSubmittedCount: number
+    totalTabSwitches: number
+    attemptsWithTabSwitches: number
+    maxTabSwitchAttempts: number
+    maxAllowedTabs: number | null
+    tabViolationAttempts: number
+    disableCopyPaste: boolean
+    hasAccessKey: boolean
   }
   statusBreakdown: Record<string, number>
   allAttempts: AttemptRecord[]
@@ -142,6 +241,9 @@ const formatTime = (seconds: number) => {
   return `${mins}m ${secs}s`
 }
 
+// Trims float noise so scores render as "8", "7.5" instead of "8.00"
+const formatRawScore = (value: number) => Number(value.toFixed(2)).toString()
+
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   return date.toLocaleDateString("en-US", {
@@ -150,6 +252,37 @@ const formatDate = (dateStr: string) => {
     year: "numeric",
   })
 }
+
+const ratingBadgeVariant = (rating: string): "default" | "secondary" | "outline" | "destructive" => {
+  if (rating === "Very Easy") return "default"
+  if (rating === "Easy") return "secondary"
+  if (rating === "Moderate") return "outline"
+  return "destructive"
+}
+
+const scoreDistConfig = {
+  count: { label: "Students", color: "var(--chart-1)" },
+} satisfies ChartConfig
+
+const timeDistConfig = {
+  count: { label: "Students", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+const trendConfig = {
+  attempts: { label: "Attempts", color: "var(--chart-1)" },
+  avgPct: { label: "Avg Score (%)", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+const scatterConfig = {
+  pct: { label: "Score (%)", color: "var(--chart-4)" },
+  timeMin: { label: "Minutes" },
+} satisfies ChartConfig
+
+const cohortConfig = {
+  avgPct: { label: "Avg Score (%)", color: "var(--chart-3)" },
+} satisfies ChartConfig
+
+const distColors = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e"]
 
 const escapeCsv = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return ""
@@ -190,6 +323,12 @@ export default function AssessmentAnalysisPage() {
   const [auBatchFilter, setAuBatchFilter] = useState<string>("all")
   const [auDepartmentFilter, setAuDepartmentFilter] = useState<string>("all")
   const [auSectionFilter, setAuSectionFilter] = useState<string>("all")
+
+  // Individual response viewer dialog
+  const [viewingAttemptId, setViewingAttemptId] = useState<string | null>(null)
+
+  // Cohort comparison dimension
+  const [cohortDim, setCohortDim] = useState<"byBatch" | "byDepartment" | "bySection" | "byCampus">("byBatch")
 
   useEffect(() => {
     fetchAssessmentData()
@@ -268,7 +407,7 @@ export default function AssessmentAnalysisPage() {
 
   const handleExportLeaderboard = () => {
     const rows: (string | number | null | undefined)[][] = [
-      ["Rank", "Name", "Email", "Score (%)", "Raw Score", "Total Points", "Time Taken", "Submitted At", "Campus", "Department", "Batch", "Section"],
+      ["Rank", "Name", "Email", "Score (%)", "Raw Score", "Total Points", "Answered", "Correct", "Tab Switches", "Time Taken", "Submitted At", "Campus", "Department", "Batch", "Section"],
       ...filteredLeaderboard.map((a, i) => [
         i + 1,
         a.user.name || "N/A",
@@ -276,6 +415,9 @@ export default function AssessmentAnalysisPage() {
         a.score.toFixed(2),
         a.rawScore,
         a.totalPoints,
+        `${a.answeredCount}/${a.totalQuestions}`,
+        a.correctCount,
+        a.tabSwitches,
         formatTime(a.timeTaken),
         a.submittedAt ? formatDate(a.submittedAt) : "—",
         a.user.campusName || "—",
@@ -290,13 +432,16 @@ export default function AssessmentAnalysisPage() {
 
   const handleExportAllUsers = () => {
     const rows: (string | number | null | undefined)[][] = [
-      ["Name", "Email", "Score (%)", "Raw Score", "Total Points", "Time Taken", "Submitted At", "Status", "Campus", "Department", "Batch", "Section"],
+      ["Name", "Email", "Score (%)", "Raw Score", "Total Points", "Answered", "Correct", "Tab Switches", "Time Taken", "Submitted At", "Status", "Campus", "Department", "Batch", "Section"],
       ...filteredAllUsers.map(a => [
         a.user.name || "N/A",
         a.user.email,
         a.score.toFixed(2),
         a.rawScore,
         a.totalPoints,
+        `${a.answeredCount}/${a.totalQuestions}`,
+        a.correctCount,
+        a.tabSwitches,
         formatTime(a.timeTaken),
         a.submittedAt ? formatDate(a.submittedAt) : "—",
         a.status,
@@ -336,6 +481,9 @@ export default function AssessmentAnalysisPage() {
     questionStats,
     topPerformers,
     timeAnalysis,
+    cohortStats,
+    scoreTrend,
+    scatterData,
     securityStats,
     statusBreakdown,
   } = data
@@ -462,7 +610,7 @@ export default function AssessmentAnalysisPage() {
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completedRate}%</div>
+            <div className="text-2xl font-bold">{stats.completedRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground mt-1">
               Successfully completed
             </p>
@@ -504,10 +652,69 @@ export default function AssessmentAnalysisPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {topPerformers[0]?.score || 0}%
+              {topPerformers[0]
+                ? `${formatRawScore(topPerformers[0].rawScore)} / ${formatRawScore(topPerformers[0].totalPoints)}`
+                : "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Highest score achieved
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Advanced Distribution Stats (always visible above tabs) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Median Score</CardTitle>
+            <Gauge className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.medianScore.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Middle of the distribution
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Consistency (σ)</CardTitle>
+            <Sigma className="h-4 w-4 text-violet-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.stdDevScore.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Std deviation • lower = uniform results
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
+            <Percent className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.passRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.passCount} passed • {stats.failCount} failed (≥{data.passMark}%)
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Score Range</CardTitle>
+            <Activity className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats.highestScore.toFixed(0)}% – {stats.lowestScore.toFixed(0)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Median time {formatTime(stats.medianTimeTaken)}
             </p>
           </CardContent>
         </Card>
@@ -532,7 +739,7 @@ export default function AssessmentAnalysisPage() {
               </div>
               <div>
                 <div className="text-sm text-orange-700 font-medium">
-                  {securityStats.timeViolationsRate}% of submissions
+                  {securityStats.timeViolationsRate.toFixed(1)}% of submissions
                 </div>
                 <div className="text-xs text-orange-600">
                   Need review for potential cheating
@@ -560,35 +767,41 @@ export default function AssessmentAnalysisPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Overview (current detailed analytics) */}
+        {/* Tab 1: Overview (master-level analytics) */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Detailed Analysis */}
+          {/* Row A: Score Distribution + Status Breakdown */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Score Distribution */}
             <Card>
               <CardHeader>
                 <CardTitle>Score Distribution</CardTitle>
                 <CardDescription>
-                  Percentage range breakdown
+                  Exact percentage buckets — [min, max) with 100% included
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {scoreDistribution.map((range) => (
-                  <div key={range.label} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{range.label}</span>
-                      <span className="text-muted-foreground">{range.count} students</span>
-                    </div>
-                    <Progress
-                      value={
-                        stats.submittedAttempts > 0
-                          ? (range.count / stats.submittedAttempts) * 100
-                          : 0
-                      }
-                      className="h-3"
-                    />
-                  </div>
-                ))}
+                <ChartContainer config={scoreDistConfig} className="h-[220px] w-full">
+                  <BarChart data={scoreDistribution} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={11} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {scoreDistribution.map((_, i) => (
+                        <Cell key={i} fill={distColors[i]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(stats.gradeBreakdown)
+                    .filter(([, count]) => count > 0)
+                    .map(([grade, count]) => (
+                      <Badge key={grade} variant="outline" className="text-xs">
+                        Grade {grade}: {count}
+                      </Badge>
+                    ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -620,35 +833,258 @@ export default function AssessmentAnalysisPage() {
                     <Badge variant="secondary">{count}</Badge>
                   </div>
                 ))}
+                {Object.keys(statusBreakdown).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">No attempts yet</p>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Time Analysis */}
+          {/* Row B: Score Trend + Time vs Score */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Score Trend */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  Score Trend Over Time
+                </CardTitle>
+                <CardDescription>
+                  Daily submissions (bars) with average score (line)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {scoreTrend.length === 0 ? (
+                  <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                    No submissions yet
+                  </div>
+                ) : (
+                  <ChartContainer config={trendConfig} className="h-[220px] w-full">
+                    <ComposedChart data={scoreTrend} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="fillAssessmentTrend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--color-avgPct)" stopOpacity={0.5} />
+                          <stop offset="95%" stopColor="var(--color-avgPct)" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+                      <YAxis yAxisId="left" allowDecimals={false} tickLine={false} axisLine={false} fontSize={11} />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar yAxisId="left" dataKey="attempts" fill="var(--color-attempts)" radius={[4, 4, 0, 0]} barSize={28} />
+                      <Area
+                        yAxisId="right"
+                        dataKey="avgPct"
+                        type="monotone"
+                        stroke="var(--color-avgPct)"
+                        strokeWidth={2}
+                        fill="url(#fillAssessmentTrend)"
+                        dot={{ r: 3 }}
+                      />
+                    </ComposedChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Time vs Score Scatter */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-orange-600" />
+                  Time vs Score
+                </CardTitle>
+                <CardDescription>
+                  Each dot is one student — low time + low score suggests rushing, high time + low score suggests struggling
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {scatterData.length === 0 ? (
+                  <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                    No timing data available
+                  </div>
+                ) : (
+                  <ChartContainer config={scatterConfig} className="h-[220px] w-full">
+                    <ScatterChart margin={{ top: 8, right: 16, bottom: 0, left: -24 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        type="number"
+                        dataKey="timeMin"
+                        name="Time"
+                        unit=" min"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="pct"
+                        name="Score"
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent />} />
+                      <Scatter data={scatterData} fill="var(--color-pct)" />
+                    </ScatterChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Row C: Time Analysis + Security Monitoring */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Time Analysis */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Completion Time Analysis</CardTitle>
+                <CardDescription>
+                  Time taken distribution • avg per question {stats.avgTimePerQuestion !== null ? formatTime(stats.avgTimePerQuestion) : "—"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={timeDistConfig} className="h-[220px] w-full">
+                  <BarChart data={timeAnalysis} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={11} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Security Monitoring */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-orange-600" />
+                  Security Monitoring
+                </CardTitle>
+                <CardDescription>
+                  Integrity signals across all attempts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 border rounded flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MousePointerClick className="h-3.5 w-3.5" /> Total tab switches
+                    </div>
+                    <div className="text-2xl font-bold">{securityStats.totalTabSwitches}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {securityStats.attemptsWithTabSwitches} of {stats.totalAttempts} attempts
+                    </div>
+                  </div>
+                  <div className="p-3 border rounded flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Tab-limit violations
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {securityStats.tabViolationAttempts}
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {securityStats.maxAllowedTabs !== null ? ` / limit ${securityStats.maxAllowedTabs}` : ""}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Peak {securityStats.maxTabSwitchAttempts} switches by one student
+                    </div>
+                  </div>
+                  <div className="p-3 border rounded flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" /> Auto-submitted
+                    </div>
+                    <div className="text-2xl font-bold">{securityStats.autoSubmittedCount}</div>
+                    <div className="text-xs text-muted-foreground">Forced by timer expiry</div>
+                  </div>
+                  <div className="p-3 border rounded flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Time-limit breaches
+                    </div>
+                    <div className="text-2xl font-bold">{securityStats.potentialTimeViolations}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {securityStats.timeViolationsRate.toFixed(1)}% of submissions
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Row D: Cohort Comparison */}
           <Card>
             <CardHeader>
-              <CardTitle>Completion Time Analysis</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Cohort Comparison
+              </CardTitle>
               <CardDescription>
-                Time taken distribution
+                Average score by batch, department, section, or campus
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {timeAnalysis.map((range) => (
-                <div key={range.label} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{range.label}</span>
-                    <span className="text-muted-foreground">{range.count} students</span>
-                  </div>
-                  <Progress
-                    value={
-                      stats.submittedAttempts > 0
-                        ? (range.count / stats.submittedAttempts) * 100
-                        : 0
-                    }
-                    className="h-3"
-                  />
+              <Select value={cohortDim} onValueChange={(v) => setCohortDim(v as typeof cohortDim)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Group by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="byBatch">Batch</SelectItem>
+                  <SelectItem value="byDepartment">Department</SelectItem>
+                  <SelectItem value="bySection">Section</SelectItem>
+                  <SelectItem value="byCampus">Campus</SelectItem>
+                </SelectContent>
+              </Select>
+              {cohortStats[cohortDim].length === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                  No cohort data for this dimension
                 </div>
-              ))}
+              ) : (
+                <>
+                  <ChartContainer config={cohortConfig} className="h-[200px] w-full">
+                    <BarChart data={cohortStats[cohortDim]} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
+                      <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="label"
+                        width={110}
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                      />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                      <Bar dataKey="avgPct" fill="var(--color-avgPct)" radius={[0, 4, 4, 0]} barSize={18} />
+                    </BarChart>
+                  </ChartContainer>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cohortStats[cohortDim].map((c) => (
+                      <Badge key={c.label} variant="outline" className="text-xs">
+                        {c.label}: {c.count} students • {c.passRate.toFixed(0)}% pass
+                      </Badge>
+                    ))}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -659,7 +1095,7 @@ export default function AssessmentAnalysisPage() {
                 <div>
                   <span>Question Performance</span>
                   <CardDescription>
-                    Individual question analytics (sorted by accuracy)
+                    Accuracy = correct ÷ answered • unanswered attempts excluded • sorted hardest first
                   </CardDescription>
                 </div>
                 <BarChart3 className="h-5 w-5 text-muted-foreground" />
@@ -672,9 +1108,12 @@ export default function AssessmentAnalysisPage() {
                     <TableHead>Question</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Difficulty</TableHead>
-                    <TableHead>Attempts</TableHead>
+                    <TableHead>Answered</TableHead>
                     <TableHead>Correct</TableHead>
+                    <TableHead>Unanswered</TableHead>
+                    <TableHead>Avg Time</TableHead>
                     <TableHead>Accuracy</TableHead>
+                    <TableHead>Rating</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -699,16 +1138,25 @@ export default function AssessmentAnalysisPage() {
                           {q.difficulty}
                         </Badge>
                       </TableCell>
-                      <TableCell>{q.totalAttempts}</TableCell>
-                      <TableCell>{q.correctAnswers}</TableCell>
+                      <TableCell>{q.answeredCount}/{q.eligibleAttempts}</TableCell>
+                      <TableCell>{q.correctCount}</TableCell>
+                      <TableCell>
+                        <span className={q.unansweredCount > 0 ? "text-orange-600 font-medium" : ""}>
+                          {q.unansweredCount}
+                        </span>
+                      </TableCell>
+                      <TableCell>{q.avgTimeSpent !== null ? formatTime(q.avgTimeSpent) : "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Progress
-                            value={parseFloat(q.accuracy)}
+                            value={q.accuracy}
                             className="w-20 h-2"
                           />
                           <span className="text-sm font-medium">{q.accuracy}%</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={ratingBadgeVariant(q.rating)}>{q.rating}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -736,8 +1184,10 @@ export default function AssessmentAnalysisPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Score</TableHead>
+                    <TableHead>Answered</TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Response</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -760,8 +1210,23 @@ export default function AssessmentAnalysisPage() {
                           {performer.score.toFixed(1)}%
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{performer.answeredCount}/{performer.totalQuestions}</div>
+                        <div className="text-xs text-muted-foreground">{performer.correctCount} correct</div>
+                      </TableCell>
                       <TableCell>{formatTime(performer.timeTaken)}</TableCell>
-                      <TableCell>{formatDate(performer.submittedAt)}</TableCell>
+                      <TableCell>{performer.submittedAt ? formatDate(performer.submittedAt) : "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                          onClick={() => setViewingAttemptId(performer.id)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -853,17 +1318,19 @@ export default function AssessmentAnalysisPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Score</TableHead>
+                      <TableHead>Answered</TableHead>
                       <TableHead>Time</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Batch</TableHead>
                       <TableHead>Section</TableHead>
+                      <TableHead className="text-right">Response</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredLeaderboard.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                           No submissions match the selected filters.
                         </TableCell>
                       </TableRow>
@@ -887,11 +1354,26 @@ export default function AssessmentAnalysisPage() {
                               {attempt.score.toFixed(1)}%
                             </Badge>
                           </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{attempt.answeredCount}/{attempt.totalQuestions}</div>
+                            <div className="text-xs text-muted-foreground">{attempt.correctCount} correct</div>
+                          </TableCell>
                           <TableCell>{formatTime(attempt.timeTaken)}</TableCell>
                           <TableCell>{attempt.submittedAt ? formatDate(attempt.submittedAt) : "—"}</TableCell>
                           <TableCell>{attempt.user.departmentName || "—"}</TableCell>
                           <TableCell>{attempt.user.batchName || "—"}</TableCell>
                           <TableCell>{attempt.user.section || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              onClick={() => setViewingAttemptId(attempt.id)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -985,6 +1467,7 @@ export default function AssessmentAnalysisPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Score</TableHead>
                       <TableHead>Raw Score</TableHead>
+                      <TableHead>Answered</TableHead>
                       <TableHead>Time</TableHead>
                       <TableHead>Submitted</TableHead>
                       <TableHead>Status</TableHead>
@@ -992,12 +1475,13 @@ export default function AssessmentAnalysisPage() {
                       <TableHead>Batch</TableHead>
                       <TableHead>Section</TableHead>
                       <TableHead>Campus</TableHead>
+                      <TableHead className="text-right">Response</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredAllUsers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                           No submissions match the selected filters.
                         </TableCell>
                       </TableRow>
@@ -1014,6 +1498,10 @@ export default function AssessmentAnalysisPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>{attempt.rawScore} / {attempt.totalPoints}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">{attempt.answeredCount}/{attempt.totalQuestions}</div>
+                            <div className="text-xs text-muted-foreground">{attempt.correctCount} correct</div>
+                          </TableCell>
                           <TableCell>{formatTime(attempt.timeTaken)}</TableCell>
                           <TableCell>{attempt.submittedAt ? formatDate(attempt.submittedAt) : "—"}</TableCell>
                           <TableCell>
@@ -1023,6 +1511,17 @@ export default function AssessmentAnalysisPage() {
                           <TableCell>{attempt.user.batchName || "—"}</TableCell>
                           <TableCell>{attempt.user.section || "—"}</TableCell>
                           <TableCell>{attempt.user.campusName || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              onClick={() => setViewingAttemptId(attempt.id)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -1033,6 +1532,16 @@ export default function AssessmentAnalysisPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Individual user response viewer */}
+      <AttemptViewDialog
+        attemptId={viewingAttemptId}
+        type="assessment"
+        open={!!viewingAttemptId}
+        onOpenChange={(open) => {
+          if (!open) setViewingAttemptId(null)
+        }}
+      />
     </div>
   )
 }

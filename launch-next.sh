@@ -19,8 +19,11 @@ sleep 2
 # Next.js dev invalidates stale cache on config/deps changes on its own.
 
 # Cap the V8 heap so the kernel OOM-killer never takes down the server or
-# starves other processes (bun, browser). 2048MB leaves headroom on 4GB.
-export NODE_OPTIONS="--max-old-space-size=2048"
+# starves other processes (bun, browser). 1536MB leaves headroom on 4GB:
+# observed OOM-kill at 2.5GB RSS with the 2048MB cap when Chromium ran alongside
+# (next-server JS heap + native overhead + Chromium > 4GB total). V8 GCs more
+# aggressively near a lower cap instead of hoarding.
+export NODE_OPTIONS="--max-old-space-size=1536"
 
 # Source .env file and export all variables so they override system env
 if [ -f "$ENVFILE" ]; then

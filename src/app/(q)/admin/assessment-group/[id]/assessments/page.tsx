@@ -55,7 +55,15 @@ import {
   Copy,
   Check,
   CheckCircle2 as CheckCircle,
+  BarChart3,
+  MoreHorizontal,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { toasts } from "@/lib/toasts"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
@@ -619,8 +627,8 @@ export default function AssessmentGroupDetailPage({
       },
     },
     {
-      id: "edit",
-      header: "Edit",
+      id: "analysis",
+      header: "Analysis",
       enableHiding: false,
       cell: ({ row }) => {
         const assessment = row.original
@@ -631,36 +639,44 @@ export default function AssessmentGroupDetailPage({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => openEditDialog(assessment)}
+                onClick={() => router.push(`/admin/analysis/assessment/${assessment.id}`)}
               >
-                <Edit className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Edit Assessment</TooltipContent>
+            <TooltipContent>View Assessment Analysis</TooltipContent>
           </Tooltip>
         )
       },
     },
     {
-      id: "delete",
-      header: "Delete",
+      id: "actions",
+      header: "Actions",
       enableHiding: false,
       cell: ({ row }) => {
         const assessment = row.original
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                onClick={() => openDeleteDialog(assessment)}
-              >
-                <Trash2 className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Delete Assessment</TooltipContent>
-          </Tooltip>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openEditDialog(assessment)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openDeleteDialog(assessment)}
+                className="text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },

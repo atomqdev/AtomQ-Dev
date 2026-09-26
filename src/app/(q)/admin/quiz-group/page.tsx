@@ -35,7 +35,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Eye,
   ArrowUpDown,
   Loader2,
   BookOpen,
@@ -170,7 +169,7 @@ export default function QuizGroupsPage() {
     },
     {
       id: "viewQuizzes",
-      header: "View",
+      header: "Quizzes",
       enableHiding: false,
       cell: ({ row }) => {
         const group = row.original
@@ -183,7 +182,7 @@ export default function QuizGroupsPage() {
                 className="h-8 gap-1.5 px-2"
                 onClick={() => router.push(`/admin/quiz-group/${group.id}/quiz`)}
               >
-                <Eye className="h-4 w-4" />
+                <BookOpen className="h-4 w-4" />
                 <span className="text-xs font-medium tabular-nums text-muted-foreground">
                   {group._count?.quizzes || 0}
                 </span>

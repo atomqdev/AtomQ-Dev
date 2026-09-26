@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,8 @@ import {
   Medal,
   Award,
   Star,
-  Filter
+  Filter,
+  Eye
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -66,6 +68,7 @@ interface Quiz {
 }
 
 export default function LeaderboardPage() {
+  const router = useRouter()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
@@ -242,6 +245,7 @@ export default function LeaderboardPage() {
                   <TableHead>Score</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Completed</TableHead>
+                  <TableHead className="w-[90px] text-right">Analysis</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -299,6 +303,18 @@ export default function LeaderboardPage() {
                       </TableCell>
                       <TableCell>
                         {formatDateDDMMYYYY(entry.submittedAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          title="View stored responses for this attempt"
+                          onClick={() => router.push(`/user/analysis/${entry.id}?type=quiz`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
                       </TableCell>
                     </TableRow>
                   )

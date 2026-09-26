@@ -1873,3 +1873,142 @@ Stage Summary:
 - UX observation (not fixed): assessment list card shows "Available until {endtime}" but join API only permits startTime ≤ now ≤ startTime+15min — potential user confusion for scheduled assessments
 - Harness note: 11/15 quiz answers because 2 MULTI_SELECT + 2 FILL_IN_BLANK need checkbox/text interaction; app scoring handled submitted answers correctly
 - Post-test server: HTTP 200, RSS ~2592MB (under 2560 heap cap + overhead, no OOM), .env restored
+
+---
+Task ID: 35
+Agent: Z.ai Code (main)
+Task: Confirm quiz/assessment responses are stored + build access to them from (1) Analysis Result Dashboard, (2) Leaderboard, (3) Admin All Users
+
+Work Log:
+- Machine-restart recovery again: .env wiped → restored 7 values; running server had empty NEXTAUTH_SECRET → relaunched via launch-next.sh (PID 1255)
+- STORAGE CONFIRMED: quiz_answers=156 rows, assessment_answers=70 rows; each row {userAnswer, isCorrect, pointsEarned, timeSpent} per attemptId+questionId (unique)
+- Explore agent mapped: leaderboard API (row = QuizAttempt incl. user.id, attempt id), quiz result page local QuestionCard pattern (checkAnswerEnabled redaction at API level), admin users DataTable actions dropdown (page.tsx:411), user sidebar userNavItems, api pattern (getServerSession + role check), date-utils exports, HexagonLoader, existing admin submissions detail route as precedent
+- Built (all additive; no core flow touched):
+  - API GET /api/analysis/list?userId&type=all|quiz|assessment — USER forced to own attempts; ADMIN may target any userId; returns attempts + response counts + user info
+  - API GET /api/analysis/attempt/[attemptId]?type= — auto-detects quiz vs assessment; mirrors existing redaction: ADMIN sees all; quiz non-admin gated by checkAnswerEnabled (isCorrect/correctAnswer/explanation nulled); assessment non-admin sees responses only (no flag on model)
+  - components/analysis/attempt-analysis.tsx — full detail view (summary card + per-question cards w/ options A/B/C, stored response, conditional correct answer/explanation, gating banner)
+  - components/analysis/attempt-list.tsx — attempts table, mode=link (user) | expand (admin inline)
+  - /user/analysis — Analysis Result Dashboard (4 summary cards + All/Quizzes/Assessments tabs + link list)
+  - /user/analysis/[attemptId] — detail page (?type= param)
+  - /admin/users/[id]/responses — admin per-user responses (user card + expandable inline analysis)
+  - sidebar.tsx: added Analysis nav (BarChart3)
+  - leaderboard page: added Analysis column + per-row View → /user/analysis/[attemptId]?type=quiz
+  - admin/users page: added View Responses dropdown item → /admin/users/[id]/responses
+- E2E verified (temp flowtest2@test.local + seeded submitted quiz attempt w/ 3 answers + assessment attempt w/ 2 answers):
+  - user /user/analysis: summary cards correct, both attempts listed, tabs work
+  - quiz detail: 15 Stored Response rows, 0 Correct Answer rows (checkAnswerEnabled=false respected), Not answered shown, amber banner
+  - assessment detail: 20 responses, 0 correctness, auto-submitted badge, assessment banner
+  - leaderboard: 21 rows w/ View buttons → navigates to analysis correctly
+  - admin: /admin/users row menu shows Edit/View Responses/Delete → responses page w/ user card → expand: 15 responses + 13 Correct Answer rows (admin bypass works) + explanations
+  - lint ✔ tsc ✔ dev.log all 200s, zero errors
+- Cleanup: flowtest2 deleted (cascade verified — answer counts back to 156/70); browser closed
+
+Stage Summary:
+- Answer: YES responses are stored (QuizAnswer/AssessmentAnswer) and now viewable from 3 entry points
+- New role-aware redaction consistent with existing result page (quiz: checkAnswerEnabled; assessment: admin-only correctness)
+- Zero changes to core flows (login/attempt/submit/result untouched; leaderboard & admin pages only gained additive UI)
+
+---
+Task ID: 36
+Agent: Z.ai Code (main)
+Task: Implement individual user response viewing in /admin/analysis/quiz/[id] and /admin/analysis/assessment/[id]
+
+Work Log:
+- Explored both admin analysis detail pages: identical structure (Overview | Leaderboard | All Users tabs; rows = attempts from /api/admin/analytics/{quiz,assessment}/[id])
+- Reused Task 35 foundation unchanged: AttemptAnalysis component + GET /api/analysis/attempt/[attemptId] (admin = full detail incl. correctness, correct answers, explanations)
+- New component src/components/analysis/attempt-view-dialog.tsx: wide scrollable Dialog (max-h-[92vh], sm:max-w-[min(1100px,95vw)]) wrapping AttemptAnalysis; sr-only DialogTitle/Description for a11y; Radix unmounts content on close so every open re-fetches fresh data
+- Wired into BOTH pages (additive only; zero changes to existing analytics logic/flows):
+  - New "Response" column + ghost Eye "View" button on every row in: Leaderboard tab, All Users tab, Top 10 Performers (Overview)
+  - Empty-state colSpan bumped (leaderboard 9→10, all-users 11→12)
+  - Quiz page renders dialog with type="quiz"; assessment page with type="assessment"
+  - viewingAttemptId state per page; dialog closes via X/Escape/overlay
+- E2E verified (root admin admin@atomcode.dev):
+  - sample-demo quiz (attempt w/ 5 stored answers): Leaderboard View → dialog shows "Responses of JACK", 80% 4/5 pts, 1m 35s, Answered 5/5, per-question Stored Response + pts + green check cards + Correct Answer on wrong Q4 (Buckets/Amazon S3/AMI...) + View Explanation buttons — admin full detail confirmed
+  - All Users tab + Top 10 Performers View buttons also open the same dialog correctly
+  - TEST-2 assessment: Leaderboard + All Users View → dialog with Assessment badge, "Responses of guru", per-question responses; Arun's attempt shows Auto-submitted badge
+  - Monthly Test Quiz leaderboard View works but shows "Not answered" for all questions — CORRECT behavior: DB check confirms its 36 attempts (legacy seeded scores, e.g. cmubyi1dx...) genuinely have 0 quiz_answers rows; answers exist only for attempts made through the submit flow (quiz_answers=156 / assessment_answers=70 across other quizzes/assessments)
+- Server hiccup: dev server OOM-died mid-test (Chromium + Neon dev-query logging); relaunched via launch-next.sh PID 5937, env verified
+- lint ✔ tsc ✔; dev.log: all /api/analysis/attempt/* 200, no 500s (only pre-existing external wikimedia image 403)
+
+Stage Summary:
+- /admin/analysis/quiz/[id] and /admin/analysis/assessment/[id] now surface individual user responses from every attempt row (Leaderboard, All Users, Top Performers) via a full-detail dialog
+- Files: src/components/analysis/attempt-view-dialog.tsx (new), src/app/(q)/admin/analysis/quiz/[id]/page.tsx, src/app/(q)/admin/analysis/assessment/[id]/page.tsx
+- Zero changes to core flows or existing analytics APIs; admin redaction policy respected (admins see correctness/answers/explanations; API already enforces per-role redaction)
+- Data note: seeded legacy attempts with scores but no per-question answers legitimately show "Not answered"
+
+---
+Task ID: 37
+Agent: Z.ai Code (main)
+Task: Rename "View" column to "Quizzes"/"Assessments" with book icon in admin quiz-group & assessment-group tables
+
+Work Log:
+- /admin/quiz-group/page.tsx: column viewQuizzes header "View" → "Quizzes"; row button icon Eye → BookOpen (already imported; removed now-unused Eye import)
+- /admin/assessment-group/page.tsx: column viewAssessments header "View" → "Assessments"; row button icon Eye → BookOpen (added import; removed unused Eye)
+- Navigation onClick handlers, counts, tooltips ("View Quizzes"/"View Assessments") untouched
+- Verified in browser as root admin: quiz-group table shows "Quizzes" header with book icon + count per row; assessment-group shows "Assessments" with book icon; clicking TEST row's book button navigates to /admin/assessment-group/[id]/assessments
+- lint ✔ tsc ✔
+
+Stage Summary:
+- Pure cosmetic rename + icon swap on both group tables; zero logic changes
+- Files: src/app/(q)/admin/quiz-group/page.tsx, src/app/(q)/admin/assessment-group/page.tsx
+
+---
+Task ID: 38
+Agent: Z.ai Code (main)
+Task: Merge edit/delete into Actions menu + add Analysis chart column in group detail tables (/admin/quiz-group/[id]/quiz, /admin/assessment-group/[id]/assessments)
+
+Work Log:
+- Replaced separate "Edit" and "Delete" columns with single "Actions" dropdown menu (MoreHorizontal trigger, DropdownMenuContent align=end) containing Edit (opens existing edit sheet) + Delete (red, opens existing delete confirm); both reuse existing openEditDialog/openDeleteDialog handlers unchanged
+- Added "Analysis" column BEFORE Actions with BarChart3 icon button + tooltip ("View Quiz Analysis"/"View Assessment Analysis") navigating to /admin/analysis/quiz/[id] and /admin/analysis/assessment/[id] respectively
+- Imports added: BarChart3, MoreHorizontal, DropdownMenu suite; removed now-unused Eye from quiz detail page
+- Pattern matches existing admin/users actions menu
+- Browser-verified as root admin:
+  - Sample Quiz Group → 1 quiz row: Analysis chart button navigates to /admin/analysis/quiz/cmsom6yem... (Monthly Test Quiz analysis page confirmed); Actions menu shows Edit/Delete; Edit opens "Edit Quiz" sheet with form
+  - Sample Assessment Group → 3 rows each with chart + menu; chart navigates to /admin/analysis/assessment/cmsom6vjv... ("Timed Assessment Test" analysis page confirmed); menu shows Edit/Delete
+  - Note: client-side router.push means `get url` may race — verify navigation via location.pathname after a beat
+- lint ✔ tsc ✔ dev.log clean
+
+Stage Summary:
+- Group detail tables now: ... | Questions | Users | Analysis (chart icon → analysis page) | Actions (⋯ menu with Edit/Delete)
+- Files: src/app/(q)/admin/quiz-group/[id]/quiz/page.tsx, src/app/(q)/admin/assessment-group/[id]/assessments/page.tsx
+- Zero logic changes to edit/delete flows; pure column restructuring + analysis entry point
+
+---
+Task ID: 39
+Agent: Z.ai Code (main)
+Task: Master-level analytics upgrade for /admin/analysis/quiz/[id] + /admin/analysis/assessment/[id] (accuracy fixes, advanced stats & graphs, per-student detail graphs)
+
+Work Log:
+- Created shared engine src/lib/analytics.ts: pctOf (exact score/totalPoints ratio), median, stdDev, gradeBand (A-F), scoreBucketIndex (half-open [min,max), 100 inclusive), difficultyRating (p-value based), buildCoreAnalytics (stats/distributions/question stats/cohorts/trend/scatter), buildClassStats (percentile rank)
+- ACCURACY FIX 1: score-distribution buckets previously used `pct > min` so 0% scores silently vanished; now 0% lands in 0-20% bucket and 100% in 80-100% (verified edge cases + real DB: Monthly Test Quiz 13 submitted, buckets sum exactly 13)
+- ACCURACY FIX 2: question accuracy denominator changed from ALL attempts (incl. NOT_STARTED + legacy zero-answer seeds) to attempts that actually ANSWERED the question; added answered/correct/incorrect/unanswered counts + p-value + rating (Very Easy..Very Hard) + avg time per question
+- ACCURACY FIX 3: topPerformers previously leaked full answer rows (`...attempt`); now lean shape with answeredCount/correctCount
+- Analytics APIs rewritten (quiz + assessment): extended stats (median, σ, highest/lowest, pass rate @40%, pass/fail counts, gradeBreakdown, median time, avg time per question, auto-submitted), cohortStats (byBatch/byDepartment/bySection/byCampus with avg/passRate/top), scoreTrend (daily avg% + attempts), scatterData (timeMin vs pct), statusBreakdown (quiz now too), per-attempt answeredCount/correctCount/totalQuestions; assessment adds securityStats (total tab switches via _count.tabSwitches, tab-limit violations vs maxAllowedTabs, peak switches, auto-submitted count, time breaches) + tabSwitches per attempt row
+- Attempt API /api/analysis/attempt/[attemptId] now returns classStats {size, avgPct, highestPct, percentile} computed from SUBMITTED siblings (pctOf-based)
+- Both analysis pages: new 4-card advanced row (Median / Consistency σ / Pass Rate / Score Range+median time); Overview rebuilt with recharts via shadcn ChartContainer: Score Distribution BarChart (color-coded buckets + grade chips), Completion Time BarChart, Score Trend ComposedChart (daily attempts bars + avg% line w/ gradient + dual axis), Time-vs-Score ScatterChart, Cohort Comparison horizontal BarChart with Batch/Department/Section/Campus Select; quiz page gained Status Breakdown card, assessment gained Security Monitoring 4-tile card
+- Question Performance table: +Answered (x/eligible), +Correct, +Unanswered (orange when >0), +Avg Time, +Rating badge; description states exact formula
+- Leaderboard/All Users/Top Performers tables: +Answered column (n/total + correct count), colSpan 10→11 / 12→13, CSV exports include Answered/Correct (+Tab Switches for assessment), completedRate/accuracy now numeric .toFixed(1), TopPerformer submittedAt null-guarded
+- attempt-analysis.tsx (shared by admin dialog + user result view): new "Performance graphs" grid — Score Overview RadialBar gauge + class comparison rows (Your/Student score, class average, class top, percentile badge "Top N%"), Points-by-Question stacked BarChart (green earned / red lost, admin/correctness-visible only), Time-per-Question BarChart (when timing data exists); isOwner-aware label
+- Verified in browser as root admin: quiz sample-demo (80% gauge, Top 1%, Q4 red bar, 0% rows visible in leaderboard 0/5 answered), assessment TEST-2 (20% auto-submitted attempt, gauge + class avg 50% + Top 50%, Q2 green), Security Monitoring real data (4 tab switches, peak 3, 0/limit 5 violations, 1 auto-submit, 1 time breach 50%)
+- lint ✔ tsc ✔ dev.log clean
+
+Stage Summary:
+- Files: src/lib/analytics.ts (new), src/app/(q)/api/admin/analytics/quiz/[id]/route.ts, src/app/(q)/api/admin/analytics/assessment/[id]/route.ts, src/app/(q)/api/analysis/attempt/[attemptId]/route.ts, src/app/(q)/admin/analysis/quiz/[id]/page.tsx, src/app/(q)/admin/analysis/assessment/[id]/page.tsx, src/components/analysis/attempt-analysis.tsx
+- Analytics are now exact (half-open buckets, answered-based question accuracy, precise ratios), advanced (median/σ/pass-rate/grades/cohorts/trend/scatter/integrity) and every individual attempt dialog shows a detailed result graph suite with class benchmarking
+
+---
+Task ID: 40
+Agent: Z.ai Code (main)
+Task: Both /admin/analysis/quiz/[id] + /admin/analysis/assessment/[id] — show raw score / total score in the Top Score card instead of Top Score %
+
+Work Log:
+- Both pages already received rawScore + totalPoints per TopPerformer from their analytics APIs (added in Task 39), so change was frontend-only
+- Added local helper formatRawScore = (v) => Number(v.toFixed(2)).toString() next to formatTime in each page (trims float noise: 8 -> "8", 7.5 -> "7.5")
+- Top Score card value changed from `{topPerformers[0]?.score || 0}%` to `${formatRawScore(raw)} / ${formatRawScore(total)}` with "—" empty state when no attempts exist; title/icon/subtext unchanged
+- Files: src/app/(q)/admin/analysis/quiz/[id]/page.tsx, src/app/(q)/admin/analysis/assessment/[id]/page.tsx
+- Dev server died mid-verification (PID 1211 gone, silent); .env intact (7 values); relaunched via launch-next.sh (new PID 8565, env vars verified)
+- Browser-verified as root admin: quiz sample-demo shows "Top Score 4 / 5" (matches 80% avg/median single submission); assessment TEST-2 shows "Top Score 4 / 5" (cross-checked: 4/5=80% + 1/5=20% -> avg 50%, median 50%, range 80%-20% all consistent); screenshot confirms clean card layout
+- lint ✔ tsc ✔
+
+Stage Summary:
+- Top Score card now displays exact points earned / points possible (e.g. "4 / 5") sourced from the attempt's own rawScore/totalPoints snapshot; percentage remains visible elsewhere (Avg Score, Median, Score Range, tables)
